@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     kto_timeout_seconds: float = 8.0
     kto_max_retries: int = 2
 
+    # 진단 점수 표시 모드.
+    #   auto      — 채점표 백테스트 기록이 있을 때만 점수 공개 (기본, 가장 정직)
+    #   score     — 항상 공개. 공모전 지정과제 9번이 '흥행도 도출'을 요구하므로 출품 시 사용
+    #   checklist — 항상 감춤
+    diagnosis_score_mode: str = "auto"
+
     # 🚨 공모전 기간에는 False. 규정이 실시간 호출을 요구하고 호출 이력을 검증한다.
     tourism_snapshot_cache_enabled: bool = False
     tourism_snapshot_ttl_days: int = 7

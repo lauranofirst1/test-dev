@@ -1,0 +1,54 @@
+{
+  "version": "v1",
+  "description": "FestaFlow 축제 준비도 채점표 v1. 배점과 구간을 코드가 아니라 여기서 관리합니다.",
+  "disclaimer": "이 점수는 한국관광공사 데이터로 산출한 준비도 상대 지표이며, 흥행을 보증하지 않습니다. 과거 축제 데이터 기반 검증은 진행 예정입니다.",
+  "max_scores": {
+    "tourism_demand": 25,
+    "crowd_safety": 30,
+    "program_balance": 20,
+    "local_linkage": 15,
+    "ops_readiness": 10
+  },
+  "risk_thresholds": {
+    "stable": 85,
+    "caution": 70
+  },
+  "item_ratio": {
+    "stable": 0.8,
+    "caution": 0.6
+  },
+  "tourism_demand": {
+    "demand_weight": 0.15,
+    "season_weight": 10
+  },
+  "crowd_safety": {
+    "venue_turnover_per_day": 2,
+    "capacity_bands": [
+      { "max_usage": 0.75, "score": 20 },
+      { "max_usage": 0.9, "score": 18 },
+      { "max_usage": 1.0, "score": 16 },
+      { "max_usage": 1.15, "score": 11 },
+      { "max_usage": null, "score": 6 }
+    ],
+    "congestion_weight": 10
+  },
+  "program_balance": {
+    "booth_points_each": 3,
+    "booth_points_max": 8,
+    "type_points_each": 3,
+    "type_points_max": 6,
+    "mission_points_each": 2,
+    "mission_points_max": 6
+  },
+  "local_linkage": {
+    "resource_points_each": 1.5,
+    "resource_points_max": 9,
+    "readiness_weight": 6,
+    "readiness_max": 6
+  },
+  "ops_readiness": {
+    "basics_max": 4,
+    "safety_max": 4,
+    "actuals_max": 2
+  }
+}
