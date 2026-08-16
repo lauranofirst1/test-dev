@@ -1,48 +1,36 @@
-/** 새 축제 생성. 필수 항목만 받고 진단으로 바로 넘깁니다. */
+/** 새 축제 생성.
+ *
+ * 진단이 실제로 소비하는 필드를 전부 받습니다 — 인력·안전/교통/혼잡 계획이
+ * 비어 있으면 운영 준비도가 낮게 나오고, 예정 프로그램 수가 없으면
+ * 부스 등록 전까지 프로그램 균형을 평가할 근거가 없습니다.
+ */
 
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
+import { EMPTY_FORM, PRESETS, type PresetForm } from '../api/presets';
 
 interface Created {
   festival: { id: number };
   operator_access_code: string;
 }
 
-const PRESET = {
-  name: '춘천 가을 먹거리 축제',
-  region: '강원특별자치도 춘천시',
-  venue: '공지천 조각공원',
-  starts_on: '2026-10-10',
-  ends_on: '2026-10-12',
-  expected_visitors: '18000',
-  total_budget: '240000000',
-  venue_capacity: '4000',
-  summary: '지역 식재료와 로컬 뮤지션이 만나는 3일',
-};
+const num = (v: string): number | null => (v.trim() === '' ? null : Number(v));
 
 export function NewFestivalPage() {
   const nav = useNavigate();
-  const [form, setForm] = useState({
-    name: '',
-    region: '',
-    venue: '',
-    starts_on: '',
-    ends_on: '',
-    expected_visitors: '',
-    total_budget: '',
-    venue_capacity: '',
-    summary: '',
-  });
-  const [code, setCode] = useState<{ id: number; code: string } | null>(null);
+  const [form, setForm] = useState<PresetForm>(EMPTY_FORM);
+  const [loadedPreset, setLoadedPreset] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ id: number; code: string } | null>(null);
 
-  const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
+  const set = (k: keyof PresetForm) => (e: { target: { value: string } }) => {
     setForm((p) => ({ ...p, [k]: e.target.value }));
+    setLoadedPreset(null);
+  };
 
-  const periodInvalid =
-    !!form.starts_on && !!form.ends_on && form.ends_on < form.starts_on;
+  const periodInvalid = !!form.starts_on && !!form.ends_on && form.ends_on < form.starts_on;
 
   const create = useMutation({
     mutationFn: () =>
@@ -56,32 +44,46 @@ export function NewFestivalPage() {
         total_budget: Number(form.total_budget),
         plan: {
           summary: form.summary || null,
-          venue_capacity: form.venue_capacity ? Number(form.venue_capacity) : null,
+          core_audience: form.core_audience || null,
+          venue_capacity: num(form.venue_capacity),
+          staff_count: num(form.staff_count),
+          volunteer_count: num(form.volunteer_count),
+          safety_staff_count: num(form.safety_staff_count),
+          parking_capacity: num(form.parking_capacity),
+          planned_performance: num(form.planned_performance) ?? 0,
+          planned_experience: num(form.planned_experience) ?? 0,
+          planned_food: num(form.planned_food) ?? 0,
+          planned_local_shop: num(form.planned_local_shop) ?? 0,
+          planned_tour_info: num(form.planned_tour_info) ?? 0,
+          planned_etc: num(form.planned_etc) ?? 0,
+          safety_plan: form.safety_plan || null,
+          traffic_plan: form.traffic_plan || null,
+          crowd_plan: form.crowd_plan || null,
         },
       }),
-    onSuccess: (d) => setCode({ id: d.festival.id, code: d.operator_access_code }),
+    onSuccess: (d) => setCreated({ id: d.festival.id, code: d.operator_access_code }),
   });
 
-  if (code) {
+  if (created) {
     return (
       <div className="shell">
         <div className="card state">
           <p className="eyebrow">축제를 만들었습니다</p>
           <h2 style={{ fontSize: 'var(--text-h2)' }}>운영자 접근 코드</h2>
-          <div className="accesscode tabular">{code.code}</div>
+          <div className="accesscode tabular">{created.code}</div>
           <p className="lede" style={{ textAlign: 'center' }}>
             <strong>이 코드는 다시 볼 수 없습니다.</strong> 현장 운영자에게 전달하세요.
           </p>
           <div className="row">
             <button
               className="btn btn--ghost"
-              onClick={() => navigator.clipboard?.writeText(code.code)}
+              onClick={() => navigator.clipboard?.writeText(created.code)}
             >
-              복사
+              코드 복사
             </button>
             <button
               className="btn btn--primary btn--lg"
-              onClick={() => nav(`/festivals/${code.id}/diagnosis`)}
+              onClick={() => nav(`/festivals/${created.id}/diagnosis`)}
             >
               사전 진단 보기
             </button>
@@ -93,132 +95,235 @@ export function NewFestivalPage() {
 
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
-      <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-        <div className="stack" style={{ gap: 4 }}>
-          <p className="eyebrow">새 축제</p>
-          <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>축제 기획 등록</h1>
-        </div>
-        <button className="btn btn--ghost" onClick={() => setForm({ ...PRESET })}>
-          샘플 기획안 불러오기
-        </button>
+      <div className="stack" style={{ gap: 4 }}>
+        <p className="eyebrow">새 축제</p>
+        <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>축제 기획 등록</h1>
+        <p className="muted">
+          입력한 값으로 한국관광공사 데이터를 조회해 준비도를 진단합니다.
+        </p>
       </div>
 
+      {/* ── 샘플 기획안 ── */}
+      <section className="card card--sunk stack" style={{ gap: 'var(--space-4)' }}>
+        <div className="stack" style={{ gap: 4 }}>
+          <p className="eyebrow">테스트 데이터 불러오기</p>
+          <p className="muted">
+            처음이라면 샘플 기획안으로 진단을 먼저 확인해 보세요. 불러온 뒤 자유롭게 고칠 수
+            있고, 저장 전까지 아무것도 기록되지 않습니다.
+          </p>
+        </div>
+
+        <div className="presets">
+          {PRESETS.map((p) => (
+            <button
+              type="button"
+              key={p.id}
+              className={`preset${loadedPreset === p.id ? ' preset--on' : ''}`}
+              onClick={() => {
+                setForm(p.build());
+                setLoadedPreset(p.id);
+              }}
+            >
+              <span className="preset__label">{p.label}</span>
+              <span className="preset__tagline tabular">{p.tagline}</span>
+              <span className="preset__note">{p.note}</span>
+            </button>
+          ))}
+        </div>
+
+        {loadedPreset && (
+          <div className="notice notice--info">
+            <span>✓</span>
+            <span>
+              샘플을 불러왔습니다. 날짜는 <strong>오늘 기준 미래 날짜</strong>로 계산됐습니다.
+              값을 고치면 이 표시가 사라집니다.
+            </span>
+          </div>
+        )}
+      </section>
+
       <form
-        className="card stack"
+        className="stack"
         style={{ gap: 'var(--space-5)' }}
         onSubmit={(e) => {
           e.preventDefault();
           if (!periodInvalid) create.mutate();
         }}
       >
-        <div className="field">
-          <label htmlFor="name">
-            축제명 <span className="req">*필수</span>
-          </label>
-          <input id="name" required minLength={2} value={form.name} onChange={set('name')} />
-        </div>
+        {/* ── 기본 정보 ── */}
+        <section className="card stack" style={{ gap: 'var(--space-5)' }}>
+          <h2 className="section">기본 정보</h2>
 
-        <div className="grid2">
           <div className="field">
-            <label htmlFor="region">
-              지역 <span className="req">*필수</span>
+            <label htmlFor="name">
+              축제명 <span className="req">*필수</span>
             </label>
-            <input
-              id="region"
-              required
-              value={form.region}
-              onChange={set('region')}
-              placeholder="강원특별자치도 춘천시"
-            />
-            <span className="hint">시·도와 시·군·구를 함께 적으면 지역 데이터가 정확해집니다</span>
+            <input id="name" required minLength={2} value={form.name} onChange={set('name')} />
           </div>
-          <div className="field">
-            <label htmlFor="venue">
-              행사 장소 <span className="req">*필수</span>
-            </label>
-            <input id="venue" required value={form.venue} onChange={set('venue')} />
-          </div>
-        </div>
 
-        <div className="grid2">
-          <div className="field">
-            <label htmlFor="starts">
-              시작일 <span className="req">*필수</span>
-            </label>
-            <input id="starts" type="date" required value={form.starts_on} onChange={set('starts_on')} />
+          <div className="grid2">
+            <div className="field">
+              <label htmlFor="region">
+                지역 <span className="req">*필수</span>
+              </label>
+              <input
+                id="region"
+                required
+                value={form.region}
+                onChange={set('region')}
+                placeholder="강원특별자치도 춘천시"
+              />
+              <span className="hint">시·도와 시·군·구를 함께 적어야 지역 데이터가 정확합니다</span>
+            </div>
+            <div className="field">
+              <label htmlFor="venue">
+                행사 장소 <span className="req">*필수</span>
+              </label>
+              <input id="venue" required value={form.venue} onChange={set('venue')} />
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="ends">
-              종료일 <span className="req">*필수</span>
-            </label>
-            <input
-              id="ends"
-              type="date"
-              required
-              value={form.ends_on}
-              min={form.starts_on || undefined}
-              onChange={set('ends_on')}
-              aria-invalid={periodInvalid}
-              aria-describedby={periodInvalid ? 'ends-err' : undefined}
-            />
-            {periodInvalid && (
-              <span className="err" id="ends-err">
-                종료일은 시작일보다 빠를 수 없습니다.
-              </span>
-            )}
-          </div>
-        </div>
 
-        <div className="grid2">
-          <div className="field field--inline">
-            <label htmlFor="visitors">
-              예상 방문객 <span className="req">*필수</span>
-            </label>
-            <input
+          <div className="grid2">
+            <div className="field">
+              <label htmlFor="starts">
+                시작일 <span className="req">*필수</span>
+              </label>
+              <input
+                id="starts"
+                type="date"
+                required
+                value={form.starts_on}
+                onChange={set('starts_on')}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="ends">
+                종료일 <span className="req">*필수</span>
+              </label>
+              <input
+                id="ends"
+                type="date"
+                required
+                value={form.ends_on}
+                min={form.starts_on || undefined}
+                onChange={set('ends_on')}
+                aria-invalid={periodInvalid}
+                aria-describedby={periodInvalid ? 'ends-err' : undefined}
+              />
+              {periodInvalid && (
+                <span className="err" id="ends-err">
+                  종료일은 시작일보다 빠를 수 없습니다.
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="summary">한 줄 소개</label>
+            <input id="summary" value={form.summary} onChange={set('summary')} />
+          </div>
+        </section>
+
+        {/* ── 목표와 규모 ── */}
+        <section className="card stack" style={{ gap: 'var(--space-5)' }}>
+          <h2 className="section">목표와 규모</h2>
+
+          <div className="grid2">
+            <NumField
               id="visitors"
-              type="number"
+              label="예상 방문객"
+              unit="명"
               required
               min={1}
               value={form.expected_visitors}
               onChange={set('expected_visitors')}
             />
-            <span className="unit">명</span>
-          </div>
-          <div className="field field--inline">
-            <label htmlFor="budget">
-              총예산 <span className="req">*필수</span>
-            </label>
-            <input
+            <NumField
               id="budget"
-              type="number"
+              label="총예산"
+              unit="원"
               required
               min={0}
               value={form.total_budget}
               onChange={set('total_budget')}
             />
-            <span className="unit">원</span>
           </div>
-        </div>
 
-        <div className="field field--inline">
-          <label htmlFor="capacity">동시 수용 인원</label>
-          <input
-            id="capacity"
-            type="number"
-            min={0}
-            value={form.venue_capacity}
-            onChange={set('venue_capacity')}
-          />
-          <span className="unit">명</span>
-          <span className="hint">
-            입력하면 진단이 추정치 대신 이 값으로 수용력을 판정합니다
-          </span>
-        </div>
+          <div className="field">
+            <label htmlFor="audience">핵심 방문 대상</label>
+            <input
+              id="audience"
+              value={form.core_audience}
+              onChange={set('core_audience')}
+              placeholder="가족 단위 방문객, 20~30대"
+            />
+          </div>
 
-        <div className="field">
-          <label htmlFor="summary">한 줄 소개</label>
-          <input id="summary" value={form.summary} onChange={set('summary')} />
-        </div>
+          <div className="grid2">
+            <NumField
+              id="capacity"
+              label="동시 수용 인원"
+              unit="명"
+              value={form.venue_capacity}
+              onChange={set('venue_capacity')}
+              hint="입력하면 진단이 추정치 대신 이 값으로 수용력을 판정합니다"
+            />
+            <NumField
+              id="parking"
+              label="주차 가능 대수"
+              unit="대"
+              value={form.parking_capacity}
+              onChange={set('parking_capacity')}
+            />
+          </div>
+        </section>
+
+        {/* ── 운영 인력 ── */}
+        <section className="card stack" style={{ gap: 'var(--space-5)' }}>
+          <h2 className="section">운영 인력</h2>
+          <p className="muted">비어 있으면 운영 준비도 점수가 낮게 나옵니다.</p>
+          <div className="grid2">
+            <NumField id="staff" label="운영 인력" unit="명" value={form.staff_count} onChange={set('staff_count')} />
+            <NumField id="volunteer" label="자원봉사" unit="명" value={form.volunteer_count} onChange={set('volunteer_count')} />
+            <NumField id="safety" label="안전관리 인력" unit="명" value={form.safety_staff_count} onChange={set('safety_staff_count')} />
+          </div>
+        </section>
+
+        {/* ── 예정 프로그램 ── */}
+        <section className="card stack" style={{ gap: 'var(--space-5)' }}>
+          <h2 className="section">예정 프로그램 구성</h2>
+          <p className="muted">
+            부스를 아직 등록하지 않았어도 이 값으로 프로그램 균형을 평가합니다.
+            부스가 등록되면 실제 값이 우선합니다.
+          </p>
+          <div className="grid3">
+            <NumField id="p1" label="공연" unit="개" value={form.planned_performance} onChange={set('planned_performance')} />
+            <NumField id="p2" label="체험" unit="개" value={form.planned_experience} onChange={set('planned_experience')} />
+            <NumField id="p3" label="먹거리" unit="개" value={form.planned_food} onChange={set('planned_food')} />
+            <NumField id="p4" label="지역상점" unit="개" value={form.planned_local_shop} onChange={set('planned_local_shop')} />
+            <NumField id="p5" label="관광안내" unit="개" value={form.planned_tour_info} onChange={set('planned_tour_info')} />
+            <NumField id="p6" label="기타" unit="개" value={form.planned_etc} onChange={set('planned_etc')} />
+          </div>
+        </section>
+
+        {/* ── 안전·교통 계획 ── */}
+        <section className="card stack" style={{ gap: 'var(--space-5)' }}>
+          <h2 className="section">안전·교통·혼잡 계획</h2>
+          <p className="muted">세 항목 모두 운영 준비도 점수에 직접 반영됩니다.</p>
+
+          <div className="field">
+            <label htmlFor="safety-plan">안전 계획</label>
+            <textarea id="safety-plan" value={form.safety_plan} onChange={set('safety_plan')} />
+          </div>
+          <div className="field">
+            <label htmlFor="traffic-plan">교통 대책</label>
+            <textarea id="traffic-plan" value={form.traffic_plan} onChange={set('traffic_plan')} />
+          </div>
+          <div className="field">
+            <label htmlFor="crowd-plan">혼잡 대응 계획</label>
+            <textarea id="crowd-plan" value={form.crowd_plan} onChange={set('crowd_plan')} />
+          </div>
+        </section>
 
         {create.error instanceof ApiError && (
           <div className="notice notice--warn">
@@ -233,10 +338,42 @@ export function NewFestivalPage() {
             className="btn btn--primary btn--lg"
             disabled={create.isPending || periodInvalid}
           >
-            {create.isPending ? '만드는 중…' : '축제 만들기'}
+            {create.isPending ? '만드는 중…' : '축제 만들고 진단하기'}
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function NumField({
+  id,
+  label,
+  unit,
+  value,
+  onChange,
+  required,
+  min,
+  hint,
+}: {
+  id: string;
+  label: string;
+  unit: string;
+  value: string;
+  onChange: (e: { target: { value: string } }) => void;
+  required?: boolean;
+  min?: number;
+  hint?: string;
+}) {
+  return (
+    <div className="field field--inline">
+      <label htmlFor={id}>
+        {label}
+        {required && <span className="req">*필수</span>}
+      </label>
+      <input id={id} type="number" required={required} min={min} value={value} onChange={onChange} />
+      <span className="unit">{unit}</span>
+      {hint && <span className="hint">{hint}</span>}
     </div>
   );
 }
