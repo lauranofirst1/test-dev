@@ -9,12 +9,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from festaflow.core.config import settings
+from festaflow.routers import diagnoses, festivals
 from festaflow.services.tourapi import KtoError
 
 logging.basicConfig(
     level=settings.log_level,
     format="%(asctime)s %(levelname)-7s %(name)s — %(message)s",
 )
+
+# httpx 는 요청 URL 을 통째로 INFO 로 남긴다.
+# serviceKey 가 쿼리스트링에 있으므로 그대로 두면 **인증키가 로그에 박힌다.**
+# 우리 스펙이 금지한 항목이라 요청 로그는 끄고, 실패만 남긴다.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 app = FastAPI(
     title="FestaFlow API",
@@ -44,6 +51,10 @@ async def kto_error_handler(_: Request, exc: KtoError) -> JSONResponse:
             }
         },
     )
+
+
+app.include_router(festivals.router)
+app.include_router(diagnoses.router)
 
 
 @app.get("/api/health")
