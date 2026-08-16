@@ -120,19 +120,34 @@ def _key_for(service: str) -> str:
 
 
 def _parse_portal_error(text: str) -> tuple[str, str] | None:
-    """⚠ 함정 — 포털 레벨 에러는 `_type=json` 을 붙여도 XML 로 온다.
+    """포털 레벨 에러를 꺼낸다.
 
-    JSON 파싱 실패 시 바로 예외를 던지면 인증 실패든 한도 초과든
-    전부 "JSON 파싱 실패"로 뭉개진다. 먼저 이걸 확인해야 한다.
+    ⚠ 두 형태로 온다 — 실제 호출로 둘 다 확인했다.
+      - XML  : `_type=json` 을 붙여도 XML 로 오는 경우
+      - JSON : `{"OpenAPI_ServiceResponse": {"cmmMsgHeader": {...}}}`
+
+    한 형태만 처리하면 인증 실패든 한도 초과든 전부 "파싱 실패"로 뭉개진다.
 
     Returns: (code, message) 또는 None
     """
     if "OpenAPI_ServiceResponse" not in text:
         return None
+
+    stripped = text.lstrip()
+    if stripped.startswith("{"):
+        try:
+            header = json.loads(stripped)["OpenAPI_ServiceResponse"]["cmmMsgHeader"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            return ("99", "포털 오류 응답(JSON)을 파싱하지 못했습니다.")
+        return (
+            str(header.get("returnReasonCode", "99")).strip(),
+            str(header.get("returnAuthMsg") or header.get("errMsg") or "").strip(),
+        )
+
     try:
         root = ET.fromstring(text)
     except ET.ParseError:
-        return ("99", "포털 오류 응답을 파싱하지 못했습니다.")
+        return ("99", "포털 오류 응답(XML)을 파싱하지 못했습니다.")
     code = (root.findtext(".//returnReasonCode") or "99").strip()
     msg = (root.findtext(".//returnAuthMsg") or root.findtext(".//errMsg") or "").strip()
     return (code, msg)
@@ -154,15 +169,26 @@ def _raise_for_code(code: str, message: str, *, service: str, operation: str) ->
 
 
 def _extract(payload: dict[str, Any], *, service: str, operation: str) -> KtoResponse:
-    """제공기관 레벨 응답에서 items 를 꺼낸다."""
-    response = payload.get("response") or {}
-    header = response.get("header") or {}
+    """제공기관 레벨 응답에서 items 를 꺼낸다.
+
+    ⚠ 응답 봉투가 서비스마다 다르다 — 실제 호출로 확인했다.
+      - KorService2 / PhotoGalleryService1 : {"response": {"header": …, "body": …}}
+      - DataLabService                     : {"resultCode": "11", "resultMsg": …} (평평함)
+
+    평평한 형태를 처리하지 않으면 DataLab 의 에러를 조용히 성공으로 읽는다.
+    """
+    if "response" in payload:
+        response = payload.get("response") or {}
+        header = response.get("header") or {}
+        body = response.get("body") or {}
+    else:
+        # DataLabService 계열: 봉투 없이 최상위에 resultCode 와 items 가 함께 온다.
+        header = payload
+        body = payload
+
     code = str(header.get("resultCode", "")).strip()
-
-    if code not in NORMAL_CODES:
+    if code and code not in NORMAL_CODES:
         _raise_for_code(code, str(header.get("resultMsg", "")), service=service, operation=operation)
-
-    body = response.get("body") or {}
 
     # items 는 빈 문자열 / dict / {"item": dict} / {"item": [dict]} 로 온다.
     raw_items = body.get("items")
@@ -274,8 +300,12 @@ class TourApiClient:
             try:
                 self._call_count += 1
                 res = await self._client.get(url)
-                res.raise_for_status()
-                return self._handle_body(res.text, service=service, operation=operation)
+                # ⚠ raise_for_status() 를 먼저 부르면 안 된다.
+                #   포털은 인증·서비스 오류를 **400 과 함께** 본문에 실어 보낸다.
+                #   먼저 던지면 code 12/30 같은 진짜 원인을 영영 못 본다.
+                return self._handle_body(
+                    res.text, service=service, operation=operation, status=res.status_code
+                )
 
             except (KtoNoData, KtoConfigError):
                 raise  # 재시도 무의미
@@ -304,8 +334,10 @@ class TourApiClient:
             f"{service}/{operation}: {settings.kto_max_retries + 1}회 시도 모두 실패 — {last}"
         )
 
-    def _handle_body(self, text: str, *, service: str, operation: str) -> KtoResponse:
-        # 포털 레벨 에러는 JSON 을 요청해도 XML 로 온다.
+    def _handle_body(
+        self, text: str, *, service: str, operation: str, status: int = 200
+    ) -> KtoResponse:
+        # 포털 레벨 에러가 먼저다. 400 과 함께 오는 경우가 있다.
         portal = _parse_portal_error(text)
         if portal is not None:
             _raise_for_code(portal[0], portal[1], service=service, operation=operation)
@@ -313,6 +345,10 @@ class TourApiClient:
         try:
             payload = json.loads(text)
         except json.JSONDecodeError as exc:
+            if status >= 400:
+                raise KtoTransientError(
+                    f"{service}/{operation}: HTTP {status} — {text[:200]}"
+                ) from exc
             raise KtoTransientError(
                 f"{service}/{operation}: 응답을 JSON 으로 읽지 못했습니다 — {text[:200]}"
             ) from exc

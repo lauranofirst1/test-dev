@@ -28,17 +28,19 @@ from festaflow.services.tourapi import (  # noqa: E402
     region_codes,
 )
 
+# 방문자수 계열은 startYmd·endYmd 가 **필수**다. 없으면 code 11.
+_YMD = {"startYmd": "20251001", "endYmd": "20251007"}
+
 # (라벨, 서비스, 오퍼레이션, 추가 파라미터)
 CHECKS: list[tuple[str, str, str, dict]] = [
     ("국문 관광정보 · 지역기반", KtoService.KOR, "areaBasedList2", {"arrange": "A"}),
     ("국문 관광정보 · 지역코드", KtoService.KOR, "areaCode2", {}),
-    ("관광 빅데이터 · 기초지자체 방문자수", KtoService.DATALAB, "locgoRegnVisitrDDList", {}),
-    ("관광 빅데이터 · 혼잡도 예측", KtoService.DATALAB, "tarDecoList", {}),
-    ("관광 빅데이터 · 관광 소요시간", KtoService.DATALAB, "tarTursmRqmtList", {}),
-    ("관광지 집중률 30일 예측", KtoService.CONCENTRATION, "tatsCnctrRateList", {}),
-    ("관광지별 연관 관광지", KtoService.RELATED, "areaBasedList", {}),
-    ("기초지자체 중심 관광지", KtoService.HUB, "areaBasedList", {}),
+    ("빅데이터 · 기초지자체 방문자수", KtoService.DATALAB, "locgoRegnVisitrDDList", _YMD),
+    ("빅데이터 · 광역지자체 방문자수", KtoService.DATALAB, "metcoRegnVisitrDDList", _YMD),
     ("관광사진갤러리", KtoService.PHOTO, "galleryList1", {}),
+    # ↓ 아직 code 12(미존재/미승인). 승인되거나 오퍼레이션명이 확인되면 살아난다.
+    ("관광 수요 강도", KtoService.DEMAND, "areaTarDemDsList", _YMD),
+    ("관광지 집중률 30일 예측", KtoService.CONCENTRATION, "tatsCnctrRateList", {}),
 ]
 
 GREEN, YELLOW, RED, DIM, RESET = "\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[0m"
@@ -66,16 +68,25 @@ async def main() -> int:
                 ok += 1
                 continue
             except KtoError as exc:
-                mark = RED if exc.code not in {"30", "20"} else YELLOW
-                note = "미승인 API로 보입니다" if exc.code == "30" else str(exc)[:70]
-                print(f"{mark}✗{RESET} {label:<34} code={exc.code} {DIM}{note}{RESET}")
-                if exc.code in {"30", "20"}:
+                pending = exc.code in {"12", "20", "30"}
+                mark = YELLOW if pending else RED
+                note = {
+                    "12": "서비스/오퍼레이션 미존재 — 승인 대기이거나 이름이 다릅니다",
+                    "20": "접근 거부 — 승인 대기",
+                    "30": "미등록 서비스키 — 승인 대기",
+                    "11": "필수 파라미터 누락",
+                }.get(exc.code or "", str(exc)[:60])
+                print(f"{mark}✗{RESET} {label:<32} code={exc.code} {DIM}{note}{RESET}")
+                if pending:
                     blocked += 1
                 else:
                     failed += 1
                 continue
 
-            print(f"{GREEN}✓{RESET} {label:<34} total={res.total_count:,} items={len(res.items)}")
+            ok += 1
+            print(f"{GREEN}✓{RESET} {label:<32} total={res.total_count:,} items={len(res.items)}")
+            if res.items and service != KtoService.KOR:
+                print(f"  {DIM}└ 필드: {', '.join(list(res.items[0])[:8])}{RESET}")
 
             # 국문 관광정보는 필드 파싱까지 확인
             if service == KtoService.KOR and operation == "areaBasedList2" and res.items:
@@ -88,9 +99,12 @@ async def main() -> int:
 
         print(f"\n총 요청 {client.call_count}건 전송")
 
-    print(f"{GREEN}성공 {ok}{RESET} · {YELLOW}미승인 {blocked}{RESET} · {RED}실패 {failed}{RESET}")
+    print(f"{GREEN}성공 {ok}{RESET} · {YELLOW}대기 {blocked}{RESET} · {RED}실패 {failed}{RESET}")
     if blocked:
-        print(f"{DIM}미승인 API는 공공데이터포털에서 활용신청하면 약 10분 뒤 열립니다.{RESET}")
+        print(
+            f"{DIM}대기 항목은 활용신청 승인 전이거나 오퍼레이션명이 다릅니다.\n"
+            f"  공공데이터포털 > 마이페이지 > 오픈API > 개발계정에서 승인 상태를 확인하세요.{RESET}"
+        )
     return 1 if failed else 0
 
 

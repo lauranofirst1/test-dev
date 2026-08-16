@@ -11,13 +11,27 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# apps/api/src/festaflow/core/config.py → 루트까지 5단계
-ROOT_DIR = Path(__file__).resolve().parents[4]
+def _find_env_file() -> Path:
+    """가장 가까운 .env 를 위로 올라가며 찾는다.
+
+    경로를 parents[N] 으로 세면 파일이 옮겨질 때마다 조용히 어긋난다.
+    실제로 한 번 어긋나서 키가 안 읽혔다.
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            return candidate
+    # 없으면 저장소 루트로 추정되는 위치를 반환한다 (pydantic 이 무시한다)
+    return here.parents[5] / ".env"
+
+
+ENV_FILE = _find_env_file()
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=ROOT_DIR / ".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
