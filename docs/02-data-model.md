@@ -517,7 +517,11 @@ CREATE TABLE tourism_snapshots (
   estimated_daily_capacity INTEGER,      -- FestaFlow 추정치
   congestion_risk     NUMERIC(5,4),      -- FestaFlow 추정치, 0~1
   local_link_readiness NUMERIC(5,4),     -- FestaFlow 추정치, 0~1
-  resources   JSONB NOT NULL DEFAULT '[]'::jsonb,  -- 대표 관광자원 최대 8개
+  -- 대표 관광자원 최대 8개.
+  -- 항목당 { contentid, title, addr1, lclsSystm1, lDongRegnCd, lDongSignguCd,
+  --         mapx, mapy, image_url } — 유형은 lclsSystm1 기준(cat1은 빈 값이 많음),
+  --         지역 판별은 lDong* 기준(areacode는 빈 값이 많음)
+  resources   JSONB NOT NULL DEFAULT '[]'::jsonb,
   source_note TEXT NOT NULL,
   fetched_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at  TIMESTAMPTZ NOT NULL,

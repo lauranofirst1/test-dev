@@ -159,17 +159,20 @@ export type TourismProvider = (typeof TourismProvider)[keyof typeof TourismProvi
 export const VisitorSource = {
   Beacon: 'beacon',
   ManualCounter: 'manual_counter',
+  /** 관광공사 DataLabService/locgoRegnVisitrDDList — 기초지자체 단위라 축제장보다 범위가 넓다 */
+  KtoBigdata: 'kto_bigdata',
   Partner: 'partner',
   Estimate: 'estimate',
 } as const;
 export type VisitorSource = (typeof VisitorSource)[keyof typeof VisitorSource];
 
-/** 낮을수록 우선. */
+/** 낮을수록 우선. 현장 계수기보다는 낮고 주최측 추산보다는 높다. */
 export const VISITOR_SOURCE_PRIORITY: Record<VisitorSource, number> = {
   [VisitorSource.Beacon]: 1,
   [VisitorSource.ManualCounter]: 2,
-  [VisitorSource.Partner]: 3,
-  [VisitorSource.Estimate]: 4,
+  [VisitorSource.KtoBigdata]: 3,
+  [VisitorSource.Partner]: 4,
+  [VisitorSource.Estimate]: 5,
 };
 
 export const PlanTier = {

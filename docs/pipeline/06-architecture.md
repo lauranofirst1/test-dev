@@ -278,9 +278,12 @@ If-None-Match: "a3f9c1"
 | `JWT_SECRET` | — | 토큰 서명 키 |
 | `JWT_TTL_HOURS` | `12` | 스태프 세션 수명 (축제 하루 기준) |
 | `DEMO_MODE` | `false` | 데모 축제 자동 시드 (0건일 때만) |
+| `KTO_BASE_URL` | `https://apis.data.go.kr/B551011` | 관광공사 기관 코드 경로 |
+| `KTO_MOBILE_APP` | `FestaFlow` | 활용 통계용. 모든 요청에 필수 |
 | `KTO_API_KEY` | — | 관광공사 공통 키 |
 | `KTO_DEMAND_API_KEY` | — | 수요 API 전용 키 |
 | `KTO_TOUR_API_KEY` | — | 관광정보 API 전용 키 |
+| `KTO_DAILY_QUOTA` | `1000` | 개발계정 한도. 초과 전 경고 로그 |
 | `TOURISM_SNAPSHOT_TTL_DAYS` | `7` | 관광 스냅샷 유효기간 |
 | `MEDIA_BUCKET` | — | 사진 오브젝트 스토리지 |
 | `MEDIA_RETENTION_DAYS` | `90` | 사진 보관 기간 |

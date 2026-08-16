@@ -4,13 +4,14 @@
 
 | 문서 | 내용 |
 |---|---|
-| [00-design-decisions.md](00-design-decisions.md) | 원문 기획 대비 **무엇을 왜 바꿨는지** 19개 결정 |
-| [01-product-spec.md](01-product-spec.md) | 개정 기획서 (5~10장) — 여기가 본문 |
+| [01-product-spec.md](01-product-spec.md) | 기획서 (5~10장) — 여기가 본문 |
 | [02-data-model.md](02-data-model.md) | PostgreSQL 스키마, 제약, 인덱스, 마이그레이션 순서 |
 | [03-api-contract.md](03-api-contract.md) | REST API 계약과 오류 코드 |
 | [04-venue-layout.md](04-venue-layout.md) | 행사장 설계 — 지도·동선·혼잡 히트맵·예산/인력 산출 |
 | [05-booth-experience.md](05-booth-experience.md) | 부스별 QR 체험 화면 (퀴즈·사진·설문·안내) |
 | [06-charts.md](06-charts.md) | 차트 시스템 — 검증된 팔레트, 화면별 폼 선택, 금지 목록 |
+| [07-tourapi-catalog.md](07-tourapi-catalog.md) | 한국관광공사 OpenAPI 26종 카탈로그와 활용 매핑 |
+| **[08-contest-submission.md](08-contest-submission.md)** | 🚨 **공모전 제출 요건과 역산 일정 — 마감 9/21 16:00** |
 
 ## 에이전트 파이프라인 연결
 
