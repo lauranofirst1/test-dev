@@ -12,12 +12,14 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
+import { GridPicker, gridBasisHint } from '../components/GridPicker';
 import type {
   BoothDetail,
   BoothList,
   BoothType,
   BoothVerifyMode,
   FestivalDetail,
+  GrantUnit,
   MissionOut,
   StampBoardAdmin,
 } from '../api/types';
@@ -116,6 +118,11 @@ export function BoothsPage() {
   const items = booths.data?.items ?? [];
   const active = items.filter((b) => b.is_active);
   const missionCount = items.reduce((n, b) => n + b.missions.length, 0);
+  // 지급 단위가 mission 이면 조각 수를 이 값과 견줘야 한다.
+  const activeMissions = active.reduce(
+    (n, b) => n + b.missions.filter((m) => m.is_active).length,
+    0,
+  );
   const joinUrl = `${window.location.origin}/join/${id}`;
 
   return (
@@ -281,6 +288,16 @@ export function BoothsPage() {
         />
       ))}
 
+      {board.data && (
+        <BoardSettings
+          festivalId={id}
+          board={board.data}
+          activeBooths={active.length}
+          activeMissions={activeMissions}
+          onChanged={refresh}
+        />
+      )}
+
       {items.length > 0 && (
         <div className="card card--sunk stack" style={{ gap: 'var(--space-3)' }}>
           <p className="eyebrow">관객 참여 링크</p>
@@ -390,6 +407,150 @@ function BoothCard({
           추가
         </button>
       </form>
+    </div>
+  );
+}
+
+
+/** 조각 보드 설정.
+ *
+ * 격자를 바꾸면 타일 집합이 새로 생기고 참여자의 수집 진행이 초기화됩니다.
+ * 되돌릴 수 없으므로 서버가 409 로 확인을 요구하고, 이 화면은 그 숫자를
+ * 그대로 보여준 뒤에만 다시 보냅니다 — "정말?" 만 묻고 몇 명이 잃는지 말하지
+ * 않으면 확인이 아니라 요식입니다.
+ */
+function BoardSettings({
+  festivalId,
+  board,
+  activeBooths,
+  activeMissions,
+  onChanged,
+}: {
+  festivalId: string;
+  board: StampBoardAdmin;
+  activeBooths: number;
+  activeMissions: number;
+  onChanged: () => void;
+}) {
+  const [grid, setGrid] = useState({ rows: board.rows, cols: board.cols });
+  const [grantUnit, setGrantUnit] = useState<GrantUnit>(board.grant_unit);
+  const [confirming, setConfirming] = useState<{ participants: number; revealed: number } | null>(
+    null,
+  );
+
+  const changed = grid.rows !== board.rows || grid.cols !== board.cols
+    || grantUnit !== board.grant_unit;
+
+  const save = useMutation({
+    mutationFn: (confirm: boolean) =>
+      api.put(
+        `/api/festivals/${festivalId}/stamp-board${confirm ? '?confirm=true' : ''}`,
+        {
+          rows: grid.rows,
+          cols: grid.cols,
+          reveal_mode: board.reveal_mode,
+          grant_unit: grantUnit,
+          image_url: board.image_url,
+          complete_message: board.complete_message,
+        },
+      ),
+    onSuccess: () => {
+      setConfirming(null);
+      onChanged();
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === 'BOARD_RESET_REQUIRES_CONFIRMATION') {
+        setConfirming({
+          participants: Number(e.details.affected_participants ?? 0),
+          revealed: Number(e.details.revealed_count ?? 0),
+        });
+      }
+    },
+  });
+
+  const tiles = grid.rows * grid.cols;
+  // 완성 가능 여부는 **선택한 지급 기준**으로 판단해야 한다. 부스 기준으로만
+  // 보여주면 미션 기준으로 바꿨을 때 화면이 엉뚱한 숫자로 겁을 준다.
+  const unitCount = grantUnit === 'booth' ? activeBooths : activeMissions;
+  const unitLabel = grantUnit === 'booth' ? '부스' : '미션';
+
+  return (
+    <div className="card stack" style={{ gap: 'var(--space-4)' }}>
+      <div className="stack" style={{ gap: 4 }}>
+        <p className="eyebrow">조각 보드</p>
+        <h3 style={{ fontSize: 'var(--text-h3)' }}>몇 조각으로 나눌지 고르세요</h3>
+        <p className="muted">{gridBasisHint(unitLabel, unitCount)}</p>
+      </div>
+
+      <GridPicker
+        value={grid}
+        onChange={setGrid}
+        unitCount={unitCount}
+        unitLabel={unitLabel}
+      />
+
+      <div className="field">
+        <label htmlFor="grant-unit">조각을 주는 기준</label>
+        <select
+          id="grant-unit"
+          value={grantUnit}
+          onChange={(e) => setGrantUnit(e.target.value as GrantUnit)}
+        >
+          <option value="booth">부스당 1조각 — 여러 부스를 돌게 유도합니다</option>
+          <option value="mission">미션마다 1조각 — 한 부스에서도 여러 조각을 줍니다</option>
+        </select>
+      </div>
+
+      {confirming && (
+        <div className="notice notice--warn">
+          <span>⚠</span>
+          <span>
+            <strong>참여자 {confirming.participants}명</strong>이 모은 조각{' '}
+            {confirming.revealed}개가 초기화됩니다. 기록은 이전 보드 버전으로 남지만 현재
+            진행에는 반영되지 않습니다.
+          </span>
+        </div>
+      )}
+
+      {save.error instanceof ApiError &&
+        save.error.code !== 'BOARD_RESET_REQUIRES_CONFIRMATION' && (
+          <div className="notice notice--warn">
+            <span>⚠</span>
+            <span>{save.error.message}</span>
+          </div>
+        )}
+
+      <div className="row wrap" style={{ justifyContent: 'space-between' }}>
+        <span className="muted tabular">
+          현재 {board.rows}×{board.cols} · {board.total_tiles}조각 (v{board.version})
+          {changed && ` → ${grid.rows}×${grid.cols} · ${tiles}조각`}
+        </span>
+        <div className="row" style={{ gap: 'var(--space-3)' }}>
+          {confirming && (
+            <button
+              className="btn btn--ghost"
+              onClick={() => {
+                setGrid({ rows: board.rows, cols: board.cols });
+                setGrantUnit(board.grant_unit);
+                setConfirming(null);
+              }}
+            >
+              취소
+            </button>
+          )}
+          <button
+            className="btn btn--primary"
+            disabled={!changed || save.isPending}
+            onClick={() => save.mutate(confirming !== null)}
+          >
+            {save.isPending
+              ? '바꾸는 중…'
+              : confirming
+                ? '초기화하고 바꾸기'
+                : '보드 바꾸기'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

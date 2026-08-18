@@ -903,3 +903,62 @@ p {
   color: var(--color-ink);
   background: var(--color-surface-sunk);
 }
+
+/* ── 격자 선택 ───────────────────────────────────────────────
+   조각 수는 부스 수와 함께 정해져야 하는 값입니다. 숫자만 나열하면 감이 안 와서
+   실제 격자 모양을 작게 그려 보여줍니다. */
+
+.gridpick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+
+.gridopt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.gridopt:hover {
+  background: var(--color-surface-sunk);
+}
+
+.gridopt--on {
+  border-color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-ink);
+}
+
+.gridopt__preview {
+  display: grid;
+  gap: 3px;
+  width: 54px;
+  aspect-ratio: 1;
+}
+
+.gridopt__preview i {
+  background: var(--color-mint-fill);
+  border-radius: 3px;
+}
+
+.gridopt--on .gridopt__preview i {
+  background: var(--color-mint-ink);
+}
+
+.gridopt__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.gridopt__warn {
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-state-caution);
+}

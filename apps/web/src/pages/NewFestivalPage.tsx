@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import { EMPTY_FORM, PRESETS, type PresetForm } from '../api/presets';
+import { GridPicker, type Grid } from '../components/GridPicker';
 
 interface Created {
   festival: { id: number };
@@ -33,6 +34,21 @@ export function NewFestivalPage() {
   const [loadedPreset, setLoadedPreset] = useState<string | null>(null);
   const [created, setCreated] = useState<Result | null>(null);
   const [phase, setPhase] = useState<'idle' | 'creating' | 'diagnosing'>('idle');
+  // 조각 보드 격자. 3×3 을 박아두면 부스가 적은 축제는 시작부터 완성이 불가능하다.
+  const [grid, setGrid] = useState<Grid>({ rows: 3, cols: 3 });
+
+  // 바로 위에서 받은 예정 프로그램 수를 격자 판정의 기준으로 쓴다. 부스 등록 전이라
+  // 실제 부스 수를 알 수 없지만, 기획자가 방금 적은 계획이 가장 가까운 근거다.
+  const plannedPrograms = (
+    [
+      'planned_performance',
+      'planned_experience',
+      'planned_food',
+      'planned_local_shop',
+      'planned_tour_info',
+      'planned_etc',
+    ] as const
+  ).reduce((n, k) => n + (num(form[k]) ?? 0), 0);
 
   const set = (k: keyof PresetForm) => (e: { target: { value: string } }) => {
     setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -73,6 +89,7 @@ export function NewFestivalPage() {
           traffic_plan: form.traffic_plan || null,
           crowd_plan: form.crowd_plan || null,
         },
+        stamp_board: { rows: grid.rows, cols: grid.cols },
       });
 
       // 축제는 이미 저장됐다. 진단이 실패해도 생성을 되돌리지 않고
@@ -344,6 +361,27 @@ export function NewFestivalPage() {
             <NumField id="p5" label="관광안내" unit="개" value={form.planned_tour_info} onChange={set('planned_tour_info')} />
             <NumField id="p6" label="기타" unit="개" value={form.planned_etc} onChange={set('planned_etc')} />
           </div>
+        </section>
+
+        {/* ── 조각 보드 ── */}
+        <section className="card stack" style={{ gap: 'var(--space-4)' }}>
+          <h2 className="section">관객이 모을 조각</h2>
+          <p className="muted">
+            부스를 돌면 축제 그림이 한 조각씩 열립니다. 기본은 부스당 1조각이므로
+            <strong> 조각 수는 계획한 부스 수 이하</strong>여야 완성이 가능합니다.
+            등록 후에도 바꿀 수 있습니다.
+          </p>
+          <GridPicker
+            value={grid}
+            onChange={setGrid}
+            unitCount={plannedPrograms > 0 ? plannedPrograms : undefined}
+            unitLabel="예정 프로그램"
+          />
+          {plannedPrograms > 0 && (
+            <p className="muted tabular">
+              위에 적은 예정 프로그램은 {plannedPrograms}개입니다.
+            </p>
+          )}
         </section>
 
         {/* ── 안전·교통 계획 ── */}

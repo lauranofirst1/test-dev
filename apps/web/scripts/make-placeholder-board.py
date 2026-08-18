@@ -16,42 +16,44 @@ DB 기본값(server_default)도 함께 바꿔야 합니다.
 
 from __future__ import annotations
 
+import math
 import struct
 import zlib
 from pathlib import Path
 
-SIZE = 900  # 3×3 으로 잘라도 300px 이라 모바일에서 충분하다
+#: 2×2·2×3·3×3 어느 격자로 잘라도 각 조각이 300px 이상이 되게 6의 배수로 둔다.
+SIZE = 900
 
-# 프로젝트 팔레트(tokens.css)에서 가져온 값. 조각 경계가 눈에 보이도록
-# 인접한 칸의 명도를 다르게 둔다.
-PALETTE = [
-    (0xBE, 0xE3, 0xD4),
-    (0xDD, 0xF0, 0xE7),
-    (0xD6, 0xCB, 0xF3),
-    (0xEC, 0xE6, 0xFA),
-    (0xF6, 0xF7, 0xF3),
-    (0xBE, 0xE3, 0xD4),
-    (0xEC, 0xE6, 0xFA),
-    (0xDD, 0xF0, 0xE7),
-    (0xD6, 0xCB, 0xF3),
-]
+# 프로젝트 팔레트(tokens.css)에서 가져온 값.
+MINT = (0xBE, 0xE3, 0xD4)
+MINT_WASH = (0xDD, 0xF0, 0xE7)
+LAV = (0xD6, 0xCB, 0xF3)
+LAV_WASH = (0xEC, 0xE6, 0xFA)
 INK = (0x25, 0x60, 0x48)
 
 
+def _mix(a, b, t):
+    t = 0.0 if t < 0 else 1.0 if t > 1 else t
+    return tuple(int(x + (y - x) * t) for x, y in zip(a, b, strict=True))
+
+
 def pixel(x: int, y: int) -> tuple[int, int, int]:
-    cell = (y * 3 // SIZE) * 3 + (x * 3 // SIZE)
-    r, g, b = PALETTE[cell % len(PALETTE)]
+    """격자를 모르는 그림.
 
-    # 칸 안에서 대각선 그라데이션 — 단색 9칸보다 그림처럼 읽힌다.
-    t = ((x % (SIZE // 3)) + (y % (SIZE // 3))) / (2 * SIZE / 3)
-    r = int(r + (INK[0] - r) * t * 0.18)
-    g = int(g + (INK[1] - g) * t * 0.18)
-    b = int(b + (INK[2] - b) * t * 0.18)
+    보드는 2×2·2×3·3×3 중에 고를 수 있으므로 **조각 경계를 그림에 그려 넣으면
+    안 된다.** 3×3 기준으로 선을 그려두면 2×3 으로 바꾼 순간 선이 조각 안쪽을
+    지나가 잘못 자른 것처럼 보인다. 어디서 잘라도 자연스럽도록 경계 없는
+    사선 그라데이션과 완만한 물결만 쓴다.
+    """
+    u = x / SIZE
+    v = y / SIZE
 
-    # 조각 경계선
-    if x % (SIZE // 3) < 3 or y % (SIZE // 3) < 3:
-        return INK
-    return (r, g, b)
+    # 좌상 민트 → 우하 라벤더 대각 그라데이션
+    base = _mix(_mix(MINT, MINT_WASH, v), _mix(LAV_WASH, LAV, v), u)
+
+    # 어느 조각에도 특징이 남도록 완만한 물결을 얹는다(주기가 격자와 무관하다).
+    wave = 0.5 + 0.5 * math.sin(6.0 * (u + v) + 1.5 * math.sin(5.0 * v))
+    return _mix(base, INK, 0.10 * wave)
 
 
 def main() -> None:

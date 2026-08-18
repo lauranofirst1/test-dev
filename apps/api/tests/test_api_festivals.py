@@ -114,6 +114,32 @@ def test_other_org_gets_404_not_403(client, db: Session):
     assert r.json()["detail"]["error"]["code"] == "NOT_FOUND"
 
 
+def test_board_grid_is_chosen_not_fixed(client):
+    """3×3 을 박아두면 부스가 적은 축제는 시작부터 완성이 불가능하다."""
+    small = {**PAYLOAD, "name": "작은 축제", "stamp_board": {"rows": 2, "cols": 2}}
+    body = client.post("/api/festivals", json=small).json()
+    assert body["stamp_board"]["rows"] == 2
+    assert body["stamp_board"]["total_tiles"] == 4
+
+    wide = {**PAYLOAD, "name": "여섯 조각 축제", "stamp_board": {"rows": 2, "cols": 3}}
+    assert client.post("/api/festivals", json=wide).json()["stamp_board"]["total_tiles"] == 6
+
+    # 비우면 스펙 기본값 3×3
+    assert client.post("/api/festivals", json={**PAYLOAD, "name": "기본 축제"}).json()[
+        "stamp_board"
+    ]["total_tiles"] == 9
+
+
+def test_unsupported_grid_is_422(client):
+    """DB CHECK 에 닿기 전에 스키마가 먼저 거절한다."""
+    r = client.post(
+        "/api/festivals",
+        json={**PAYLOAD, "name": "이상한 격자", "stamp_board": {"rows": 3, "cols": 2}},
+    )
+    assert r.status_code == 422
+    assert "2×2" in r.text
+
+
 def test_missing_festival_is_404(client):
     assert client.get("/api/festivals/999999").status_code == 404
 

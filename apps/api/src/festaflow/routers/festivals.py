@@ -30,6 +30,7 @@ from festaflow.schemas.festival import (
     FestivalOut,
     FestivalPlanOut,
     FestivalUpdate,
+    StampBoardIn,
 )
 
 router = APIRouter(prefix="/api/festivals", tags=["festivals"])
@@ -103,7 +104,9 @@ def create_festival(payload: FestivalCreate, db: DbSession, org: CurrentOrg) -> 
         if used >= org.festival_quota:
             raise quota_exceeded(org.festival_quota)
 
-    festival = Festival(organization_id=org.id, **payload.model_dump(exclude={"plan"}))
+    festival = Festival(
+        organization_id=org.id, **payload.model_dump(exclude={"plan", "stamp_board"})
+    )
     db.add(festival)
     db.flush()
 
@@ -113,7 +116,16 @@ def create_festival(payload: FestivalCreate, db: DbSession, org: CurrentOrg) -> 
     diagnosis = Diagnosis(festival_id=festival.id)
     db.add(diagnosis)
 
-    board = StampBoard(festival_id=festival.id, rows=3, cols=3)
+    # 격자를 3×3 으로 박아두면 부스가 적은 축제는 시작부터 완성이 불가능하다.
+    # 요청이 고르지 않으면 스펙 기본값(3×3)을 쓴다.
+    cfg = payload.stamp_board or StampBoardIn()
+    board = StampBoard(
+        festival_id=festival.id,
+        rows=cfg.rows,
+        cols=cfg.cols,
+        reveal_mode=cfg.reveal_mode,
+        grant_unit=cfg.grant_unit,
+    )
     db.add(board)
     db.flush()
     for idx in range(board.total_tiles):

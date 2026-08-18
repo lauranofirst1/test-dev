@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from festaflow.models.enums import FestivalStatus, PlanStage
+from festaflow.models.enums import FestivalStatus, GrantUnit, PlanStage, RevealMode
 
 
 class FestivalPlanIn(BaseModel):
@@ -62,8 +62,29 @@ class FestivalBase(BaseModel):
         return self
 
 
+class StampBoardIn(BaseModel):
+    """조각 보드 초기 구성 — 01-product-spec §5 는 2×2·2×3·3×3 중 선택으로 정의한다.
+
+    비우면 3×3 이 기본이다. 부스 수가 조각 수보다 적으면 완성이 불가능하므로,
+    부스 계획이 작은 축제는 여기서 줄여야 한다(등록 후에도 바꿀 수 있다).
+    """
+
+    rows: int = Field(3, ge=2, le=3)
+    cols: int = Field(3, ge=2, le=3)
+    reveal_mode: RevealMode = RevealMode.RANDOM
+    grant_unit: GrantUnit = GrantUnit.BOOTH
+
+    @model_validator(mode="after")
+    def _supported_grid(self):
+        # DB 의 grid_supported CHECK 와 같은 집합. 여기서 먼저 걸러 422 로 답한다.
+        if (self.rows, self.cols) not in {(2, 2), (2, 3), (3, 3)}:
+            raise ValueError("격자는 2×2, 2×3, 3×3 만 지원합니다.")
+        return self
+
+
 class FestivalCreate(FestivalBase):
     plan: FestivalPlanIn | None = None
+    stamp_board: StampBoardIn | None = None
 
 
 class FestivalUpdate(FestivalBase):
