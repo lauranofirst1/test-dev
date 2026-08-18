@@ -29,9 +29,23 @@ class ApiError(HTTPException):
         )
 
 
+def object_particle(word: str) -> str:
+    """목적격 조사를 받침 유무로 고른다 — `축제를`, `진단을`.
+
+    리소스명을 문장에 끼워 넣을 때 조사를 고정하면 반드시 한쪽이 틀린다.
+    한글이 아닌 글자로 끝나면(영문·숫자) 읽는 방식이 갈리므로 `를`로 둔다.
+    """
+    if not word:
+        return "를"
+    last = word[-1]
+    if "가" <= last <= "힣":
+        return "를" if (ord(last) - 0xAC00) % 28 == 0 else "을"
+    return "를"
+
+
 def not_found(what: str = "리소스") -> ApiError:
     """타 기관 리소스도 이걸로 응답한다 — 403 을 쓰면 존재 여부가 노출된다."""
-    return ApiError(404, "NOT_FOUND", f"{what}를 찾을 수 없습니다.")
+    return ApiError(404, "NOT_FOUND", f"{what}{object_particle(what)} 찾을 수 없습니다.")
 
 
 def validation_failed(message: str, field: str | None = None) -> ApiError:

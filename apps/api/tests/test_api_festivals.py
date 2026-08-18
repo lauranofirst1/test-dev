@@ -118,6 +118,26 @@ def test_missing_festival_is_404(client):
     assert client.get("/api/festivals/999999").status_code == 404
 
 
+def test_not_found_message_picks_right_particle(client):
+    """리소스명 받침에 따라 조사가 달라져야 한다 — `축제를`, `진단을`."""
+    from festaflow.core.errors import not_found, object_particle
+
+    fid = client.post("/api/festivals", json=PAYLOAD).json()["festival"]["id"]
+
+    missing = client.get("/api/festivals/999999").json()["detail"]["error"]["message"]
+    assert "축제를 찾을 수 없습니다." in missing
+    r = client.get(f"/api/festivals/{fid}/diagnoses/latest")
+    assert r.status_code == 404
+    assert "진단을 찾을 수 없습니다." in r.json()["detail"]["error"]["message"]
+
+    assert object_particle("축제") == "를"  # 받침 없음
+    assert object_particle("진단") == "을"  # 받침 있음
+    assert object_particle("리소스") == "를"
+    assert object_particle("QR") == "를"  # 한글이 아니면 기본값
+    assert object_particle("") == "를"
+    assert "리소스를" in not_found().detail["error"]["message"]
+
+
 # ── 수정 ────────────────────────────────────────────────────────────────────
 
 

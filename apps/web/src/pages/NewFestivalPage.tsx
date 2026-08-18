@@ -5,7 +5,7 @@
  * 부스 등록 전까지 프로그램 균형을 평가할 근거가 없습니다.
  */
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,13 +17,22 @@ interface Created {
   operator_access_code: string;
 }
 
+/** 생성 결과. `diagnosisError` 가 있으면 축제는 저장됐지만 진단만 실패한 상태다. */
+interface Result {
+  id: number;
+  code: string;
+  diagnosisError: string | null;
+}
+
 const num = (v: string): number | null => (v.trim() === '' ? null : Number(v));
 
 export function NewFestivalPage() {
   const nav = useNavigate();
+  const qc = useQueryClient();
   const [form, setForm] = useState<PresetForm>(EMPTY_FORM);
   const [loadedPreset, setLoadedPreset] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ id: number; code: string } | null>(null);
+  const [created, setCreated] = useState<Result | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'creating' | 'diagnosing'>('idle');
 
   const set = (k: keyof PresetForm) => (e: { target: { value: string } }) => {
     setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -32,9 +41,13 @@ export function NewFestivalPage() {
 
   const periodInvalid = !!form.starts_on && !!form.ends_on && form.ends_on < form.starts_on;
 
+  // 버튼이 "축제 만들고 진단하기"인 만큼 생성에서 끝내지 않고 진단까지 이어서 돌린다.
+  // 백엔드 생성 엔드포인트는 pending 진단 레코드만 만들고 실제 실행은 하지 않는다 —
+  // 외부 API 호출을 생성 트랜잭션 안에 넣지 않으려는 설계이므로 호출은 여기서 한다.
   const create = useMutation({
-    mutationFn: () =>
-      api.post<Created>('/api/festivals', {
+    mutationFn: async (): Promise<Result> => {
+      setPhase('creating');
+      const d = await api.post<Created>('/api/festivals', {
         name: form.name,
         region: form.region,
         venue: form.venue,
@@ -60,8 +73,26 @@ export function NewFestivalPage() {
           traffic_plan: form.traffic_plan || null,
           crowd_plan: form.crowd_plan || null,
         },
-      }),
-    onSuccess: (d) => setCreated({ id: d.festival.id, code: d.operator_access_code }),
+      });
+
+      // 축제는 이미 저장됐다. 진단이 실패해도 생성을 되돌리지 않고
+      // 접근 코드는 반드시 보여준 뒤, 진단만 다시 실행하게 한다.
+      setPhase('diagnosing');
+      let diagnosisError: string | null = null;
+      try {
+        await api.post(`/api/festivals/${d.festival.id}/diagnoses`);
+      } catch (e) {
+        diagnosisError =
+          e instanceof ApiError ? e.message : '진단을 실행하지 못했습니다.';
+      }
+
+      return { id: d.festival.id, code: d.operator_access_code, diagnosisError };
+    },
+    onSuccess: (r) => {
+      setCreated(r);
+      qc.invalidateQueries({ queryKey: ['festivals'] });
+    },
+    onSettled: () => setPhase('idle'),
   });
 
   if (created) {
@@ -74,6 +105,15 @@ export function NewFestivalPage() {
           <p className="lede" style={{ textAlign: 'center' }}>
             <strong>이 코드는 다시 볼 수 없습니다.</strong> 현장 운영자에게 전달하세요.
           </p>
+          {created.diagnosisError && (
+            <div className="notice notice--warn">
+              <span>⚠</span>
+              <span>
+                축제는 저장됐지만 진단에 실패했습니다 — {created.diagnosisError} 진단
+                화면에서 다시 실행할 수 있습니다.
+              </span>
+            </div>
+          )}
           <div className="row">
             <button
               className="btn btn--ghost"
@@ -85,7 +125,7 @@ export function NewFestivalPage() {
               className="btn btn--primary btn--lg"
               onClick={() => nav(`/festivals/${created.id}/diagnosis`)}
             >
-              사전 진단 보기
+              {created.diagnosisError ? '진단 다시 실행하기' : '사전 진단 보기'}
             </button>
           </div>
         </div>
@@ -338,7 +378,11 @@ export function NewFestivalPage() {
             className="btn btn--primary btn--lg"
             disabled={create.isPending || periodInvalid}
           >
-            {create.isPending ? '만드는 중…' : '축제 만들고 진단하기'}
+            {phase === 'creating'
+              ? '만드는 중…'
+              : phase === 'diagnosing'
+                ? '진단 중…'
+                : '축제 만들고 진단하기'}
           </button>
         </div>
       </form>
