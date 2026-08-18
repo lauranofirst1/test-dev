@@ -637,8 +637,17 @@ def test_scan_context_marks_granted_missions_and_used_scan(client, festival, sca
     ).json()
     assert before["scan_already_used"] is False
     assert [m["already_granted"] for m in before["missions"]] == [False, False]
-    assert before["seconds_remaining"] <= 30
     assert "answer_index" not in str(before)
+
+    # 화면이 카운트다운에 쓰는 값은 accepted_until 이다. 서버가 직전 window 까지
+    # 인정하므로 expires_at 보다 정확히 한 window 뒤이고, 남은 시간도 그만큼 길다.
+    window = settings.scan_token_window_seconds
+    expires = datetime.fromisoformat(before["expires_at"])
+    accepted = datetime.fromisoformat(before["accepted_until"])
+    assert (accepted - expires).total_seconds() == window
+    # 토큰 생성과 서버 판정 사이에 window 가 넘어가면 서버는 직전 window 로 맞춘다.
+    # 그때 남은 시간은 한 window 아래로 떨어지므로 하한을 걸면 시간 경계에서 흔들린다.
+    assert 0 < before["seconds_remaining"] <= window * 2
 
     client.post(
         f"/api/festivals/{festival.id}/scan-grants",

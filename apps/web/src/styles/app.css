@@ -377,6 +377,11 @@ p {
   color: var(--color-ink-soft);
 }
 
+.notice--ok {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
 .notice strong {
   font-weight: var(--weight-bold);
 }
@@ -785,4 +790,52 @@ p {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-4);
+}
+
+/* ── 관객 조각 보드 ──────────────────────────────────────────
+   조각은 한 장의 그림을 격자로 잘라 보여줍니다. 열린 조각만 배경이 드러나고
+   나머지는 물음표로 남습니다. 이미지가 없거나 못 불러와도 격자와 진행 수치는
+   그대로 읽히도록, 색과 형태를 배경 이미지에 의존하지 않습니다. */
+
+.stampgrid {
+  display: grid;
+  gap: 6px;
+  aspect-ratio: 1;
+  padding: 6px;
+  background: var(--color-surface-sunk);
+  border-radius: var(--radius-lg);
+}
+
+.stamptile {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--color-line);
+  color: var(--color-ink-mute);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: var(--weight-black);
+  background-repeat: no-repeat;
+  transition: background-color 200ms ease, transform 200ms ease;
+}
+
+.stamptile--on {
+  background-color: var(--color-mint-wash);
+  transform: scale(1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamptile {
+    transition: none;
+  }
+  .stamptile--on {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .accesscode {
+    font-size: 30px;
+    padding: var(--space-4) var(--space-5);
+  }
 }

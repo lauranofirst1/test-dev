@@ -152,3 +152,143 @@ export const FULFILLMENT_LABEL: Record<Fulfillment, string> = {
   partial: '부분 충족',
   unmet: '미충족',
 };
+
+// ── 관객(참여자) 화면 — 계약 §7~§9 ──────────────────────────────────────────
+
+export type BoothVerifyMode = 'staff_scan' | 'participant_scan';
+export type RevealMode = 'random' | 'booth_assigned';
+export type GrantUnit = 'booth' | 'mission';
+
+export interface PublicMission {
+  id: number;
+  booth_id: number | null;
+  title: string;
+  description: string | null;
+  points: number;
+}
+
+export interface PublicBooth {
+  id: number;
+  name: string;
+  booth_type: string;
+  type_label: string | null;
+  location: string | null;
+  verify_mode: BoothVerifyMode;
+  missions: PublicMission[];
+}
+
+export interface PublicFestival {
+  id: number;
+  name: string;
+  region: string;
+  venue: string;
+  starts_on: string;
+  ends_on: string;
+  booths: PublicBooth[];
+  source_note: string;
+}
+
+export interface ParticipantIssued {
+  code: string;
+  secret: string;
+  festival_id: number;
+}
+
+export interface MissionStatus {
+  mission_id: number;
+  booth_id: number | null;
+  booth_name: string | null;
+  title: string;
+  points: number;
+  status: 'pending' | 'granted';
+  granted_points: number | null;
+  completed_at: string | null;
+}
+
+export interface ActiveCampaign {
+  id: number;
+  booth_id: number;
+  mission_id: number | null;
+  title: string;
+  message: string;
+  bonus_points: number;
+  ends_at: string;
+}
+
+export interface ParticipantMe {
+  code: string;
+  festival_id: number;
+  total_points: number;
+  completed_count: number;
+  missions: MissionStatus[];
+  active_campaigns: ActiveCampaign[];
+}
+
+export interface BoardTile {
+  tile_index: number;
+  assigned_booth_id: number | null;
+  is_revealed: boolean;
+  revealed_at: string | null;
+}
+
+export interface BoardProgress {
+  revealed_count: number;
+  total_tiles: number;
+  is_complete: boolean;
+}
+
+export interface ParticipantBoard {
+  id: number;
+  festival_id: number;
+  version: number;
+  rows: number;
+  cols: number;
+  total_tiles: number;
+  reveal_mode: RevealMode;
+  grant_unit: GrantUnit;
+  image_url: string;
+  complete_message: string;
+  tiles: BoardTile[];
+  progress: BoardProgress;
+  complete_message_shown: string | null;
+}
+
+export interface ScanContextMission {
+  mission_id: number;
+  title: string;
+  description: string | null;
+  points: number;
+  already_granted: boolean;
+}
+
+export interface ScanContext {
+  booth_id: number;
+  booth_name: string;
+  type_label: string | null;
+  location: string | null;
+  window_index: number;
+  /** QR 이 부스 화면에서 갱신되는 시각. */
+  expires_at: string;
+  /** 서버가 실제로 받아주는 마지막 시각. 직전 window 까지 인정하므로 이쪽이 더 늦다. */
+  accepted_until: string;
+  seconds_remaining: number;
+  missions: ScanContextMission[];
+  scan_already_used: boolean;
+}
+
+export interface GrantResult {
+  was_already_granted: boolean;
+  participation: {
+    id: number;
+    mission_id: number | null;
+    booth_id: number | null;
+    base_points: number;
+    bonus_points: number;
+    granted_points: number;
+    reward_campaign_id: number | null;
+    verified_via: BoothVerifyMode | null;
+    completed_at: string | null;
+  };
+  revealed_tile: { tile_index: number; board_version: number } | null;
+  board_progress: BoardProgress;
+}

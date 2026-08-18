@@ -233,6 +233,9 @@ def scan_context(
     from festaflow.core import security
 
     expires_at = security.window_expires_at(window)
+    # 서버는 현재와 직전 window 를 모두 인정한다. 이 토큰이 직전 window 것이면
+    # 이미 만료 시각을 지난 뒤에도 한 window 동안 더 받아준다.
+    accepted_until = security.window_expires_at(window + 1)
     granted = {
         p.mission_id
         for p in db.execute(
@@ -251,7 +254,8 @@ def scan_context(
         location=booth.location,
         window_index=window,
         expires_at=expires_at,
-        seconds_remaining=max(0, int((expires_at - datetime.now(UTC)).total_seconds())),
+        accepted_until=accepted_until,
+        seconds_remaining=max(0, int((accepted_until - datetime.now(UTC)).total_seconds())),
         missions=[
             ScanContextMission(
                 mission_id=m.id,

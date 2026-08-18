@@ -67,10 +67,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+type Headers = Record<string, string>;
+
 export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, data?: unknown) =>
-    request<T>(path, { method: 'POST', body: data ? JSON.stringify(data) : undefined }),
-  put: <T>(path: string, data: unknown) =>
-    request<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
+  get: <T>(path: string, headers?: Headers) => request<T>(path, { headers }),
+  post: <T>(path: string, data?: unknown, headers?: Headers) =>
+    request<T>(path, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+      headers,
+    }),
+  put: <T>(path: string, data: unknown, headers?: Headers) =>
+    request<T>(path, { method: 'PUT', body: JSON.stringify(data), headers }),
 };

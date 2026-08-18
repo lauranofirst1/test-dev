@@ -207,7 +207,12 @@ class ScanContext(BaseModel):
     type_label: str | None
     location: str | None
     window_index: int
+    #: 이 QR 이 화면에서 갱신되는 시각(= window 끝).
     expires_at: datetime
+    #: 서버가 **실제로 받아주는** 마지막 시각. 직전 window 도 인정하므로
+    #: expires_at 보다 한 window 뒤다. 화면은 이 값으로 카운트다운해야 한다 —
+    #: expires_at 로 잠그면 서버가 받아줄 30초를 화면이 먼저 포기한다.
+    accepted_until: datetime
     seconds_remaining: int
     missions: list[ScanContextMission]
     #: 이 window 에서 이미 한 건 받았으면 다시 스캔해야 한다.
