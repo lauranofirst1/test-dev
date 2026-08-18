@@ -25,7 +25,7 @@ from festaflow.core import security
 from festaflow.core.config import settings
 from festaflow.core.errors import ApiError
 from festaflow.db.session import get_db
-from festaflow.models import Festival, FestivalStaff, Organization
+from festaflow.models import Festival, FestivalStaff, Organization, Participant
 from festaflow.models.enums import StaffRole
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -150,3 +150,60 @@ def require_role(*roles: StaffRole):
 #: 기획을 고치고 진단을 돌리는 쪽. 부스 관리자는 읽기만 한다.
 CanManagePlan = Depends(require_role(StaffRole.PLANNER, StaffRole.OPERATOR))
 FestivalAccess = Depends(require_festival_access)
+
+
+# ── 참여자 ──────────────────────────────────────────────────────────────────
+
+
+def get_participant(
+    festival_id: int,
+    db: DbSession,
+    x_participant_secret: Annotated[str | None, Header(alias="X-Participant-Secret")] = None,
+) -> Participant:
+    """참여자 본인 조회용. 코드가 아니라 **비밀**로 인증한다.
+
+    코드는 부스에서 스태프에게 보여주는 값이라 옆 사람도 볼 수 있다. 코드로 조회를
+    허용하면 남의 수집 현황과 포인트가 들여다보인다.
+    """
+    if not x_participant_secret:
+        raise ApiError(
+            401,
+            "PARTICIPANT_AUTH_REQUIRED",
+            "참여자 인증이 필요합니다. 참여 코드를 다시 발급받으세요.",
+        )
+
+    hashed = security.hash_participant_secret(x_participant_secret)
+    participant = db.execute(
+        select(Participant).where(
+            Participant.festival_id == festival_id,
+            Participant.secret_hash == hashed,
+        )
+    ).scalar_one_or_none()
+    if participant is None:
+        raise ApiError(401, "PARTICIPANT_AUTH_FAILED", "참여자 정보를 확인할 수 없습니다.")
+    return participant
+
+
+CurrentParticipant = Annotated[Participant, Depends(get_participant)]
+
+
+def require_booth_scope(staff: FestivalStaff | None, booth_id: int) -> None:
+    """`booth_manager` 는 **자기 부스의 미션만** 지급할 수 있다 — 계약 §1.
+
+    역할 검사만으로는 부족하다. booth_manager 토큰이면 부스까지 봐야 한다.
+    """
+    if staff is None:
+        return
+    if staff.role != StaffRole.BOOTH_MANAGER:
+        return
+    if staff.booth_id != booth_id:
+        raise ApiError(
+            403,
+            "FORBIDDEN",
+            "담당 부스의 미션만 지급할 수 있습니다.",
+            {"assigned_booth_id": staff.booth_id},
+        )
+
+
+#: 부스·미션·보드를 고치는 쪽. 부스 관리자는 조회와 자기 부스 지급만 한다.
+CanOperate = Depends(require_role(StaffRole.PLANNER, StaffRole.OPERATOR))

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from festaflow.core import security
 from festaflow.core.config import settings
-from festaflow.routers import auth, diagnoses, festivals
+from festaflow.routers import auth, booths, diagnoses, festivals, participants, stamp_board
 from festaflow.services.tourapi import KtoError
 
 logging.basicConfig(
@@ -61,6 +61,10 @@ async def kto_error_handler(_: Request, exc: KtoError) -> JSONResponse:
 app.include_router(auth.router)
 app.include_router(festivals.router)
 app.include_router(diagnoses.router)
+app.include_router(booths.router)
+app.include_router(stamp_board.router)
+# 참여자 라우터는 기관 스코프를 쓰지 않는다. 마지막에 붙여 경로 충돌을 피한다.
+app.include_router(participants.router)
 
 
 @app.get("/api/health")

@@ -11,6 +11,10 @@ passlib 은 쓰지 않습니다 — 1.7.4 의 bcrypt 백엔드가 bcrypt 5.x 와
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -118,3 +122,76 @@ def assert_secret_is_safe() -> None:
             f"APP_ENV={settings.app_env} 에서 JWT_SECRET 이 개발 기본값이거나 너무 짧습니다. "
             "openssl rand -hex 32 으로 새로 만들어 넣으세요."
         )
+
+
+# ── 참여자 ──────────────────────────────────────────────────────────────────
+
+#: 사람이 부스에서 소리내어 읽고 손으로 옮겨 적는 코드다.
+#: 0/O, 1/I 처럼 헷갈리는 글자를 빼야 현장에서 오타 문의가 줄어든다.
+PARTICIPANT_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
+def generate_participant_code() -> str:
+    """`FF-XXXXXXXX`. participants.code 의 CHECK 제약과 같은 모양이어야 한다."""
+    body = "".join(secrets.choice(PARTICIPANT_ALPHABET) for _ in range(8))
+    return f"FF-{body}"
+
+
+def generate_participant_secret() -> str:
+    """조회 인증용 비밀. 코드는 부스에서 노출되므로 반드시 분리한다."""
+    return f"s_{secrets.token_urlsafe(24)}"
+
+
+def hash_participant_secret(secret: str) -> str:
+    """참여자 비밀은 sha256 으로 해시한다 — 접근 코드와 달리 bcrypt 가 아니다.
+
+    6자리 접근 코드는 사람이 외우는 저엔트로피 값이라 느린 해시가 필요하지만,
+    이 비밀은 서버가 만든 24바이트 난수라 전수 대입이 애초에 불가능하다.
+    관객 화면은 보드를 자주 폴링하므로, 요청마다 180ms 를 쓰는 쪽이 오히려 위험하다.
+    """
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def verify_participant_secret(secret: str, hashed: str) -> bool:
+    return hmac.compare_digest(hash_participant_secret(secret), hashed)
+
+
+# ── 부스 회전 QR ────────────────────────────────────────────────────────────
+
+
+def current_window(now: datetime | None = None) -> int:
+    """`floor(unix_seconds / window)` — docs/02-data-model.md §7."""
+    ts = (now or datetime.now(UTC)).timestamp()
+    return int(ts // settings.scan_token_window_seconds)
+
+
+def booth_scan_token(qr_secret: bytes, booth_id: int, window_index: int) -> str:
+    """부스 QR 토큰. 별도 테이블 없이 HMAC 으로 만든다.
+
+    `base64url(HMAC_SHA256(qr_secret, booth_id || window_index))[0:12]`
+    """
+    msg = f"{booth_id}|{window_index}".encode()
+    digest = hmac.new(qr_secret, msg, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")[:12]
+
+
+def match_scan_window(
+    qr_secret: bytes, booth_id: int, token: str, now: datetime | None = None
+) -> int | None:
+    """토큰이 맞는 window 를 돌려준다. 현재와 **직전** 둘 다 인정한다.
+
+    갱신 직전에 스캔한 참여자를 실패시키지 않기 위한 것이고, 기기 시계 오차도 함께
+    흡수한다. 실질 유효기간이 30~60초라 QR 사진이 돌아도 현장 밖에서는 못 쓴다.
+    """
+    now_window = current_window(now)
+    for candidate in (now_window, now_window - 1):
+        if hmac.compare_digest(booth_scan_token(qr_secret, booth_id, candidate), token):
+            return candidate
+    return None
+
+
+def window_expires_at(window_index: int) -> datetime:
+    """이 window 가 끝나는 시각. 부스 화면이 QR 갱신 시점을 잡는 데 쓴다."""
+    return datetime.fromtimestamp(
+        (window_index + 1) * settings.scan_token_window_seconds, tz=UTC
+    )

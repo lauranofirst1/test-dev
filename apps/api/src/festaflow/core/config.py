@@ -76,7 +76,10 @@ class Settings(BaseSettings):
     tourism_snapshot_ttl_days: int = 7
 
     # ── 도메인 임계값 ───────────────────────────────────────
-    scan_token_window_seconds: int = 300
+    #: 부스 회전 QR 의 window 길이. 서버가 현재·직전 window 를 모두 인정하므로
+    #: 실질 유효기간은 30~60초다. docs/02-data-model.md §7 과 계약 §8.2 기준.
+    #: (01-product-spec 의 "5분 회전"은 더 느슨한 초기 서술이라 따르지 않는다)
+    scan_token_window_seconds: int = 30
     insights_min_sample: int = 10
     anonymize_after_days: int = 90
     media_retention_days: int = 90
