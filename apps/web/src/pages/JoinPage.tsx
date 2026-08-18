@@ -8,17 +8,23 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
-import { loadParticipant, participantApi, saveParticipant } from '../api/participant';
+import {
+  clearParticipant,
+  loadParticipant,
+  participantApi,
+  saveParticipant,
+} from '../api/participant';
 import type { ParticipantBoard, ParticipantMe, PublicFestival } from '../api/types';
 
 export function JoinPage() {
   const { id = '' } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [stored, setStored] = useState(() => loadParticipant(id));
+  const [wasReset, setWasReset] = useState(false);
 
   const festival = useQuery({
     queryKey: ['public', id],
@@ -43,12 +49,29 @@ export function JoinPage() {
     retry: false,
   });
 
+  // 저장된 비밀이 더 이상 통하지 않으면 스스로 비우고 처음 화면으로 돌아간다.
+  //
+  // 이걸 하지 않으면 화면에 죽은 코드와 오류 문구만 남고 빠져나갈 버튼이 없어서,
+  // 관객은 localStorage 를 직접 지우는 방법밖에 없다. 운영자가 참여 데이터를
+  // 초기화했거나(리허설), 90일 뒤 익명화됐거나, 축제를 다시 만든 경우에 실제로 걸린다.
+  const authFailed =
+    (board.error instanceof ApiError && board.error.status === 401) ||
+    (me.error instanceof ApiError && me.error.status === 401);
+
+  useEffect(() => {
+    if (!authFailed) return;
+    clearParticipant(id);
+    setStored(null);
+    setWasReset(true);
+  }, [authFailed, id]);
+
   const join = useMutation({
     mutationFn: () => participantApi.issue(id),
     onSuccess: (issued) => {
       // secret 은 이 응답에서만 나온다. 여기서 저장하지 않으면 되돌릴 방법이 없다.
       saveParticipant(id, { code: issued.code, secret: issued.secret });
       setStored({ code: issued.code, secret: issued.secret });
+      setWasReset(false);
       qc.invalidateQueries({ queryKey: ['my-board', id] });
     },
   });
@@ -75,6 +98,16 @@ export function JoinPage() {
                 {f.region} · {f.venue} · {f.starts_on} ~ {f.ends_on}
               </p>
             </div>
+
+            {wasReset && (
+              <div className="notice notice--warn">
+                <span>⚠</span>
+                <span>
+                  이전 참여 정보가 더 이상 유효하지 않아 초기화했습니다. 다시 시작하면 새 참여
+                  코드를 받습니다.
+                </span>
+              </div>
+            )}
 
             <div className="card stack" style={{ gap: 'var(--space-4)' }}>
               <p className="lede">

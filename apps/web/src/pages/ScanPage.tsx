@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
-import { loadParticipant, participantApi } from '../api/participant';
+import { clearParticipant, loadParticipant, participantApi } from '../api/participant';
 import type { GrantResult, ScanContext } from '../api/types';
 
 export function ScanPage() {
@@ -71,6 +71,26 @@ export function ScanPage() {
           </p>
           <Link to={`/join/${id}`} className="btn btn--primary btn--lg">
             참여 시작하기
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 저장된 비밀이 죽었으면 여기서도 비운다. 그러지 않으면 스캔할 때마다 같은
+  // 오류를 보고, 참여 화면으로 가도 갇힌 상태가 그대로다.
+  if (scan.error instanceof ApiError && scan.error.status === 401) {
+    clearParticipant(id);
+    return (
+      <div className="shell stack" style={{ gap: 'var(--space-4)' }}>
+        <div className="card state">
+          <p className="eyebrow">참여 정보를 다시 만들어야 합니다</p>
+          <p className="lede" style={{ textAlign: 'center' }}>
+            이전 참여 정보가 더 이상 유효하지 않습니다. 참여를 다시 시작한 뒤 QR을 스캔해
+            주세요.
+          </p>
+          <Link to={`/join/${id}`} className="btn btn--primary btn--lg">
+            참여 다시 시작하기
           </Link>
         </div>
       </div>
