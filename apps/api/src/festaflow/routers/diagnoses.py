@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-from festaflow.core.deps import CurrentOrg, DbSession
+from festaflow.core.deps import CanManagePlan, CurrentOrg, DbSession, FestivalAccess
 from festaflow.core.errors import ApiError, not_found
 from festaflow.models import Diagnosis, DiagnosisItem, Festival
 from festaflow.models.enums import DiagnosisCategory
@@ -20,7 +20,12 @@ from festaflow.services import diagnosis as svc
 from festaflow.services import rubric
 from festaflow.services.tourapi import TourApiClient
 
-router = APIRouter(prefix="/api/festivals/{festival_id}/diagnoses", tags=["diagnoses"])
+router = APIRouter(
+    prefix="/api/festivals/{festival_id}/diagnoses",
+    tags=["diagnoses"],
+    # 모든 경로가 {festival_id} 아래라 라우터 단위로 축제 권한을 건다.
+    dependencies=[FestivalAccess],
+)
 
 CATEGORY_LABELS = {
     DiagnosisCategory.TOURISM_DEMAND: "관광수요 적합성",
@@ -94,7 +99,12 @@ def _serialize(db: DbSession, d: Diagnosis) -> DiagnosisOut:
     )
 
 
-@router.post("", response_model=DiagnosisOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DiagnosisOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[CanManagePlan],
+)
 async def run_diagnosis(festival_id: int, db: DbSession, org: CurrentOrg) -> DiagnosisOut:
     """진단을 실행하고 새 레코드를 추가한다(append-only).
 

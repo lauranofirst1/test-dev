@@ -8,7 +8,8 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
 
-from festaflow.core.deps import CurrentOrg, DbSession
+from festaflow.core import security
+from festaflow.core.deps import CanManagePlan, CurrentOrg, DbSession, FestivalAccess
 from festaflow.core.errors import not_found, quota_exceeded
 from festaflow.models import (
     Booth,
@@ -42,9 +43,7 @@ def _access_code(length: int = 6) -> str:
 
 def _hash(code: str) -> str:
     """접근 코드는 해시만 저장한다. 평문은 발급 응답에서 1회만 노출."""
-    import hashlib
-
-    return hashlib.sha256(code.encode()).hexdigest()
+    return security.hash_access_code(code)
 
 
 def _get_owned(db: DbSession, org_id: int, festival_id: int) -> Festival:
@@ -84,7 +83,12 @@ def list_festivals(
     return FestivalList(items=[FestivalOut.model_validate(r) for r in rows], total=total)
 
 
-@router.post("", response_model=FestivalCreated, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=FestivalCreated,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[CanManagePlan],
+)
 def create_festival(payload: FestivalCreate, db: DbSession, org: CurrentOrg) -> FestivalCreated:
     """축제·기획상세·진단·스탬프보드·운영자 스태프를 **하나의 트랜잭션**으로 만든다.
 
@@ -143,7 +147,11 @@ def create_festival(payload: FestivalCreate, db: DbSession, org: CurrentOrg) -> 
     )
 
 
-@router.get("/{festival_id}", response_model=FestivalDetail)
+@router.get(
+    "/{festival_id}",
+    response_model=FestivalDetail,
+    dependencies=[FestivalAccess],
+)
 def get_festival(festival_id: int, db: DbSession, org: CurrentOrg) -> FestivalDetail:
     f = _get_owned(db, org.id, festival_id)
     plan = db.get(FestivalPlan, f.id)
@@ -167,7 +175,11 @@ def get_festival(festival_id: int, db: DbSession, org: CurrentOrg) -> FestivalDe
     )
 
 
-@router.put("/{festival_id}", response_model=FestivalDetail)
+@router.put(
+    "/{festival_id}",
+    response_model=FestivalDetail,
+    dependencies=[FestivalAccess, CanManagePlan],
+)
 def update_festival(
     festival_id: int, payload: FestivalUpdate, db: DbSession, org: CurrentOrg
 ) -> FestivalDetail:
@@ -189,7 +201,11 @@ def update_festival(
     return get_festival(festival_id, db, org)
 
 
-@router.post("/{festival_id}/archive", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/{festival_id}/archive",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[FestivalAccess, CanManagePlan],
+)
 def archive_festival(festival_id: int, db: DbSession, org: CurrentOrg) -> None:
     """보관. 참여 이력과 리포트는 지우지 않는다 — 목록에서만 사라진다."""
     f = _get_owned(db, org.id, festival_id)

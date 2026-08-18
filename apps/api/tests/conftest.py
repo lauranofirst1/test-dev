@@ -78,4 +78,14 @@ def second_db(engine: Engine) -> Iterator[Session]:
         session.close()
 
 
+@pytest.fixture(autouse=True)
+def _fast_hashing(monkeypatch):
+    """bcrypt 비용을 테스트에서만 낮춘다.
+
+    운영 기본값 12 는 한 번에 약 180ms 다. 축제를 만드는 테스트마다 해시가
+    한 번씩 돌아 스위트가 눈에 띄게 느려진다. 검증 로직은 라운드 수와 무관하다.
+    """
+    monkeypatch.setattr(settings, "bcrypt_rounds", 4, raising=False)
+
+
 os.environ.setdefault("PYTHONUTF8", "1")

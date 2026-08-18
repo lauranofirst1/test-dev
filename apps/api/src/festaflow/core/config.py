@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     # ── 인증 ────────────────────────────────────────────────
     jwt_secret: str = "dev-only-change-me"
     jwt_ttl_hours: int = 12
+    #: 접근 코드 해시 비용. 12 는 한 번에 약 180ms — 온라인 대입을 무의미하게 만든다.
+    #: 테스트에서만 낮춘다(테스트가 해시를 수십 번 만든다).
+    bcrypt_rounds: int = 12
+    #: 접근 코드 연속 실패 허용 횟수와 잠금 시간 — docs/03-api-contract.md §1
+    login_max_attempts: int = 5
+    login_lock_minutes: int = 10
 
     # ── 한국관광공사 OpenAPI ────────────────────────────────
     kto_api_key: str = ""

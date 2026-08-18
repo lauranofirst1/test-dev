@@ -8,8 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from festaflow.core import security
 from festaflow.core.config import settings
-from festaflow.routers import diagnoses, festivals
+from festaflow.routers import auth, diagnoses, festivals
 from festaflow.services.tourapi import KtoError
 
 logging.basicConfig(
@@ -22,6 +23,10 @@ logging.basicConfig(
 # 우리 스펙이 금지한 항목이라 요청 로그는 끄고, 실패만 남긴다.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+# 개발용 기본 JWT 시크릿으로 로컬 밖에서 뜨는 것을 막는다.
+# 시크릿이 저장소에 공개된 채로 배포되면 토큰을 누구나 위조할 수 있다.
+security.assert_secret_is_safe()
 
 app = FastAPI(
     title="FestaFlow API",
@@ -53,6 +58,7 @@ async def kto_error_handler(_: Request, exc: KtoError) -> JSONResponse:
     )
 
 
+app.include_router(auth.router)
 app.include_router(festivals.router)
 app.include_router(diagnoses.router)
 
