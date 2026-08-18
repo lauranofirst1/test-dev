@@ -17,12 +17,20 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+interface RequestOptions extends RequestInit {
+  /** FormData 전송용 — 아래 주석 참고. */
+  skipJsonContentType?: boolean;
+}
+
+async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   let res: Response;
+  const { skipJsonContentType, ...rest } = init ?? {};
   try {
     res = await fetch(path, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+      ...rest,
+      headers: skipJsonContentType
+        ? (init?.headers as HeadersInit | undefined)
+        : { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     });
   } catch {
     // 서버가 안 떠 있을 때 무한 로딩으로 두지 않는다.
@@ -68,6 +76,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 type Headers = Record<string, string>;
+
+/**
+ * 파일 업로드. `Content-Type` 을 **직접 지정하지 않는다** —
+ * FormData 를 보낼 때는 브라우저가 multipart 경계(boundary)를 포함해 붙여야 하고,
+ * 우리가 헤더를 덮어쓰면 경계가 빠져 서버가 본문을 파싱하지 못한다.
+ */
+export async function upload<T>(path: string, body: FormData): Promise<T> {
+  return request<T>(path, { method: 'POST', body, skipJsonContentType: true });
+}
 
 export const api = {
   get: <T>(path: string, headers?: Headers) => request<T>(path, { headers }),

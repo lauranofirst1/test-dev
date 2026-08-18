@@ -801,7 +801,9 @@ p {
 .stampgrid {
   display: grid;
   gap: 6px;
-  aspect-ratio: 1;
+  /* 비율은 격자에 따라 인라인으로 준다(cols / rows). 여기서 1 로 고정하면
+     2×4 보드에서 조각이 세로로 늘어나 원본 그림과 다른 모양이 된다. */
+  aspect-ratio: var(--grid-ratio, 1);
   padding: 6px;
   background: var(--color-surface-sunk);
   border-radius: var(--radius-lg);
@@ -904,9 +906,103 @@ p {
   background: var(--color-surface-sunk);
 }
 
-/* ── 격자 선택 ───────────────────────────────────────────────
-   조각 수는 부스 수와 함께 정해져야 하는 값입니다. 숫자만 나열하면 감이 안 와서
-   실제 격자 모양을 작게 그려 보여줍니다. */
+/* ── 격자 후보 (A안·B안·C안) ─────────────────────────────────
+   "3×4 · 12조각"은 감이 오지 않습니다. 실제 그림을 그 격자로 쪼갠 미리보기를
+   보여주면 바로 읽힙니다. */
+
+.plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+}
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+}
+
+.plan:hover {
+  background: var(--color-surface-sunk);
+}
+
+.plan--on {
+  border-color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-ink);
+}
+
+.plan__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plan__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-black);
+}
+
+.plan__badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-mint-wash);
+  color: var(--color-mint-ink);
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+}
+
+.plan__total {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.plan__note {
+  font-size: var(--text-label);
+  color: var(--color-ink-mute);
+  line-height: 1.4;
+}
+
+/* 그림을 격자로 쪼갠 미리보기. 관객 보드와 같은 방식으로 자른다. */
+.gridprev {
+  display: grid;
+  gap: 2px;
+  aspect-ratio: var(--grid-ratio, 1);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-line);
+}
+
+.gridprev i {
+  background-color: var(--color-mint-fill);
+  background-repeat: no-repeat;
+  border-radius: 2px;
+}
+
+/* 그림 등록 */
+.boardimg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.boardimg__thumb {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-sunk);
+}
 
 .gridpick {
   display: grid;

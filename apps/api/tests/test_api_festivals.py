@@ -130,14 +130,23 @@ def test_board_grid_is_chosen_not_fixed(client):
     ]["total_tiles"] == 9
 
 
-def test_unsupported_grid_is_422(client):
+def test_grid_can_match_booth_count(client):
+    """8개처럼 4·6·9 로 못 담는 수도 2×4 로 정확히 쪼갤 수 있어야 한다."""
+    r = client.post(
+        "/api/festivals",
+        json={**PAYLOAD, "name": "여덟 조각 축제", "stamp_board": {"rows": 2, "cols": 4}},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["stamp_board"]["total_tiles"] == 8
+
+
+def test_grid_outside_range_is_422(client):
     """DB CHECK 에 닿기 전에 스키마가 먼저 거절한다."""
     r = client.post(
         "/api/festivals",
-        json={**PAYLOAD, "name": "이상한 격자", "stamp_board": {"rows": 3, "cols": 2}},
+        json={**PAYLOAD, "name": "너무 큰 격자", "stamp_board": {"rows": 6, "cols": 6}},
     )
     assert r.status_code == 422
-    assert "2×2" in r.text
 
 
 def test_missing_festival_is_404(client):

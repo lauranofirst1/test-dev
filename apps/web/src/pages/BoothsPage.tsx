@@ -11,8 +11,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { ApiError, api } from '../api/client';
-import { GridPicker, gridBasisHint } from '../components/GridPicker';
+import { ApiError, api, upload as uploadFile } from '../api/client';
+import {
+  type Grid,
+  GridPlanPicker,
+  gridBasisHint,
+  useGridOptions,
+} from '../components/GridPicker';
 import type {
   BoothDetail,
   BoothList,
@@ -292,8 +297,8 @@ export function BoothsPage() {
         <BoardSettings
           festivalId={id}
           board={board.data}
-          activeBooths={active.length}
-          activeMissions={activeMissions}
+          boothCount={active.length}
+          missionCount={activeMissions}
           onChanged={refresh}
         />
       )}
@@ -412,34 +417,44 @@ function BoothCard({
 }
 
 
-/** 조각 보드 설정.
+/** 조각 보드 설정 — 그림 등록과 격자 선택.
  *
  * 격자를 바꾸면 타일 집합이 새로 생기고 참여자의 수집 진행이 초기화됩니다.
- * 되돌릴 수 없으므로 서버가 409 로 확인을 요구하고, 이 화면은 그 숫자를
- * 그대로 보여준 뒤에만 다시 보냅니다 — "정말?" 만 묻고 몇 명이 잃는지 말하지
- * 않으면 확인이 아니라 요식입니다.
+ * 되돌릴 수 없으므로 서버가 409 로 확인을 요구하고, 이 화면은 그 숫자를 그대로
+ * 보여준 뒤에만 다시 보냅니다 — "정말?" 만 묻고 몇 명이 잃는지 말하지 않으면
+ * 확인이 아니라 요식입니다.
+ *
+ * 그림만 바꾸는 것은 되돌릴 수 있어 확인 없이 즉시 반영합니다.
  */
 function BoardSettings({
   festivalId,
   board,
-  activeBooths,
-  activeMissions,
+  boothCount,
+  missionCount,
   onChanged,
 }: {
   festivalId: string;
   board: StampBoardAdmin;
-  activeBooths: number;
-  activeMissions: number;
+  boothCount: number;
+  missionCount: number;
   onChanged: () => void;
 }) {
-  const [grid, setGrid] = useState({ rows: board.rows, cols: board.cols });
+  const [grid, setGrid] = useState<Grid>({ rows: board.rows, cols: board.cols });
   const [grantUnit, setGrantUnit] = useState<GrantUnit>(board.grant_unit);
   const [confirming, setConfirming] = useState<{ participants: number; revealed: number } | null>(
     null,
   );
 
-  const changed = grid.rows !== board.rows || grid.cols !== board.cols
-    || grantUnit !== board.grant_unit;
+  // 지급 기준을 바꾸면 후보의 근거가 되는 단위 수 자체가 달라진다. 화면에서 다시
+  // 계산하지 않고 서버에 그 수로 다시 묻는다.
+  const unitChanged = grantUnit !== board.grant_unit;
+  const unitCount = grantUnit === 'booth' ? boothCount : missionCount;
+  const unitLabel = grantUnit === 'booth' ? '부스' : '미션';
+  const fetched = useGridOptions(unitCount);
+  const options = fetched.data ?? board.grid_options;
+
+  const changed =
+    grid.rows !== board.rows || grid.cols !== board.cols || grantUnit !== board.grant_unit;
 
   const save = useMutation({
     mutationFn: (confirm: boolean) =>
@@ -468,26 +483,62 @@ function BoardSettings({
     },
   });
 
-  const tiles = grid.rows * grid.cols;
-  // 완성 가능 여부는 **선택한 지급 기준**으로 판단해야 한다. 부스 기준으로만
-  // 보여주면 미션 기준으로 바꿨을 때 화면이 엉뚱한 숫자로 겁을 준다.
-  const unitCount = grantUnit === 'booth' ? activeBooths : activeMissions;
-  const unitLabel = grantUnit === 'booth' ? '부스' : '미션';
+  const upload = useMutation({
+    mutationFn: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return uploadFile(`/api/festivals/${festivalId}/stamp-board/image`, body);
+    },
+    onSuccess: onChanged,
+  });
 
   return (
-    <div className="card stack" style={{ gap: 'var(--space-4)' }}>
+    <div className="card stack" style={{ gap: 'var(--space-5)' }}>
       <div className="stack" style={{ gap: 4 }}>
         <p className="eyebrow">조각 보드</p>
-        <h3 style={{ fontSize: 'var(--text-h3)' }}>몇 조각으로 나눌지 고르세요</h3>
+        <h3 style={{ fontSize: 'var(--text-h3)' }}>관객이 모을 그림</h3>
         <p className="muted">{gridBasisHint(unitLabel, unitCount)}</p>
       </div>
 
-      <GridPicker
-        value={grid}
-        onChange={setGrid}
-        unitCount={unitCount}
-        unitLabel={unitLabel}
-      />
+      {/* 그림 등록 */}
+      <div className="boardimg">
+        <img className="boardimg__thumb" src={board.image_url} alt="현재 조각 보드 그림" />
+        <div className="stack" style={{ gap: 'var(--space-2)' }}>
+          <label className="btn btn--ghost" style={{ alignSelf: 'flex-start' }}>
+            그림 등록
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) upload.mutate(file);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <span className="hint">
+            PNG · JPG · WEBP, 5MB 이하. 정사각형에 가까운 그림이 조각으로 잘 나뉩니다.
+          </span>
+          {upload.isPending && <span className="muted">올리는 중…</span>}
+          {upload.error instanceof ApiError && (
+            <span style={{ color: 'var(--color-danger)' }}>{upload.error.message}</span>
+          )}
+        </div>
+      </div>
+
+      {/* 격자 후보 */}
+      <div className="stack" style={{ gap: 'var(--space-3)' }}>
+        <p className="eyebrow">몇 조각으로 나눌지 고르세요</p>
+        <GridPlanPicker
+          options={options}
+          value={grid}
+          onChange={setGrid}
+          imageUrl={board.image_url}
+          unitLabel={unitLabel}
+          unitCount={unitCount}
+        />
+      </div>
 
       <div className="field">
         <label htmlFor="grant-unit">조각을 주는 기준</label>
@@ -499,6 +550,11 @@ function BoardSettings({
           <option value="booth">부스당 1조각 — 여러 부스를 돌게 유도합니다</option>
           <option value="mission">미션마다 1조각 — 한 부스에서도 여러 조각을 줍니다</option>
         </select>
+        {unitChanged && (
+          <span className="hint">
+            기준을 바꾸면 후보도 달라집니다. 저장하면 새 기준으로 다시 계산됩니다.
+          </span>
+        )}
       </div>
 
       {confirming && (
@@ -523,7 +579,7 @@ function BoardSettings({
       <div className="row wrap" style={{ justifyContent: 'space-between' }}>
         <span className="muted tabular">
           현재 {board.rows}×{board.cols} · {board.total_tiles}조각 (v{board.version})
-          {changed && ` → ${grid.rows}×${grid.cols} · ${tiles}조각`}
+          {changed && ` → ${grid.rows}×${grid.cols} · ${grid.rows * grid.cols}조각`}
         </span>
         <div className="row" style={{ gap: 'var(--space-3)' }}>
           {confirming && (
@@ -543,11 +599,7 @@ function BoardSettings({
             disabled={!changed || save.isPending}
             onClick={() => save.mutate(confirming !== null)}
           >
-            {save.isPending
-              ? '바꾸는 중…'
-              : confirming
-                ? '초기화하고 바꾸기'
-                : '보드 바꾸기'}
+            {save.isPending ? '바꾸는 중…' : confirming ? '초기화하고 바꾸기' : '보드 바꾸기'}
           </button>
         </div>
       </div>

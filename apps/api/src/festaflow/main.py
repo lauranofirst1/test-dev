@@ -7,10 +7,12 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from festaflow.core import security
 from festaflow.core.config import settings
 from festaflow.routers import auth, booths, diagnoses, festivals, participants, stamp_board
+from festaflow.services import media
 from festaflow.services.tourapi import KtoError
 
 logging.basicConfig(
@@ -58,11 +60,16 @@ async def kto_error_handler(_: Request, exc: KtoError) -> JSONResponse:
     )
 
 
+# 업로드된 조각 보드 그림. StaticFiles 가 확장자로 Content-Type 을 정하므로,
+# 저장할 때 매직 바이트로 판별한 확장자만 붙여야 한다(services/media.py).
+app.mount("/media", StaticFiles(directory=str(media.media_root())), name="media")
+
 app.include_router(auth.router)
 app.include_router(festivals.router)
 app.include_router(diagnoses.router)
 app.include_router(booths.router)
 app.include_router(stamp_board.router)
+app.include_router(stamp_board.grid_router)
 # 참여자 라우터는 기관 스코프를 쓰지 않는다. 마지막에 붙여 경로 충돌을 피한다.
 app.include_router(participants.router)
 

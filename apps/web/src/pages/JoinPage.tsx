@@ -174,7 +174,11 @@ export function JoinPage() {
 
           <div
             className="stampgrid"
-            style={{ gridTemplateColumns: `repeat(${b.cols}, 1fr)` }}
+            style={{
+              gridTemplateColumns: `repeat(${b.cols}, 1fr)`,
+              // 원본 그림의 비율을 지켜야 조각이 맞춰졌을 때 그림이 된다.
+              ['--grid-ratio' as string]: `${b.cols} / ${b.rows}`,
+            }}
             role="img"
             aria-label={`축제 조각 보드, ${progress.total_tiles}조각 중 ${progress.revealed_count}조각 공개`}
           >

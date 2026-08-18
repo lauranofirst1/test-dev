@@ -270,9 +270,18 @@ def test_supported_grids_accepted(db: Session, rows, cols):
     db.flush()
 
 
-def test_unsupported_grid_rejected(db: Session):
+def test_grid_range_is_two_to_five(db: Session):
+    """조각 수는 부스 수에 맞춰 정한다 — 4·6·9 로 묶어두면 부스 8개를 담을 격자가 없다."""
     f = make_festival(db)
-    db.add(StampBoard(festival_id=f.id, rows=3, cols=2))  # 3×2 는 미지원
+    board = StampBoard(festival_id=f.id, rows=2, cols=4)  # 8조각
+    db.add(board)
+    db.flush()
+    assert board.total_tiles == 8
+
+
+def test_grid_outside_range_rejected(db: Session):
+    f = make_festival(db)
+    db.add(StampBoard(festival_id=f.id, rows=6, cols=2))  # 변이 5를 넘는다
     with pytest.raises(IntegrityError):
         db.flush()
 

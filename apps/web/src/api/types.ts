@@ -340,7 +340,18 @@ export interface BoothList {
   total: number;
 }
 
-/** 운영자 보드 조회. 완성 가능성 경고를 서버가 판정해 내려준다. */
+/** 격자 후보. 서버가 지급 단위 수를 보고 계산한다 (A안·B안·C안). */
+export interface GridOption {
+  rows: number;
+  cols: number;
+  total: number;
+  /** 지급 단위 수와 정확히 맞는가 */
+  exact: boolean;
+  /** 조각을 못 받고 남는 지급 단위 수 */
+  leftover: number;
+}
+
+/** 운영자 보드 조회. 완성 가능성 경고와 격자 후보를 서버가 판정해 내려준다. */
 export interface StampBoardAdmin {
   id: number;
   festival_id: number;
@@ -354,4 +365,7 @@ export interface StampBoardAdmin {
   complete_message: string;
   tiles: BoardTile[];
   warnings: Record<string, unknown>[];
+  unit_count: number;
+  unit_label: string;
+  grid_options: GridOption[];
 }

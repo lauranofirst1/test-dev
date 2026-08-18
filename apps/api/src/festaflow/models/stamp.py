@@ -35,12 +35,12 @@ def _pg_enum(enum_cls, name: str):
 class StampBoard(Base):
     __tablename__ = "stamp_boards"
     __table_args__ = (
-        CheckConstraint("rows BETWEEN 2 AND 3", name="rows_range"),
-        CheckConstraint("cols BETWEEN 2 AND 3", name="cols_range"),
+        # 조각 수는 **부스 수에 맞춰** 정한다. 4·6·9 세 가지로 묶어두면 부스가
+        # 8개인 축제는 9조각(완성 불가)이나 6조각(2개 부스가 조각 없이 남음) 중
+        # 하나를 골라야 한다. 2~5 범위면 4·6·8·9·10·12·15·16·20·25 를 만들 수 있다.
+        CheckConstraint("rows BETWEEN 2 AND 5", name="rows_range"),
+        CheckConstraint("cols BETWEEN 2 AND 5", name="cols_range"),
         CheckConstraint("version >= 1", name="version_positive"),
-        CheckConstraint(
-            "(rows, cols) IN ((2,2),(2,3),(3,3))", name="grid_supported"
-        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

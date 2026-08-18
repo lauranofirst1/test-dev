@@ -207,6 +207,62 @@ def uncompletable_warning(db: Session, festival_id: int, board: StampBoard) -> d
     }
 
 
+#: 제안할 격자의 최소·최대 변 길이. DB 의 rows_range/cols_range 와 같아야 한다.
+GRID_MIN, GRID_MAX = 2, 5
+
+
+@dataclass(frozen=True)
+class GridOption:
+    """기획자에게 제시할 격자 후보 한 개."""
+
+    rows: int
+    cols: int
+    #: 지급 단위 수와 정확히 맞는가 — 부스가 모두 조각 하나씩 갖는 구성
+    exact: bool
+    #: 조각을 못 받는 지급 단위 수(0 이면 남는 부스가 없다)
+    leftover: int
+
+    @property
+    def total(self) -> int:
+        return self.rows * self.cols
+
+
+def grid_options(unit_count: int, *, limit: int = 3) -> list[GridOption]:
+    """지급 단위 수에 맞춰 쪼갤 격자 후보를 만든다.
+
+    조각 수는 단독으로 정할 값이 아니다. `rows*cols` 가 지급 단위 수보다 크면
+    아무도 완성할 수 없고, 작으면 그만큼의 부스가 조각 없이 남는다. 그래서
+    **단위 수를 넘지 않는 격자만** 제안하고, 정확히 맞는 것을 앞에 세운다.
+
+    8개처럼 정사각이 안 되는 수도 2×4 로 정확히 나뉜다. 소수(5·7·11)는 정확한
+    격자가 없어 가장 가까운 아래쪽 격자를 제안한다 — 그때 남는 부스 수를
+    `leftover` 로 알려주고 숨기지 않는다.
+    """
+    if unit_count < GRID_MIN * GRID_MIN:
+        return []
+
+    seen: set[tuple[int, int]] = set()
+    candidates: list[GridOption] = []
+    for rows in range(GRID_MIN, GRID_MAX + 1):
+        for cols in range(rows, GRID_MAX + 1):  # rows <= cols — 90도 회전은 같은 격자
+            total = rows * cols
+            if total > unit_count or (rows, cols) in seen:
+                continue
+            seen.add((rows, cols))
+            candidates.append(
+                GridOption(
+                    rows=rows,
+                    cols=cols,
+                    exact=total == unit_count,
+                    leftover=unit_count - total,
+                )
+            )
+
+    # 남는 부스가 적은 순 → 조각이 많은 순. 정확히 맞는 격자가 자연히 1순위가 된다.
+    candidates.sort(key=lambda g: (g.leftover, -g.total))
+    return candidates[:limit]
+
+
 @dataclass
 class Progress:
     revealed_count: int

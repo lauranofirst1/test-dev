@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     tourism_snapshot_cache_enabled: bool = False
     tourism_snapshot_ttl_days: int = 7
 
+    # ── 업로드 ──────────────────────────────────────────────
+    #: 조각 보드 그림이 저장되는 곳. /media 로 서빙된다.
+    media_dir: str = "media"
+
     # ── 도메인 임계값 ───────────────────────────────────────
     #: 부스 회전 QR 의 window 길이. 서버가 현재·직전 window 를 모두 인정하므로
     #: 실질 유효기간은 30~60초다. docs/02-data-model.md §7 과 계약 §8.2 기준.

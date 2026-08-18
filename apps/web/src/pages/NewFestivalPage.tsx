@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import { EMPTY_FORM, PRESETS, type PresetForm } from '../api/presets';
-import { GridPicker, type Grid } from '../components/GridPicker';
+import { type Grid, GridPlanPicker, useGridOptions } from '../components/GridPicker';
 
 interface Created {
   festival: { id: number };
@@ -49,6 +49,9 @@ export function NewFestivalPage() {
       'planned_etc',
     ] as const
   ).reduce((n, k) => n + (num(form[k]) ?? 0), 0);
+
+  // 후보 계산은 서버에 맡긴다 — 부스 화면과 같은 규칙을 봐야 한다.
+  const gridOptions = useGridOptions(plannedPrograms);
 
   const set = (k: keyof PresetForm) => (e: { target: { value: string } }) => {
     setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -368,19 +371,22 @@ export function NewFestivalPage() {
           <h2 className="section">관객이 모을 조각</h2>
           <p className="muted">
             부스를 돌면 축제 그림이 한 조각씩 열립니다. 기본은 부스당 1조각이므로
-            <strong> 조각 수는 계획한 부스 수 이하</strong>여야 완성이 가능합니다.
-            등록 후에도 바꿀 수 있습니다.
+            <strong> 조각 수는 계획한 프로그램 수 이하</strong>여야 완성이 가능합니다.
+            그림과 조각 수는 등록 후에도 바꿀 수 있습니다.
           </p>
-          <GridPicker
-            value={grid}
-            onChange={setGrid}
-            unitCount={plannedPrograms > 0 ? plannedPrograms : undefined}
-            unitLabel="예정 프로그램"
-          />
-          {plannedPrograms > 0 && (
-            <p className="muted tabular">
-              위에 적은 예정 프로그램은 {plannedPrograms}개입니다.
+          {plannedPrograms === 0 ? (
+            <p className="muted">
+              위에서 예정 프로그램 수를 채우면 그 수에 맞는 조각 구성을 제안합니다.
             </p>
+          ) : (
+            <GridPlanPicker
+              options={gridOptions.data ?? []}
+              value={grid}
+              onChange={setGrid}
+              imageUrl="/images/chuncheon-stamp-board.png"
+              unitLabel="예정 프로그램"
+              unitCount={plannedPrograms}
+            />
           )}
         </section>
 

@@ -1,68 +1,134 @@
-/** 조각 격자 선택.
+/** 조각 격자 후보 선택 — A안 · B안 · C안.
  *
- * 01-product-spec §5.2 는 2×2(4조각) / 2×3(6조각) / 3×3(9조각) 중 **선택**으로
- * 정의합니다. 숫자만 나열하면 감이 오지 않아 실제 격자 모양을 작게 그립니다.
+ * 조각 수는 단독으로 정할 값이 아닙니다. 지급 단위(부스 또는 미션) 수보다 많으면
+ * 아무도 완성할 수 없고, 적으면 그만큼의 부스가 조각 없이 남습니다. 그래서 후보를
+ * **서버가 계산해** 내려주고(`GET /api/stamp-board/grid-options`) 화면은 고르게만
+ * 합니다. 같은 규칙이 화면에도 살면 반드시 어긋납니다.
  *
- * 지급 단위 수(부스 또는 미션)를 넘기면 완성 불가능한 격자에 표시를 붙입니다.
- * 조각 수는 단독으로 정할 값이 아니라 부스 계획과 함께 정해지는 값이기 때문입니다.
+ * 후보는 숫자가 아니라 **실제 그림을 그 격자로 쪼갠 미리보기**로 보여줍니다.
+ * "3×4 · 12조각"은 감이 오지 않지만 쪼개진 그림은 바로 읽힙니다.
  */
 
-import { topic } from '../lib/particles';
+import { useQuery } from '@tanstack/react-query';
+
+import { api } from '../api/client';
+import type { GridOption } from '../api/types';
+import { subject, topic } from '../lib/particles';
 
 export interface Grid {
   rows: number;
   cols: number;
 }
 
-/** DB 의 grid_supported CHECK 와 같은 집합. 한쪽만 늘리면 422 로 튕긴다. */
-export const GRIDS: (Grid & { label: string })[] = [
-  { rows: 2, cols: 2, label: '2×2 · 4조각' },
-  { rows: 2, cols: 3, label: '2×3 · 6조각' },
-  { rows: 3, cols: 3, label: '3×3 · 9조각' },
-];
+const PLAN_LABELS = ['A안', 'B안', 'C안', 'D안', 'E안'];
 
-export function GridPicker({
+export function useGridOptions(unitCount: number) {
+  return useQuery({
+    queryKey: ['grid-options', unitCount],
+    queryFn: () => api.get<GridOption[]>(`/api/stamp-board/grid-options?unit_count=${unitCount}`),
+    enabled: unitCount > 0,
+    staleTime: 60 * 60_000, // 순수 계산이라 바뀌지 않는다
+  });
+}
+
+export function GridPlanPicker({
+  options,
   value,
   onChange,
-  unitCount,
+  imageUrl,
   unitLabel,
+  unitCount,
 }: {
+  options: GridOption[];
   value: Grid;
   onChange: (g: Grid) => void;
-  /** 지급 단위 수. 모르면 생략하면 경고를 붙이지 않는다. */
-  unitCount?: number;
-  unitLabel?: string;
+  /** 미리보기에 쓸 그림. 없으면 색 블록으로 보여준다. */
+  imageUrl?: string;
+  unitLabel: string;
+  unitCount: number;
 }) {
+  if (options.length === 0) {
+    return (
+      <div className="notice notice--warn">
+        <span>⚠</span>
+        <span>
+          {unitLabel}
+          {subject(unitLabel)} {unitCount}개라 나눌 수 있는 격자가 없습니다. 최소 4개가 필요합니다.
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className="gridpick">
-      {GRIDS.map((g) => {
-        const on = g.rows === value.rows && g.cols === value.cols;
-        const impossible = unitCount !== undefined && g.rows * g.cols > unitCount;
+    <div className="plans">
+      {options.map((o, i) => {
+        const on = o.rows === value.rows && o.cols === value.cols;
         return (
           <button
-            key={g.label}
+            key={`${o.rows}x${o.cols}`}
             type="button"
-            className={`gridopt${on ? ' gridopt--on' : ''}`}
+            className={`plan${on ? ' plan--on' : ''}`}
             aria-pressed={on}
-            onClick={() => onChange({ rows: g.rows, cols: g.cols })}
+            onClick={() => onChange({ rows: o.rows, cols: o.cols })}
           >
-            <span
-              className="gridopt__preview"
-              style={{ gridTemplateColumns: `repeat(${g.cols}, 1fr)` }}
-              aria-hidden="true"
-            >
-              {Array.from({ length: g.rows * g.cols }, (_, i) => (
-                <i key={i} />
-              ))}
+            <span className="plan__head">
+              <span className="plan__name">{PLAN_LABELS[i] ?? `${i + 1}안`}</span>
+              {o.exact && <span className="plan__badge">딱 맞음</span>}
             </span>
-            <span className="gridopt__label">{g.label}</span>
-            {impossible && (
-              <span className="gridopt__warn">{unitLabel ?? '지급 단위'} 부족</span>
-            )}
+
+            <GridPreview rows={o.rows} cols={o.cols} imageUrl={imageUrl} />
+
+            <span className="plan__total tabular">
+              {o.total}조각 · {o.rows}×{o.cols}
+            </span>
+            <span className="plan__note">
+              {o.exact
+                ? `${unitLabel} ${unitCount}개가 각각 한 조각`
+                : `${unitLabel} ${o.leftover}개는 조각 없음`}
+            </span>
           </button>
         );
       })}
     </div>
+  );
+}
+
+/** 그림을 격자로 쪼갠 미리보기. 실제 관객 보드와 같은 방식으로 자른다. */
+export function GridPreview({
+  rows,
+  cols,
+  imageUrl,
+}: {
+  rows: number;
+  cols: number;
+  imageUrl?: string;
+}) {
+  return (
+    <span
+      className="gridprev"
+      style={{
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        ['--grid-ratio' as string]: `${cols} / ${rows}`,
+      }}
+      aria-hidden="true"
+    >
+      {Array.from({ length: rows * cols }, (_, i) => (
+        <i
+          key={i}
+          style={
+            imageUrl
+              ? {
+                  backgroundImage: `url(${imageUrl})`,
+                  backgroundSize: `${cols * 100}% ${rows * 100}%`,
+                  backgroundPosition: `${(i % cols) * (100 / (cols - 1 || 1))}% ${
+                    Math.floor(i / cols) * (100 / (rows - 1 || 1))
+                  }%`,
+                }
+              : undefined
+          }
+        />
+      ))}
+    </span>
   );
 }
 

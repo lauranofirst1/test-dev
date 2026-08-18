@@ -113,19 +113,37 @@ class StampBoardOut(BaseModel):
 
 
 class StampBoardUpdate(BaseModel):
-    rows: int = Field(ge=2, le=3)
-    cols: int = Field(ge=2, le=3)
+    # 2~5 — DB 의 rows_range/cols_range 와 같은 범위.
+    rows: int = Field(ge=2, le=5)
+    cols: int = Field(ge=2, le=5)
     reveal_mode: RevealMode
     grant_unit: GrantUnit
     image_url: str = Field(min_length=1)
     complete_message: str = Field(min_length=1)
 
 
+class GridOptionOut(BaseModel):
+    """기획자에게 제시하는 격자 후보. A안·B안·C안으로 보여준다."""
+
+    rows: int
+    cols: int
+    total: int
+    #: 지급 단위 수와 정확히 맞는가
+    exact: bool
+    #: 조각을 못 받고 남는 지급 단위 수
+    leftover: int
+
+
 class StampBoardAdmin(StampBoardOut):
-    """운영자 조회. 참여자 응답에는 운영 경고를 싣지 않는다."""
+    """운영자 조회. 참여자 응답에는 운영 경고도 제안도 싣지 않는다."""
 
     #: 완성이 불가능한 구성이면 여기에 담긴다 — 당일에 알면 늦다.
     warnings: list[dict] = Field(default_factory=list)
+    #: 지급 단위(부스 또는 미션) 수와 이름. 화면이 다시 세지 않게 함께 보낸다.
+    unit_count: int = 0
+    unit_label: str = "부스"
+    #: 지급 단위 수에 맞춰 쪼갤 격자 후보. 정확히 맞는 것이 앞에 온다.
+    grid_options: list[GridOptionOut] = Field(default_factory=list)
 
 
 class BoardProgress(BaseModel):

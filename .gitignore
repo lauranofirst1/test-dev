@@ -25,6 +25,9 @@ dist/
 .vscode/*
 !.vscode/extensions.json
 
+# 업로드된 파일 — 사용자 데이터라 저장소에 넣지 않는다
+apps/api/media/
+
 # 도구 산출물
 .playwright-mcp/
 coverage/

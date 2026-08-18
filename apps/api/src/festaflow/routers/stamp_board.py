@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, File, Query, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -21,17 +21,38 @@ from festaflow.core.deps import (
 )
 from festaflow.core.errors import ApiError, not_found
 from festaflow.models import Festival, StampBoard, StampReveal, StampTile
+from festaflow.models.enums import GrantUnit
 from festaflow.schemas.participation import (
     BoardProgress,
     BoardTile,
+    GridOptionOut,
     ParticipantBoard,
     StampBoardAdmin,
     StampBoardOut,
     StampBoardUpdate,
 )
 from festaflow.services import grants as svc
+from festaflow.services import media
 
 router = APIRouter(prefix="/api/festivals/{festival_id}", tags=["stamp-board"])
+
+#: 축제와 무관한 순수 계산. 생성 화면은 축제가 없는 상태에서 후보를 물어야 한다.
+grid_router = APIRouter(prefix="/api/stamp-board", tags=["stamp-board"])
+
+
+@grid_router.get("/grid-options", response_model=list[GridOptionOut])
+def grid_options(unit_count: int = Query(..., ge=0, le=1000)) -> list[GridOptionOut]:
+    """지급 단위 수에 맞춰 쪼갤 격자 후보. 규칙을 화면에 복제하지 않기 위한 것이다.
+
+    부스 등록 전에는 기획서의 예정 프로그램 수를, 등록 후에는 실제 부스·미션 수를
+    넘긴다. 어느 쪽이든 판정 규칙은 서버 한 곳에만 있다.
+    """
+    return [
+        GridOptionOut(
+            rows=g.rows, cols=g.cols, total=g.total, exact=g.exact, leftover=g.leftover
+        )
+        for g in svc.grid_options(unit_count)
+    ]
 
 #: version 을 올려야 하는 필드. 이걸 바꾸면 타일 집합 자체가 달라진다.
 STRUCTURAL = ("rows", "cols", "reveal_mode", "grant_unit")
@@ -62,9 +83,19 @@ def _out(db: Session, board: StampBoard, *, tiles: list[StampTile] | None = None
 
 def _admin(db: Session, festival_id: int, board: StampBoard) -> StampBoardAdmin:
     warning = svc.uncompletable_warning(db, festival_id, board)
+    units = svc.grant_unit_count(db, festival_id, board)
     return StampBoardAdmin(
         **_out(db, board).model_dump(),
         warnings=[warning] if warning else [],
+        unit_count=units,
+        unit_label="부스" if board.grant_unit == GrantUnit.BOOTH else "미션",
+        # 후보 계산도 서버에 둔다 — 어떤 격자가 가능한지는 도메인 규칙이다.
+        grid_options=[
+            GridOptionOut(
+                rows=g.rows, cols=g.cols, total=g.total, exact=g.exact, leftover=g.leftover
+            )
+            for g in svc.grid_options(units)
+        ],
     )
 
 
@@ -143,6 +174,31 @@ def update_stamp_board(
             db.add(StampTile(board_id=board.id, board_version=board.version, tile_index=idx))
         # 기존 stamp_reveals 는 지우지 않는다. 이전 버전 기록으로 남는다.
 
+    db.commit()
+    db.refresh(board)
+    return _admin(db, festival_id, board)
+
+
+@router.post(
+    "/stamp-board/image",
+    response_model=StampBoardAdmin,
+    dependencies=[FestivalAccess, CanOperate],
+)
+def upload_board_image(
+    festival_id: int,
+    db: DbSession,
+    org: CurrentOrg,
+    # ruff B008: FastAPI 는 의존성을 기본값으로 선언한다 — 여기서는 관용구가 맞다.
+    file: UploadFile = File(...),  # noqa: B008
+) -> StampBoardAdmin:
+    """조각 보드 그림을 올린다. 격자는 바뀌지 않으므로 진행도 초기화하지 않는다.
+
+    그림만 바꾸는 것은 되돌릴 수 있는 변경이라 확인을 요구하지 않는다 —
+    version 을 올리는 것은 타일 집합이 달라지는 변경뿐이다.
+    """
+    _owned(db, org.id, festival_id)
+    board = svc.get_board(db, festival_id)
+    board.image_url = media.save_board_image(file.file, festival_id)
     db.commit()
     db.refresh(board)
     return _admin(db, festival_id, board)
