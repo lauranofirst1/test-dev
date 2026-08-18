@@ -52,12 +52,28 @@ python3 -m venv .venv
 
 ## 실행
 
+백엔드와 프론트엔드를 한 번에 띄웁니다. Ctrl-C 한 번으로 둘 다 내려갑니다.
+
+```bash
+./dev.sh
+# → http://localhost:5173      프론트엔드 (여기로 접속)
+# → http://localhost:8000/docs 백엔드 API 문서
+```
+
+프론트엔드가 `/api` 요청을 백엔드로 프록시하므로 브라우저는 5173만 열면 됩니다.
+포트를 바꾸려면 `API_PORT=8001 WEB_PORT=5174 ./dev.sh`.
+
+따로 띄우려면:
+
+```bash
+cd apps/api && ./.venv/bin/uvicorn festaflow.main:app --reload --port 8000
+cd apps/web && npm run dev
+```
+
+그 밖에:
+
 ```bash
 cd apps/api
-
-# 개발 서버
-./.venv/bin/uvicorn festaflow.main:app --reload --port 8000
-# → http://localhost:8000/docs
 
 # 테스트 (인증키 불필요)
 ./.venv/bin/python -m pytest -q
