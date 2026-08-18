@@ -121,6 +121,13 @@ class StampBoardUpdate(BaseModel):
     complete_message: str = Field(min_length=1)
 
 
+class StampBoardAdmin(StampBoardOut):
+    """운영자 조회. 참여자 응답에는 운영 경고를 싣지 않는다."""
+
+    #: 완성이 불가능한 구성이면 여기에 담긴다 — 당일에 알면 늦다.
+    warnings: list[dict] = Field(default_factory=list)
+
+
 class BoardProgress(BaseModel):
     revealed_count: int
     total_tiles: int

@@ -283,7 +283,8 @@ p {
 }
 
 .field input:focus-visible,
-.field textarea:focus-visible {
+.field textarea:focus-visible,
+.field select:focus-visible {
   outline: 3px solid var(--color-mint-ink);
   outline-offset: 1px;
 }
@@ -838,4 +839,67 @@ p {
     font-size: 30px;
     padding: var(--space-4) var(--space-5);
   }
+}
+
+/* ── 부스 관리 ───────────────────────────────────────────── */
+
+/* 부스 카드 안의 인라인 미션 추가 입력. .field 밖이라 따로 준다. */
+.card form input {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.card form input:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 1px;
+}
+
+.joinurl {
+  flex: 1 1 260px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* 관객 헤더 — 기획자 헤더와 같은 자리에 있지만 밖으로 나가는 링크가 없다. */
+.topbar--audience {
+  justify-content: space-between;
+}
+
+.brand--plain {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-black);
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 카드 전체가 진단 링크이므로 보조 링크는 카드 밖에 둔다 — <a> 중첩 금지. */
+.fcard__wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fcard__sub {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-mute);
+  border-radius: var(--radius-md);
+}
+
+.fcard__sub:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-sunk);
 }

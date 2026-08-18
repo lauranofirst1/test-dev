@@ -130,6 +130,10 @@ def test_not_found_message_picks_right_particle(client):
     assert r.status_code == 404
     assert "진단을 찾을 수 없습니다." in r.json()["detail"]["error"]["message"]
 
+    from festaflow.core.errors import subject_particle
+
+    assert subject_particle("부스") == "가"  # 받침 없음
+    assert subject_particle("미션") == "이"  # 받침 있음
     assert object_particle("축제") == "를"  # 받침 없음
     assert object_particle("진단") == "을"  # 받침 있음
     assert object_particle("리소스") == "를"

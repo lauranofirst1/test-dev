@@ -57,7 +57,8 @@ export function WorkspacePage() {
       {data && data.items.length > 0 && (
         <div className="cards">
           {data.items.map((f) => (
-            <Link to={`/festivals/${f.id}/diagnosis`} className="card fcard" key={f.id}>
+            <div className="fcard__wrap" key={f.id}>
+            <Link to={`/festivals/${f.id}/diagnosis`} className="card fcard">
               <div className="row" style={{ justifyContent: 'space-between' }}>
                 <span className="muted tabular">#{f.id}</span>
                 {f.is_demo && <span className="badge badge--none">데모</span>}
@@ -81,6 +82,12 @@ export function WorkspacePage() {
               </div>
               <span className="fcard__cta">진단 보기 →</span>
             </Link>
+            {/* 진단만으로는 현장이 준비되지 않는다. 부스 등록으로 가는 길을
+                카드에서 바로 열어 둔다. */}
+            <Link to={`/festivals/${f.id}/booths`} className="fcard__sub">
+              부스 · 미션 관리 →
+            </Link>
+            </div>
           ))}
         </div>
       )}

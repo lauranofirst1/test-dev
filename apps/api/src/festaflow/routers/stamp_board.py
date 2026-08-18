@@ -25,6 +25,7 @@ from festaflow.schemas.participation import (
     BoardProgress,
     BoardTile,
     ParticipantBoard,
+    StampBoardAdmin,
     StampBoardOut,
     StampBoardUpdate,
 )
@@ -59,10 +60,20 @@ def _out(db: Session, board: StampBoard, *, tiles: list[StampTile] | None = None
 # ── 운영자 ──────────────────────────────────────────────────────────────────
 
 
-@router.get("/stamp-board", response_model=StampBoardOut, dependencies=[FestivalAccess])
-def get_stamp_board(festival_id: int, db: DbSession, org: CurrentOrg) -> StampBoardOut:
+def _admin(db: Session, festival_id: int, board: StampBoard) -> StampBoardAdmin:
+    warning = svc.uncompletable_warning(db, festival_id, board)
+    return StampBoardAdmin(
+        **_out(db, board).model_dump(),
+        warnings=[warning] if warning else [],
+    )
+
+
+@router.get("/stamp-board", response_model=StampBoardAdmin, dependencies=[FestivalAccess])
+def get_stamp_board(festival_id: int, db: DbSession, org: CurrentOrg) -> StampBoardAdmin:
+    """운영자 조회. 완성 가능성 경고를 함께 싣는다 — 같은 판정을 화면이 다시
+    계산하면 규칙이 두 곳에 살고 반드시 어긋난다."""
     _owned(db, org.id, festival_id)
-    return _out(db, svc.get_board(db, festival_id))
+    return _admin(db, festival_id, svc.get_board(db, festival_id))
 
 
 def _owned(db: Session, org_id: int, festival_id: int) -> Festival:
@@ -80,7 +91,7 @@ def _owned(db: Session, org_id: int, festival_id: int) -> Festival:
 
 @router.put(
     "/stamp-board",
-    response_model=StampBoardOut,
+    response_model=StampBoardAdmin,
     dependencies=[FestivalAccess, CanOperate],
 )
 def update_stamp_board(
@@ -89,7 +100,7 @@ def update_stamp_board(
     db: DbSession,
     org: CurrentOrg,
     confirm: bool = Query(False),
-) -> StampBoardOut:
+) -> StampBoardAdmin:
     """구조를 바꾸면 진행이 초기화된다. 공개 이력이 있으면 확인 없이는 진행하지 않는다."""
     _owned(db, org.id, festival_id)
     board = svc.get_board(db, festival_id)
@@ -134,7 +145,7 @@ def update_stamp_board(
 
     db.commit()
     db.refresh(board)
-    return _out(db, board)
+    return _admin(db, festival_id, board)
 
 
 # ── 참여자 ──────────────────────────────────────────────────────────────────

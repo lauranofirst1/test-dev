@@ -292,3 +292,66 @@ export interface GrantResult {
   revealed_tile: { tile_index: number; board_version: number } | null;
   board_progress: BoardProgress;
 }
+
+// ── 부스 · 미션 (운영자) ─────────────────────────────────────────────────────
+
+export type BoothType =
+  | 'food'
+  | 'experience'
+  | 'performance'
+  | 'information'
+  | 'local_shop'
+  | 'etc';
+
+export type BoothQrMode = 'printed' | 'rotating';
+
+export interface MissionOut {
+  id: number;
+  festival_id: number;
+  booth_id: number | null;
+  title: string;
+  description: string | null;
+  points: number;
+  is_active: boolean;
+  experience_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BoothDetail {
+  id: number;
+  festival_id: number;
+  name: string;
+  booth_type: BoothType;
+  type_label: string | null;
+  location: string | null;
+  manager_name: string | null;
+  is_active: boolean;
+  verify_mode: BoothVerifyMode;
+  qr_mode: BoothQrMode;
+  use_experience: boolean;
+  created_at: string;
+  updated_at: string;
+  missions: MissionOut[];
+}
+
+export interface BoothList {
+  items: BoothDetail[];
+  total: number;
+}
+
+/** 운영자 보드 조회. 완성 가능성 경고를 서버가 판정해 내려준다. */
+export interface StampBoardAdmin {
+  id: number;
+  festival_id: number;
+  version: number;
+  rows: number;
+  cols: number;
+  total_tiles: number;
+  reveal_mode: RevealMode;
+  grant_unit: GrantUnit;
+  image_url: string;
+  complete_message: string;
+  tiles: BoardTile[];
+  warnings: Record<string, unknown>[];
+}

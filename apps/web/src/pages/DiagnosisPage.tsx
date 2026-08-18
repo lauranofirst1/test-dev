@@ -65,13 +65,18 @@ export function DiagnosisPage() {
               </p>
             )}
           </div>
-          <button
-            className="btn btn--primary btn--lg"
-            onClick={() => run.mutate()}
-            disabled={run.isPending}
-          >
-            {run.isPending ? '관광 데이터 조회 중…' : d ? '다시 진단하기' : '진단 실행'}
-          </button>
+          <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
+            <Link to={`/festivals/${id}/booths`} className="btn btn--ghost">
+              부스 · 미션 관리
+            </Link>
+            <button
+              className="btn btn--primary btn--lg"
+              onClick={() => run.mutate()}
+              disabled={run.isPending}
+            >
+              {run.isPending ? '관광 데이터 조회 중…' : d ? '다시 진단하기' : '진단 실행'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -113,7 +118,14 @@ export function DiagnosisPage() {
         </div>
       )}
 
-      {d && <DiagnosisResult d={d} comparison={comparison.data} />}
+      {d && (
+        <DiagnosisResult
+          d={d}
+          comparison={comparison.data}
+          festivalId={id ?? ''}
+          boothCount={f?.booth_count ?? 0}
+        />
+      )}
     </div>
   );
 }
@@ -121,9 +133,14 @@ export function DiagnosisPage() {
 function DiagnosisResult({
   d,
   comparison,
+  festivalId,
+  boothCount,
 }: {
   d: Diagnosis;
   comparison?: DiagnosisComparison;
+  festivalId: string;
+  /** 부스가 없으면 프로그램 균형·운영 준비도가 예정값으로 계산된다. */
+  boothCount: number;
 }) {
   const disclosed = d.score_disclosed;
 
@@ -223,6 +240,29 @@ function DiagnosisResult({
           </article>
         ))}
       </div>
+
+      {/* 다음 단계 — 권고와 행동을 같은 흐름에 둔다.
+          "부스를 등록하면 실제 구성으로 평가됩니다"라고 말하면서 등록할 곳을
+          알려주지 않으면, 읽은 사람은 무엇을 해야 하는지 모른다. */}
+      {boothCount === 0 && (
+        <div className="card card--accent stack" style={{ gap: 'var(--space-4)' }}>
+          <div className="stack" style={{ gap: 4 }}>
+            <p className="eyebrow">다음 단계</p>
+            <h3 style={{ fontSize: 'var(--text-h3)' }}>부스를 등록하면 점수가 달라집니다</h3>
+          </div>
+          <p className="soft">
+            지금 <strong>프로그램 균형</strong>과 <strong>운영 준비도</strong>는 기획서에 적은
+            예정값으로 계산됐습니다. 부스와 미션을 등록하면 실제 구성으로 평가되고, 현장에서
+            QR 참여를 측정할 수 있습니다. 등록한 뒤 <strong>다시 진단</strong>하면 직전 결과와
+            비교해 개선 효과를 보여드립니다.
+          </p>
+          <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
+            <Link to={`/festivals/${festivalId}/booths`} className="btn btn--primary btn--lg">
+              부스 등록하러 가기
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* 데이터 출처 */}
       {d.tourism_source && (

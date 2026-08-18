@@ -129,7 +129,6 @@ export function JoinPage() {
             </div>
 
             <BoothGuide festival={f} />
-            <p className="muted" style={{ textAlign: 'center' }}>{f.source_note}</p>
           </>
         )}
       </div>
@@ -142,10 +141,10 @@ export function JoinPage() {
 
   return (
     <div className="shell stack" style={{ gap: 'var(--space-5)' }}>
-      <div className="stack" style={{ gap: 4 }}>
-        <p className="eyebrow">내 축제 조각</p>
-        <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>{f?.name ?? '축제'}</h1>
-      </div>
+      {/* 헤더가 축제 이름을 계속 보여주므로 여기서 반복하지 않는다.
+          참여 전에는 "이 축제가 맞나" 확인이 중요해 이름을 크게 두지만,
+          참여 후에는 확인이 끝났고 필요한 건 지금 어디까지 모았는지다. */}
+      <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>내 축제 조각</h1>
 
       <div className="card card--accent stack" style={{ gap: 'var(--space-3)' }}>
         <p className="eyebrow">부스에서 이 코드를 보여주세요</p>
@@ -247,7 +246,6 @@ export function JoinPage() {
         </div>
       )}
 
-      {f && <p className="muted" style={{ textAlign: 'center' }}>{f.source_note}</p>}
     </div>
   );
 }

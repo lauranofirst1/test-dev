@@ -758,6 +758,14 @@ def test_board_uncompletable_warning(festival, db):
     assert warning is not None
     assert warning["code"] == "BOARD_UNCOMPLETABLE"
     assert "9조각" in warning["message"] and "5개" in warning["message"]
+    # 받침 없는 "부스"에는 `가`, 받침 있는 "미션"에는 `이` 가 붙어야 한다.
+    assert "활성 부스가" in warning["message"]
+
+    board.grant_unit = GrantUnit.MISSION
+    db.flush()
+    mission_warning = g.uncompletable_warning(db, festival.id, _board(db, festival))
+    assert mission_warning is not None
+    assert "활성 미션이" in mission_warning["message"]
 
     for i in range(5, 9):
         _make_booth(db, festival, name=f"부스{i}")

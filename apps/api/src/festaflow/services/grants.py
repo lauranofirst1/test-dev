@@ -19,7 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from festaflow.core import security
-from festaflow.core.errors import ApiError, not_found
+from festaflow.core.errors import ApiError, not_found, subject_particle
 from festaflow.models import (
     Booth,
     BoothScanUse,
@@ -201,7 +201,8 @@ def uncompletable_warning(db: Session, festival_id: int, board: StampBoard) -> d
     return {
         "code": "BOARD_UNCOMPLETABLE",
         "message": (
-            f"{board.total_tiles}조각 보드에 {unit_label}이 {units}개라 완성이 불가능합니다."
+            f"{board.total_tiles}조각 보드에 {unit_label}{subject_particle(unit_label)} "
+            f"{units}개라 완성이 불가능합니다."
         ),
     }
 

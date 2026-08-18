@@ -43,6 +43,16 @@ def object_particle(word: str) -> str:
     return "를"
 
 
+def subject_particle(word: str) -> str:
+    """주격 조사를 받침 유무로 고른다 — `부스가`, `미션이`."""
+    if not word:
+        return "가"
+    last = word[-1]
+    if "가" <= last <= "힣":
+        return "가" if (ord(last) - 0xAC00) % 28 == 0 else "이"
+    return "가"
+
+
 def not_found(what: str = "리소스") -> ApiError:
     """타 기관 리소스도 이걸로 응답한다 — 403 을 쓰면 존재 여부가 노출된다."""
     return ApiError(404, "NOT_FOUND", f"{what}{object_particle(what)} 찾을 수 없습니다.")
