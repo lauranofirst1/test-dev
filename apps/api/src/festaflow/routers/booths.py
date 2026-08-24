@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 from fastapi import APIRouter, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -19,7 +21,7 @@ from festaflow.core.deps import (
 )
 from festaflow.core.errors import ApiError, not_found, validation_failed
 from festaflow.models import Booth, Festival, Mission, Participant, Participation
-from festaflow.models.enums import BoothVerifyMode
+from festaflow.models.enums import BoothQrMode, BoothVerifyMode
 from festaflow.schemas.booth import (
     BoothCreate,
     BoothCreated,
@@ -41,6 +43,7 @@ from festaflow.schemas.participation import (
     RevealedTile,
     StaffGrantIn,
 )
+from festaflow.services import experience as exp
 from festaflow.services import grants as svc
 
 router = APIRouter(
@@ -91,6 +94,20 @@ def _detail(db: Session, booth: Booth) -> BoothDetail:
         **BoothOut.model_validate(booth).model_dump(),
         missions=[MissionOut.model_validate(m) for m in _missions_of(db, booth.id)],
     )
+
+
+def _validated_mission_fields(payload: MissionIn | MissionCreate) -> dict:
+    """미션 저장값. **체험 설정을 검증하고 정규화한 것으로 바꿔 넣는다.**
+
+    현장에서 참여자가 깨진 문항을 만나면 그때는 고칠 수 없다. 운영자가 저장을
+    누르는 순간이 마지막 기회다. 검증만 하고 원본을 저장하면 공백이 섞인 값과
+    알 수 없는 키가 그대로 남아 화면이 그것을 다시 읽는다.
+    """
+    fields = payload.model_dump()
+    fields["experience_config"] = exp.validate_config(
+        payload.experience_type, payload.experience_config
+    )
+    return fields
 
 
 def _duplicate_name(exc: IntegrityError) -> bool:
@@ -151,7 +168,7 @@ def create_booth(
         mission = Mission(
             festival_id=festival.id,
             booth_id=booth.id,  # 요청 값이 아니라 방금 만든 부스
-            **payload.first_mission.model_dump(),
+            **_validated_mission_fields(payload.first_mission),
         )
         db.add(mission)
         db.flush()
@@ -256,7 +273,7 @@ def create_mission(
                 {"booth_id": payload.booth_id},
             )
 
-    mission = Mission(festival_id=festival.id, **payload.model_dump())
+    mission = Mission(festival_id=festival.id, **_validated_mission_fields(payload))
     db.add(mission)
     db.commit()
     db.refresh(mission)
@@ -277,7 +294,7 @@ def update_mission(
     ).scalar_one_or_none()
     if mission is None:
         raise not_found("미션")
-    for k, v in payload.model_dump().items():
+    for k, v in _validated_mission_fields(payload).items():
         setattr(mission, k, v)
     db.commit()
     db.refresh(mission)
@@ -320,20 +337,63 @@ def scan_token(
         raise ApiError(
             409,
             "BOOTH_MODE_MISMATCH",
-            "이 부스는 스태프가 참여자 QR 을 스캔하는 방식입니다. 회전 QR 을 쓰지 않습니다.",
+            "이 부스는 스태프가 참여자 QR 을 스캔하는 방식입니다. 부스 QR 을 쓰지 않습니다.",
             {"verify_mode": booth.verify_mode.value},
+        )
+
+    # 인쇄 QR — 고정 서명 하나. 종이에 인쇄해 붙이면 재발행 전까지 그대로 쓴다.
+    if booth.qr_mode == BoothQrMode.PRINTED:
+        signature = security.booth_print_signature(booth.qr_secret, booth.id)
+        path = f"/join/{festival_id}/scan?b={booth.id}&s={signature}"
+        base = (settings.public_web_origin or str(request.base_url)).rstrip("/")
+        return ScanToken(
+            booth_id=booth.id,
+            qr_mode=booth.qr_mode,
+            scan_path=path,
+            scan_url=f"{base}{path}",
         )
 
     window = security.current_window()
     token = security.booth_scan_token(booth.qr_secret, booth.id, window)
-    base = str(request.base_url).rstrip("/")
+    path = f"/join/{festival_id}/scan?b={booth.id}&t={token}"
+    # 설정이 있으면 그것이 진실이다. 없으면 요청이 도착한 주소로 짐작하는데,
+    # 그건 API 서버 주소라 프런트가 따로 뜬 환경에서는 틀린다. 그래서 브라우저는
+    # scan_path 를 쓴다.
+    base = (settings.public_web_origin or str(request.base_url)).rstrip("/")
     return ScanToken(
         booth_id=booth.id,
-        scan_url=f"{base}/join/{festival_id}/scan?b={booth.id}&t={token}",
+        qr_mode=booth.qr_mode,
+        scan_path=path,
+        scan_url=f"{base}{path}",
         window_index=window,
         expires_at=security.window_expires_at(window),
         refresh_after_seconds=settings.scan_token_window_seconds,
     )
+
+
+@router.post(
+    "/booths/{booth_id}/qr/rotate", response_model=ScanToken, dependencies=[CanOperate]
+)
+def rotate_booth_qr(
+    festival_id: int, booth_id: int, request: Request, db: DbSession, org: CurrentOrg
+) -> ScanToken:
+    """부스 QR 서명을 재발행한다 — 계약 §14.4.
+
+    **이미 붙여 둔 인쇄물이 그 순간 무효가 됩니다.** 되돌릴 수 없습니다.
+    인쇄 QR 은 사진으로 찍혀 돌 수 있고(기획서 E4 가 적어 둔 약점), 그 사실을
+    알게 됐을 때 운영자가 쓸 수 있는 유일한 수단이 이것입니다.
+
+    회전 QR 부스에서도 씁니다 — 같은 `qr_secret` 이 두 모드의 뿌리라, 키를
+    새로 뽑으면 지금 떠 있는 회전 토큰도 함께 무효가 됩니다.
+    """
+    _festival(db, org.id, festival_id)
+    booth = _booth(db, festival_id, booth_id)
+
+    booth.qr_secret = secrets.token_bytes(32)
+    db.commit()
+    db.refresh(booth)
+
+    return scan_token(festival_id, booth_id, request, db, org, staff=None)
 
 
 # ── 스태프 지급 (§8.1) ──────────────────────────────────────────────────────
@@ -378,6 +438,8 @@ def staff_grant(
         verified_via=BoothVerifyMode.STAFF_SCAN,
         granted_by_staff_id=staff.id if staff else None,
         client_request_id=payload.client_request_id,
+        # 현장에서 누른 시각. 없으면 서버 시각을 쓴다 — 계약 §14.3.
+        queued_at=payload.queued_at,
     )
     db.commit()
     return _result(outcome)

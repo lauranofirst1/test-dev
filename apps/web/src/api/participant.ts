@@ -50,12 +50,19 @@ export function clearParticipant(festivalId: number | string): void {
 const auth = (secret: string) => ({ 'X-Participant-Secret': secret });
 
 export const participantApi = {
-  issue: (festivalId: number | string) =>
-    api.post<ParticipantIssued>(`/api/festivals/${festivalId}/participants`),
+  /** 학번 축제에서는 `studentNo` 가 필수다. 같은 학번이면 기존 참여를 이어받는다. */
+  issue: (festivalId: number | string, studentNo?: string) =>
+    api.post<ParticipantIssued>(`/api/festivals/${festivalId}/participants`, {
+      student_no: studentNo ?? null,
+    }),
 
   get: <T>(festivalId: number | string, path: string, secret: string) =>
     api.get<T>(`/api/festivals/${festivalId}${path}`, auth(secret)),
 
   post: <T>(festivalId: number | string, path: string, secret: string, body?: unknown) =>
     api.post<T>(`/api/festivals/${festivalId}${path}`, body, auth(secret)),
+
+  /** 표를 거두는 것처럼 되돌리는 동작에 쓴다. */
+  del: <T>(festivalId: number | string, path: string, secret: string) =>
+    api.del<T>(`/api/festivals/${festivalId}${path}`, auth(secret)),
 };

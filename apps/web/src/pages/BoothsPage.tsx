@@ -12,14 +12,18 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ApiError, api, upload as uploadFile } from '../api/client';
+import { ExperienceEditor } from '../components/ExperienceEditor';
 import {
   type Grid,
   GridPlanPicker,
   gridBasisHint,
   useGridOptions,
 } from '../components/GridPicker';
+import { PrizeSettings } from '../components/PrizeSettings';
 import type {
+  BoardStyle,
   BoothDetail,
+  BoothQrMode,
   BoothList,
   BoothType,
   BoothVerifyMode,
@@ -41,6 +45,32 @@ const BOOTH_TYPES: { value: BoothType; label: string }[] = [
 const VERIFY_LABEL: Record<BoothVerifyMode, string> = {
   staff_scan: '스태프 확인',
   participant_scan: 'QR 스캔',
+};
+
+const QR_MODES: { value: BoothQrMode; label: string; hint: string }[] = [
+  {
+    value: 'printed',
+    label: '인쇄 QR',
+    hint: '한 번 뽑아 붙이면 끝. 바뀌지 않습니다. 태블릿이 없는 부스의 기본값입니다.',
+  },
+  {
+    value: 'rotating',
+    label: '회전 QR',
+    hint: '30초마다 바뀝니다. 현장에 와야만 찍을 수 있지만 태블릿·전원이 필요합니다.',
+  },
+];
+
+const BOARD_STYLES: { value: BoardStyle; label: string; hint: string }[] = [
+  { value: 'grid', label: '그림 퍼즐', hint: '그림 한 장을 격자로 쪼갭니다. 다 모으면 그림이 완성됩니다.' },
+  { value: 'trail', label: '스탬프 지도', hint: '점선으로 이어진 길을 따라 도장을 찍습니다. 그림은 쓰지 않습니다.' },
+];
+
+const EXPERIENCE_LABEL: Record<string, string> = {
+  stamp: '도착 확인',
+  quiz: '퀴즈',
+  info: '안내',
+  photo: '사진',
+  survey: '설문',
 };
 
 const EMPTY = {
@@ -303,6 +333,9 @@ export function BoothsPage() {
         />
       )}
 
+      {/* 뽑기는 조각 보드를 다 채운 관객이 돌린다. 보드 설정 바로 아래가 제자리다. */}
+      {items.length > 0 && <PrizeSettings festivalId={id} />}
+
       {items.length > 0 && (
         <div className="card card--sunk stack" style={{ gap: 'var(--space-3)' }}>
           <p className="eyebrow">관객 참여 링크</p>
@@ -340,6 +373,7 @@ function BoothCard({
 }) {
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('100');
+  const [editing, setEditing] = useState<number | null>(null);
 
   const addMission = useMutation({
     mutationFn: () =>
@@ -367,9 +401,11 @@ function BoothCard({
             {[booth.type_label, booth.location].filter(Boolean).join(' · ') || '위치 미정'}
           </span>
         </div>
-        <button className="btn btn--ghost" onClick={onToggle}>
-          {booth.is_active ? '중지' : '재개'}
-        </button>
+        <div className="row" style={{ gap: 'var(--space-2)' }}>
+          <button className="btn btn--ghost" onClick={onToggle}>
+            {booth.is_active ? '중지' : '재개'}
+          </button>
+        </div>
       </div>
 
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
@@ -377,12 +413,54 @@ function BoothCard({
           <p className="muted">미션이 없습니다. 하나 이상 있어야 지급할 수 있습니다.</p>
         )}
         {booth.missions.map((m) => (
-          <div key={m.id} className="row" style={{ justifyContent: 'space-between' }}>
-            <span>{m.title}</span>
-            <span className="badge badge--none tabular">{m.points.toLocaleString()}점</span>
+          <div key={m.id} className="stack" style={{ gap: 'var(--space-2)' }}>
+            <div className="row wrap" style={{ justifyContent: 'space-between' }}>
+              <div className="row" style={{ gap: 'var(--space-2)' }}>
+                <span>{m.title}</span>
+                <span className="badge badge--none">
+                  {EXPERIENCE_LABEL[m.experience_type] ?? m.experience_type}
+                </span>
+              </div>
+              <div className="row" style={{ gap: 'var(--space-2)' }}>
+                <span className="badge badge--none tabular">
+                  {m.points.toLocaleString()}점
+                </span>
+                <button
+                  className="btn btn--ghost"
+                  onClick={() => setEditing(editing === m.id ? null : m.id)}
+                >
+                  {editing === m.id ? '닫기' : '체험 설정'}
+                </button>
+              </div>
+            </div>
+            {editing === m.id && (
+              <ExperienceEditor
+                festivalId={festivalId}
+                mission={m}
+                onSaved={onChanged}
+                onClose={() => setEditing(null)}
+              />
+            )}
           </div>
         ))}
       </div>
+
+      {booth.verify_mode === 'participant_scan' && (
+        <BoothQrSettings booth={booth} festivalId={festivalId} onChanged={onChanged} />
+      )}
+
+      {/* 체험은 참여자가 QR을 찍었을 때만 뜬다. 스태프 확인 부스에 설정해 두면
+          아무도 보지 못하는 설정이 된다 — 저장은 되지만 그 사실을 말해 준다. */}
+      {booth.verify_mode === 'staff_scan' &&
+        booth.missions.some((m) => m.experience_type !== 'stamp') && (
+          <div className="notice notice--warn">
+            <span>⚠</span>
+            <span>
+              이 부스는 스태프 확인 방식이라 체험 화면이 뜨지 않습니다. 관객이 직접 QR을
+              찍게 하려면 확인 방식을 QR 스캔으로 바꾸세요.
+            </span>
+          </div>
+        )}
 
       <form
         className="row wrap"
@@ -417,6 +495,136 @@ function BoothCard({
 }
 
 
+/** 부스 QR 설정 — 인쇄냐 회전이냐. 기획서 E4.
+ *
+ * **인쇄가 기본입니다.** 지역 축제 천막 부스에 태블릿도 상시 전원도 없는 경우가
+ * 대부분이라, 보안을 이유로 장비를 강요하면 그 기능은 안 쓰입니다.
+ *
+ * 대신 인쇄 QR 은 **현장 방문을 증명하지 않습니다.** 사진 한 장이면 어디서든
+ * 같은 값이라 집에서도 지급받을 수 있습니다. 이 사실을 화면에서 분명히 말합니다 —
+ * 운영자가 모르고 고르면 그 위에 운영 계획이 세워집니다.
+ */
+function BoothQrSettings({
+  booth,
+  festivalId,
+  onChanged,
+}: {
+  booth: BoothDetail;
+  festivalId: string;
+  onChanged: () => void;
+}) {
+  const [confirmRotate, setConfirmRotate] = useState(false);
+
+  const setMode = useMutation({
+    mutationFn: (qr_mode: BoothQrMode) =>
+      api.put<BoothDetail>(`/api/festivals/${festivalId}/booths/${booth.id}`, {
+        name: booth.name,
+        booth_type: booth.booth_type,
+        type_label: booth.type_label,
+        location: booth.location,
+        manager_name: booth.manager_name,
+        is_active: booth.is_active,
+        verify_mode: booth.verify_mode,
+        qr_mode,
+        use_experience: booth.use_experience,
+        experience_theme: {},
+      }),
+    onSuccess: onChanged,
+  });
+
+  const reissue = useMutation({
+    mutationFn: () =>
+      api.post(`/api/festivals/${festivalId}/booths/${booth.id}/qr/rotate`),
+    onSuccess: () => {
+      setConfirmRotate(false);
+      onChanged();
+    },
+  });
+
+  const printed = booth.qr_mode === 'printed';
+
+  return (
+    <div className="card card--sunk stack" style={{ gap: 'var(--space-4)' }}>
+      <p className="eyebrow">부스 QR</p>
+
+      <div className="exptypes">
+        {QR_MODES.map((m) => (
+          <button
+            key={m.value}
+            type="button"
+            className={`exptype${booth.qr_mode === m.value ? ' exptype--on' : ''}`}
+            aria-pressed={booth.qr_mode === m.value}
+            disabled={setMode.isPending}
+            onClick={() => setMode.mutate(m.value)}
+          >
+            <b>{m.label}</b>
+            <small>{m.hint}</small>
+          </button>
+        ))}
+      </div>
+
+      {/* 무엇을 포기하는지 고른 뒤에 말한다. 고르기 전 경고는 읽히지 않는다. */}
+      {printed && (
+        <div className="notice notice--warn">
+          <span>⚠</span>
+          <span>
+            인쇄 QR은 <b>현장에 왔다는 것을 증명하지 못합니다.</b> QR 사진이 돌면 축제장
+            밖에서도 지급받을 수 있습니다. 경품이 걸린 축제라면 스태프 확인을 함께 두거나,
+            사진이 돈다는 걸 알게 됐을 때 아래 <b>QR 다시 발행</b>으로 인쇄물을 무효화하세요.
+          </span>
+        </div>
+      )}
+
+      <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
+        <Link
+          to={`/festivals/${festivalId}/booths/${booth.id}/qr`}
+          className="btn btn--mint"
+          target="_blank"
+        >
+          QR 화면 열기 ↗
+        </Link>
+        {printed && (
+          <Link
+            to={`/festivals/${festivalId}/booths/${booth.id}/poster`}
+            className="btn btn--ghost"
+            target="_blank"
+          >
+            인쇄용 안내문 ↗
+          </Link>
+        )}
+        <button className="btn btn--ghost" onClick={() => setConfirmRotate(true)}>
+          QR 다시 발행
+        </button>
+      </div>
+
+      {confirmRotate && (
+        <div className="notice notice--warn">
+          <span>⚠</span>
+          <span className="stack" style={{ gap: 'var(--space-3)' }}>
+            <span>
+              다시 발행하면 <b>이미 붙여 둔 인쇄물이 그 순간 무효가 됩니다.</b> 되돌릴 수
+              없습니다. 새 안내문을 뽑아 붙여야 관객이 지급받을 수 있습니다.
+            </span>
+            <span className="row" style={{ gap: 'var(--space-3)' }}>
+              <button
+                className="btn btn--primary"
+                onClick={() => reissue.mutate()}
+                disabled={reissue.isPending}
+              >
+                {reissue.isPending ? '발행 중…' : '알겠습니다, 다시 발행'}
+              </button>
+              <button className="btn btn--ghost" onClick={() => setConfirmRotate(false)}>
+                취소
+              </button>
+            </span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /** 조각 보드 설정 — 그림 등록과 격자 선택.
  *
  * 격자를 바꾸면 타일 집합이 새로 생기고 참여자의 수집 진행이 초기화됩니다.
@@ -441,6 +649,7 @@ function BoardSettings({
 }) {
   const [grid, setGrid] = useState<Grid>({ rows: board.rows, cols: board.cols });
   const [grantUnit, setGrantUnit] = useState<GrantUnit>(board.grant_unit);
+  const [style, setStyle] = useState<BoardStyle>(board.board_style);
   const [confirming, setConfirming] = useState<{ participants: number; revealed: number } | null>(
     null,
   );
@@ -454,7 +663,10 @@ function BoardSettings({
   const options = fetched.data ?? board.grid_options;
 
   const changed =
-    grid.rows !== board.rows || grid.cols !== board.cols || grantUnit !== board.grant_unit;
+    grid.rows !== board.rows ||
+    grid.cols !== board.cols ||
+    grantUnit !== board.grant_unit ||
+    style !== board.board_style;
 
   const save = useMutation({
     mutationFn: (confirm: boolean) =>
@@ -465,6 +677,7 @@ function BoardSettings({
           cols: grid.cols,
           reveal_mode: board.reveal_mode,
           grant_unit: grantUnit,
+          board_style: style,
           image_url: board.image_url,
           complete_message: board.complete_message,
         },
@@ -500,6 +713,43 @@ function BoardSettings({
         <p className="muted">{gridBasisHint(unitLabel, unitCount)}</p>
       </div>
 
+      {/* 보여주는 방식 — 구조가 아니라 표현이라 바꿔도 진행이 초기화되지 않는다.
+          그림 등록보다 **위**에 둔다. 지도를 골랐는데 그림 업로드가 먼저 보이면
+          올린 그림이 어디에 쓰이는지 오해한다. */}
+      <div className="field">
+        <label>보여주는 방식</label>
+        <div className="exptypes">
+          {BOARD_STYLES.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              className={`exptype${style === o.value ? ' exptype--on' : ''}`}
+              aria-pressed={style === o.value}
+              onClick={() => setStyle(o.value)}
+            >
+              <b>{o.label}</b>
+              <small>{o.hint}</small>
+            </button>
+          ))}
+        </div>
+        <span className="hint">
+          같은 조각을 다르게 그릴 뿐입니다. 바꿔도 참여자의 수집 진행은 그대로입니다.
+        </span>
+      </div>
+
+      {/* 지도를 골랐으면 그림은 쓰이지 않는다. 업로드 칸을 숨기지는 않는다 —
+          이미 올린 그림이 사라진 것처럼 보이고, 되돌리려면 다시 올려야 한다고
+          오해한다. 쓰이지 않는다는 사실만 말한다. */}
+      {style === 'trail' && (
+        <div className="notice notice--info">
+          <span>ℹ</span>
+          <span>
+            스탬프 지도에서는 아래 그림이 화면에 나오지 않습니다. 등록해 둔 그림은
+            그대로 남아 있어, 그림 퍼즐로 되돌리면 다시 쓰입니다.
+          </span>
+        </div>
+      )}
+
       {/* 그림 등록 */}
       <div className="boardimg">
         <img className="boardimg__thumb" src={board.image_url} alt="현재 조각 보드 그림" />
@@ -529,12 +779,16 @@ function BoardSettings({
 
       {/* 격자 후보 */}
       <div className="stack" style={{ gap: 'var(--space-3)' }}>
-        <p className="eyebrow">몇 조각으로 나눌지 고르세요</p>
+        <p className="eyebrow">
+          {style === 'trail' ? '몇 곳을 돌지 고르세요' : '몇 조각으로 나눌지 고르세요'}
+        </p>
         <GridPlanPicker
           options={options}
           value={grid}
           onChange={setGrid}
-          imageUrl={board.image_url}
+          // 지도 모드에서는 그림을 넘기지 않는다. 미리보기가 화면에 나오지도 않을
+          // 그림을 잘라 보여주면, 방금 "그림은 쓰지 않는다"고 한 말과 어긋난다.
+          imageUrl={style === 'trail' ? undefined : board.image_url}
           unitLabel={unitLabel}
           unitCount={unitCount}
         />
@@ -588,6 +842,7 @@ function BoardSettings({
               onClick={() => {
                 setGrid({ rows: board.rows, cols: board.cols });
                 setGrantUnit(board.grant_unit);
+                setStyle(board.board_style);
                 setConfirming(null);
               }}
             >

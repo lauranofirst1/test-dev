@@ -8,8 +8,9 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 def _find_env_file() -> Path:
     """가장 가까운 .env 를 위로 올라가며 찾는다.
@@ -42,6 +43,17 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = False
 
+    #: 관객이 실제로 접속하는 프런트엔드 주소. 부스 QR 에 담을 링크를 만들 때 쓴다.
+    #:
+    #: 비워 두면 요청이 도착한 주소(`request.base_url`)를 쓰는데, 그건 **API 서버**
+    #: 주소다. 개발 환경에서는 프런트가 5173, API 가 8000 이라 QR 이 API 서버를
+    #: 가리키고 그쪽에는 `/join` 라우트가 없다. 리버스 프록시 뒤에서도 내부 주소가
+    #: 잡힌다. 배포에서는 반드시 채우세요.
+    #:
+    #: 브라우저(부스 QR 화면)는 이 값 대신 자기 오리진을 쓰는 것이 가장 정확하다 —
+    #: 응답의 `scan_path` 가 그 용도다.
+    public_web_origin: str | None = None
+
     # ── 데이터베이스 ────────────────────────────────────────
     database_url: str = "postgresql+psycopg://festaflow:festaflow@localhost:5432/festaflow"
 
@@ -54,6 +66,16 @@ class Settings(BaseSettings):
     #: 접근 코드 연속 실패 허용 횟수와 잠금 시간 — docs/03-api-contract.md §1
     login_max_attempts: int = 5
     login_lock_minutes: int = 10
+
+    #: 세션 쿠키 이름. 토큰을 localStorage 에 두면 XSS 한 번에 전부 털린다.
+    #: httpOnly 쿠키는 스크립트가 읽을 수 없다.
+    session_cookie_name: str = "festaflow_session"
+    #: 쿠키에 Secure 를 붙일지. 로컬(http://192.168.x.x:5173)에서는 붙이면
+    #: 브라우저가 아예 저장하지 않으므로 개발에서만 끈다. **배포에서는 반드시 켠다.**
+    session_cookie_secure: bool = False
+    #: SameSite=strict 면 외부 사이트에서 온 요청에 쿠키가 실리지 않는다 —
+    #: 우리 요청은 전부 같은 사이트라 CSRF 가 구조적으로 막힌다.
+    session_cookie_samesite: str = "strict"
 
     # ── 한국관광공사 OpenAPI ────────────────────────────────
     kto_api_key: str = ""
@@ -74,6 +96,24 @@ class Settings(BaseSettings):
     # 🚨 공모전 기간에는 False. 규정이 실시간 호출을 요구하고 호출 이력을 검증한다.
     tourism_snapshot_cache_enabled: bool = False
     tourism_snapshot_ttl_days: int = 7
+
+    # ── 메일 ────────────────────────────────────────────────
+    #: SMTP 설정. 비어 있으면 **보내지 않고 로그에 남깁니다** —
+    #: 조용히 성공한 척하면 사용자는 영원히 메일을 기다립니다.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    #: 587 포트의 STARTTLS. 465 를 쓸 때만 smtp_use_ssl 을 켭니다.
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    #: 보내는 주소. 도메인의 SPF·DKIM 에 등록된 주소여야 스팸함을 피합니다.
+    mail_from: str = ""
+    mail_from_name: str = "FestaFlow"
+
+    #: 재설정 링크 유효 시간(분). 메일 본문이 이 값을 그대로 알립니다 —
+    #: 서비스와 문구가 다르면 사용자는 만료된 링크를 계속 누릅니다.
+    reset_ttl_minutes: int = 30
 
     # ── 업로드 ──────────────────────────────────────────────
     #: 조각 보드 그림이 저장되는 곳. /media 로 서빙된다.

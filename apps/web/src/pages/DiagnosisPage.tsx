@@ -10,8 +10,15 @@ import { Link, useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import type { Diagnosis, DiagnosisComparison, FestivalDetail } from '../api/types';
-import { CATEGORY_LABEL, FULFILLMENT_LABEL, RISK_LABEL } from '../api/types';
+import { CATEGORY_LABEL, FULFILLMENT_LABEL } from '../api/types';
 import { BulletChart } from '../components/BulletChart';
+import {
+  LazyDeltaDumbbell,
+  LazyScoreBullet,
+  LazyScoreGap,
+} from '../components/charts/lazy';
+// 스탯 타일은 CSS 만 쓴다(§1) — 지연 로드할 것이 없다.
+import { ScoreTile } from '../components/charts/ScoreTile';
 
 export function DiagnosisPage() {
   const { id } = useParams<{ id: string }>();
@@ -49,9 +56,6 @@ export function DiagnosisPage() {
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
-        <Link to="/" className="muted">
-          ← 축제 목록
-        </Link>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
           <div className="stack" style={{ gap: 4 }}>
             <p className="eyebrow">사전 진단</p>
@@ -66,8 +70,8 @@ export function DiagnosisPage() {
             )}
           </div>
           <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
-            <Link to={`/festivals/${id}/booths`} className="btn btn--ghost">
-              부스 · 미션 관리
+            <Link to={`/festivals/${id}/edit`} className="btn btn--ghost">
+              기획 수정
             </Link>
             <button
               className="btn btn--primary btn--lg"
@@ -146,45 +150,45 @@ function DiagnosisResult({
 
   return (
     <>
-      {/* 종합 */}
+      {/* 종합 — 숫자 하나에 차트를 붙이지 않는다(§3.1). 스탯 타일 + 상태 배지. */}
       <div className="card card--accent">
-        <div className="row wrap" style={{ gap: 'var(--space-7)', alignItems: 'flex-start' }}>
-          <div className="stack" style={{ gap: 4 }}>
-            <p className="eyebrow">종합 준비도</p>
-            {disclosed && d.total_score !== null ? (
-              <>
-                <div className="row" style={{ gap: 'var(--space-3)', alignItems: 'baseline' }}>
-                  <span className="score tabular">{d.total_score.toFixed(1)}</span>
-                  <span className="score__max">/ 100</span>
-                  {d.risk && (
-                    <span className={`badge badge--${d.risk}`}>
-                      <i />
-                      {RISK_LABEL[d.risk]}
-                    </span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="score score--muted">체크리스트</span>
-                <p className="muted" style={{ maxWidth: '46ch' }}>
-                  {d.disclosure_note}
-                </p>
-              </>
-            )}
+        <p className="eyebrow">종합 준비도</p>
+        {disclosed && d.total_score !== null ? (
+          <ScoreTile
+            score={d.total_score}
+            risk={d.risk}
+            previous={comparison?.comparable ? comparison.previous?.total_score : null}
+          />
+        ) : (
+          <div className="stack" style={{ gap: 4, marginTop: 'var(--space-2)' }}>
+            <span className="score score--muted">체크리스트</span>
+            <p className="muted" style={{ maxWidth: '46ch' }}>
+              {d.disclosure_note}
+            </p>
+            {/* 점수를 공개하지 않는 모드에서는 충족 상태만 CSS 로 보여준다. */}
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <BulletChart items={d.items} disclosed={false} />
+            </div>
           </div>
-
-          <div className="grow" />
-
-          <div className="stack" style={{ gap: 6, minWidth: 220 }}>
-            <BulletChart items={d.items} disclosed={disclosed} />
-          </div>
-        </div>
+        )}
 
         {disclosed && d.disclosure_note && (
           <p className="disclaimer">{d.disclosure_note}</p>
         )}
       </div>
+
+      {/* 항목별 — 두 차트가 서로 다른 질문에 답한다.
+          불릿: 배점 대비 얼마나 찼나. 손실: 어디부터 손대야 총점이 오르나. */}
+      {disclosed && (
+        <div className="chartgrid">
+          <div className="card">
+            <LazyScoreBullet items={d.items} disclosed={disclosed} />
+          </div>
+          <div className="card">
+            <LazyScoreGap items={d.items} />
+          </div>
+        </div>
+      )}
 
       {/* 경고 */}
       {d.warnings.map((w) => (
@@ -315,31 +319,21 @@ function ComparisonCard({ c, disclosed }: { c: DiagnosisComparison; disclosed: b
         )}
       </div>
 
-      <div className="deltas">
-        {c.items.map((item) => (
-          <div className="deltas__row" key={item.category}>
-            <span>{CATEGORY_LABEL[item.category]}</span>
-            {disclosed && item.delta !== null ? (
-              <span className="tabular">
-                <span className="muted">{item.previous?.toFixed(1)}</span>
-                <span className="muted"> → </span>
-                <b>{item.current?.toFixed(1)}</b>
-                <span
-                  className={
-                    item.delta > 0 ? 'delta--up' : item.delta < 0 ? 'delta--down' : 'muted'
-                  }
-                  style={{ marginLeft: 8 }}
-                >
-                  {item.delta > 0 ? '+' : ''}
-                  {item.delta.toFixed(1)}
-                </span>
-              </span>
-            ) : (
+      {/* 나란한 막대 두 개는 "증가했다"가 아니라 "두 개가 있다"로 읽힌다.
+          덤벨이 방향과 크기를 하나의 획으로 보여준다(§3.2). */}
+      {disclosed && <LazyDeltaDumbbell c={c} />}
+
+      {/* 점수를 공개하지 않는 모드에서는 덤벨을 그릴 값이 없다. 그때만 목록을 쓴다. */}
+      {!disclosed && (
+        <div className="deltas deltas--folded">
+          {c.items.map((item) => (
+            <div className="deltas__row" key={item.category}>
+              <span>{CATEGORY_LABEL[item.category]}</span>
               <span className="muted">—</span>
-            )}
-          </div>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {c.biggest_improvement && (
         <div className="improve">

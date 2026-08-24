@@ -1,0 +1,743 @@
+/* ============================================================
+   관객 화면 — 페이퍼 테마 (티켓 · 영수증 · 고무도장)
+   ============================================================
+
+   기획자 화면은 데이터를 비교하는 도구라 민트 계열 SaaS 룩을 그대로 둡니다.
+   관객 화면은 다릅니다. 하는 일이 "부스를 돌며 도장을 모아 그림을 완성한다"
+   이므로 화면당 아티팩트가 하나고, 종이 은유가 장식이 아니라 그 행위의 이름입니다.
+
+   그래서 테마를 갈아끼우지 않고 **`.paper` 안에서만 토큰을 덮어씁니다.**
+   `.card` · `.btn` · `.notice` · `.badge` · `.stampgrid` 는 손대지 않아도
+   따라옵니다. 기획자 화면으로 새는 경로가 없습니다.
+
+   ⚠ `--color-mint-*` 슬롯은 이 안에서 민트가 아니라 **도장 잉크**를 담습니다.
+     이름을 바꾸려면 공용 컴포넌트를 전부 고쳐야 해서, 이름은 두고 뜻만 바꿉니다.
+
+   색은 전부 대비를 계산해 통과시킨 값입니다(본문 4.5:1, 테두리·포커스 3:1).
+   라이트/다크 모두 정의하며, 3상태(명시 light / 명시 dark / OS) 규칙은
+   tokens.css 와 같습니다.
+   ============================================================ */
+
+.paper {
+  /* ── 표면 ── 크림지 */
+  --color-ground:        #F0EADD;
+  --color-surface:       #FBF7EF;
+  --color-surface-sunk:  #EDE6D8;
+  --color-line:          #DED4C2;
+  --color-line-strong:   #9C8C71;   /* 3.07:1 on surface — 테두리 3:1 통과 */
+
+  /* ── 텍스트 ── */
+  --color-ink:           #1F1A14;   /* 16.16:1 on surface */
+  --color-ink-soft:      #4A4137;   /*  9.35:1 */
+  --color-ink-mute:      #6B6152;   /*  5.69:1 on surface · 4.89:1 on sunk — AA */
+  --color-ink-inverse:   #FBF7EF;
+
+  /* ── 도장 잉크 (mint 슬롯을 빌려 씀) ── */
+  --color-mint-fill:     #F2B824;   /* 도장 노랑 */
+  --color-mint-wash:     #F7E9C6;
+  --color-mint-ink:      #7A3B1E;   /* 4.72:1 on fill · 7.95:1 on surface */
+
+  /* ── 보조 ── 테라코타 */
+  --color-lav-fill:      #E8C9BC;
+  --color-lav-wash:      #F7DFD6;
+  --color-lav-ink:       #A83E22;   /* 5.82:1 on surface */
+
+  /* ── 상태 ── */
+  --color-state-low:     #2F6141;
+  --color-state-caution: #7A5200;
+  --color-state-high:    #A32A1C;
+  --color-state-none:    #6B6152;
+  --color-state-low-bg:     #DDEBD8;
+  --color-state-caution-bg: #F7E9C6;
+  --color-state-high-bg:    #F7DFD6;
+  --color-state-none-bg:    #EDE6D8;
+
+  --color-danger:        #A32A1C;   /* 5.67:1 on danger-bg */
+  --color-danger-bg:     #F7DFD6;
+  --color-success:       #2F6141;   /* 5.83:1 on success-bg */
+  --color-success-bg:    #DDEBD8;
+
+  /* ── 그림자 ── 종이는 뜨지 않는다. 얇게 눕힌다. */
+  --shadow-sm: 0 1px 0 rgba(31,26,20,.06), 0 2px 6px rgba(31,26,20,.05);
+  --shadow-md: 0 1px 0 rgba(31,26,20,.08), 0 8px 20px rgba(31,26,20,.09);
+  --shadow-lg: 0 2px 0 rgba(31,26,20,.08), 0 18px 40px rgba(31,26,20,.13);
+  --shadow-focus: 0 0 0 3px rgba(122,59,30,.40);
+
+  /* ── 세리프 ── 한글에는 쓰지 않는다.
+     한글 웹폰트는 용량이 커서 축제장 통신에서 비현실적이고(tokens.css 참고),
+     이 고대비 올드스타일 결에 맞는 한글 폰트도 마땅치 않다.
+     그래서 숫자와 로마자에만 붙인다 — 시스템 폰트라 내려받지 않는다. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
+                  Georgia, 'Times New Roman', serif;
+
+  /* ── 종이 반경 ── 종이는 30px 로 둥글지 않다 */
+  --radius-lg:   0.75rem;
+  --radius-xl:   0.875rem;
+  --radius-2xl:  1rem;
+
+  color: var(--color-ink);
+  background: var(--color-ground);
+  min-height: 100vh;
+
+  /* 종이 결 — 이미지 없이 그라디언트로만. 내려받을 자산이 늘지 않는다. */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(31,26,20,.018) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(31,26,20,.012) 0 1px, transparent 1px 4px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .paper {
+    --color-ground:        #191612;
+    --color-surface:       #221E17;
+    --color-surface-sunk:  #1E1B15;
+    --color-line:          #322C23;
+    --color-line-strong:   #786C5A;   /* 3.23:1 on surface */
+
+    --color-ink:           #F3EADA;   /* 13.90:1 */
+    --color-ink-soft:      #CDC2AE;   /*  9.42:1 */
+    --color-ink-mute:      #9E9382;   /*  5.49:1 on surface · 5.68:1 on sunk */
+    --color-ink-inverse:   #191612;
+
+    --color-mint-fill:     #4A3212;
+    --color-mint-wash:     #2E2415;
+    --color-mint-ink:      #F2C25A;   /* 7.20:1 on fill · 9.98:1 on surface */
+
+    --color-lav-fill:      #43291F;
+    --color-lav-wash:      #2E1C17;
+    --color-lav-ink:       #E88A6E;
+
+    --color-state-low:     #8FC79B;
+    --color-state-caution: #E0B255;
+    --color-state-high:    #E88A6E;
+    --color-state-none:    #9E9382;
+    --color-state-low-bg:     #1D2A1E;
+    --color-state-caution-bg: #2E2415;
+    --color-state-high-bg:    #2E1C17;
+    --color-state-none-bg:    #1E1B15;
+
+    --color-danger:        #E88A6E;   /* 6.40:1 */
+    --color-danger-bg:     #2E1C17;
+    --color-success:       #8FC79B;   /* 7.71:1 */
+    --color-success-bg:    #1D2A1E;
+
+    --shadow-sm: 0 1px 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.30);
+    --shadow-md: 0 1px 0 rgba(0,0,0,.40), 0 8px 20px rgba(0,0,0,.40);
+    --shadow-lg: 0 2px 0 rgba(0,0,0,.45), 0 18px 40px rgba(0,0,0,.50);
+    --shadow-focus: 0 0 0 3px rgba(242,194,90,.45);
+
+    background-image:
+      repeating-linear-gradient(0deg, rgba(243,234,218,.022) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(243,234,218,.014) 0 1px, transparent 1px 4px);
+  }
+}
+
+:root[data-theme="dark"] .paper {
+  --color-ground:        #191612;
+  --color-surface:       #221E17;
+  --color-surface-sunk:  #1E1B15;
+  --color-line:          #322C23;
+  --color-line-strong:   #786C5A;
+
+  --color-ink:           #F3EADA;
+  --color-ink-soft:      #CDC2AE;
+  --color-ink-mute:      #9E9382;
+  --color-ink-inverse:   #191612;
+
+  --color-mint-fill:     #4A3212;
+  --color-mint-wash:     #2E2415;
+  --color-mint-ink:      #F2C25A;
+
+  --color-lav-fill:      #43291F;
+  --color-lav-wash:      #2E1C17;
+  --color-lav-ink:       #E88A6E;
+
+  --color-state-low:     #8FC79B;
+  --color-state-caution: #E0B255;
+  --color-state-high:    #E88A6E;
+  --color-state-none:    #9E9382;
+  --color-state-low-bg:     #1D2A1E;
+  --color-state-caution-bg: #2E2415;
+  --color-state-high-bg:    #2E1C17;
+  --color-state-none-bg:    #1E1B15;
+
+  --color-danger:        #E88A6E;
+  --color-danger-bg:     #2E1C17;
+  --color-success:       #8FC79B;
+  --color-success-bg:    #1D2A1E;
+
+  --shadow-sm: 0 1px 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.30);
+  --shadow-md: 0 1px 0 rgba(0,0,0,.40), 0 8px 20px rgba(0,0,0,.40);
+  --shadow-lg: 0 2px 0 rgba(0,0,0,.45), 0 18px 40px rgba(0,0,0,.50);
+  --shadow-focus: 0 0 0 3px rgba(242,194,90,.45);
+
+  background-image:
+    repeating-linear-gradient(0deg, rgba(243,234,218,.022) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(243,234,218,.014) 0 1px, transparent 1px 4px);
+}
+
+/* ── 관객 헤더 ────────────────────────────────────────────
+   기획자 헤더와 같은 자리지만 종이 위에 인쇄된 머리글처럼 보이게 한다. */
+
+.paper .topbar {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line-strong);
+  box-shadow: 0 1px 0 var(--color-line);
+}
+
+.paper .card {
+  border: 1px solid var(--color-line);
+}
+
+/* ── 천공 띠 ──────────────────────────────────────────────
+   상단 인쇄 띠. 축제 이름·기간·장소를 대문자 모노로 흘린다. 애니메이션은
+   없다 — 움직이면 조각 보드에서 눈이 빼앗긴다. */
+
+.punch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-mint-fill);
+  color: var(--color-mint-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  line-height: 1.5;
+  /* 좁은 화면에서 자르지 않는다. 기간은 "이 축제가 맞나" 를 확인하는 정보라
+     말줄임으로 지우면 확인이 불가능해진다. 접어서 두 줄로 둔다. */
+  border-radius: var(--radius-lg);
+}
+
+/* ── 티켓 ─────────────────────────────────────────────────
+   참여 코드는 부스에 내미는 물건이다. 카드가 아니라 반쪽 티켓으로 둔다.
+   절취선 아래가 부스에 보여줄 쪽, 위가 내가 쥐는 쪽이다. */
+
+.ticket {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.ticket__stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-6) var(--space-6);
+  text-align: center;
+}
+
+/* 절취선 — 양 끝의 반원 노치와 가운데 점선. mask 로 파내면 배경색이 무엇이든
+   진짜로 뚫린 것처럼 보인다(색을 맞출 필요가 없다). */
+.ticket__perf {
+  position: relative;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+
+.ticket__perf::before,
+.ticket__perf::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-ground);
+  border: 1px solid var(--color-line-strong);
+  transform: translateY(-50%);
+}
+
+.ticket__perf::before { left: -12px; }
+.ticket__perf::after  { right: -12px; }
+
+.ticket__perf i {
+  display: block;
+  width: calc(100% - var(--space-8));
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-line-strong) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.ticket__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6) var(--space-5);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-ink-mute);
+}
+
+.paper .accesscode {
+  background: transparent;
+  color: var(--color-ink);
+  border: none;
+  padding: 0;
+  font-size: 44px;
+  letter-spacing: 0.18em;
+  /* 자간을 오른쪽에도 주므로 가운데가 왼쪽으로 밀린다. 되돌린다. */
+  text-indent: 0.18em;
+}
+
+/* ── 고무도장 ─────────────────────────────────────────────
+   "완성" 을 알약 배지로 두면 다른 상태값과 구분이 안 된다. 실제로 찍힌
+   도장처럼 둥근 이중 링에 기울여 둔다. */
+
+.stamp {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--color-mint-ink);
+  box-shadow: inset 0 0 0 3px var(--color-surface), inset 0 0 0 5px var(--color-mint-ink);
+  color: var(--color-mint-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-black);
+  letter-spacing: var(--tracking-label);
+  line-height: 1.25;
+  text-align: center;
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+  opacity: 0.92;
+}
+
+.stamp small {
+  display: block;
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  opacity: 0.8;
+}
+
+.stamp--lg {
+  width: 132px;
+  height: 132px;
+  font-size: 17px;
+}
+
+/* ── 영수증 행 ────────────────────────────────────────────
+   미션·부스 목록은 영수증 품목처럼 읽는다. 이름과 값 사이를 점선으로 이어
+   시선이 끊기지 않게 한다. */
+
+.rcpt {
+  display: flex;
+  flex-direction: column;
+}
+
+.rcpt__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.rcpt__row + .rcpt__row {
+  border-top: 1px dashed var(--color-line);
+}
+
+.rcpt__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  max-width: 68%;
+}
+
+.rcpt__name strong {
+  font-weight: var(--weight-bold);
+}
+
+.rcpt__name span {
+  font-size: var(--text-sm);
+  color: var(--color-ink-mute);
+}
+
+/* 점선 이음줄. flex 로 남는 폭을 전부 먹는다. */
+.rcpt__lead {
+  flex: 1 1 auto;
+  min-width: var(--space-4);
+  height: 1px;
+  align-self: flex-end;
+  margin-bottom: 5px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-line-strong) 0 2px,
+    transparent 2px 6px
+  );
+  opacity: 0.7;
+}
+
+/* 모노를 물리면 한글 값("스태프 확인")에서 폴백이 걸려 글자가 벌어진다.
+   자리 맞춤은 tabular-nums 로 충분하다. */
+.rcpt__value {
+  flex: none;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.rcpt__value--muted { color: var(--color-ink-mute); }
+.rcpt__value--done  { color: var(--color-mint-ink); }
+
+button.rcpt__row { cursor: pointer; }
+
+button.rcpt__row:hover:not(:disabled) .rcpt__value { color: var(--color-mint-ink); }
+button.rcpt__row:hover:not(:disabled) .rcpt__lead  { opacity: 1; }
+
+button.rcpt__row:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── 큰 수치 ──────────────────────────────────────────────
+   "3 / 9" 같은 값은 숫자뿐이라 세리프가 그대로 산다. 한글에는 닿지 않는다. */
+
+.figure {
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  color: var(--color-ink);
+}
+
+/* 라벨은 한글이다. 모노를 물리면 글자 사이가 벌어져 "모은  조각"처럼 읽힌다.
+   .eyebrow 와 같은 산세리프 결로 맞춘다. */
+.figure small {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-ink-mute);
+}
+
+/* ── 조각 보드 ────────────────────────────────────────────
+   판을 대지(mount board)처럼 눌러 앉히고, 아직 안 열린 조각은 종이 결이
+   남은 빈 칸으로 둔다. 열린 조각은 도장이 찍힌 것처럼 잉크색 테두리를 얻는다. */
+
+.paper .stampgrid {
+  background: var(--color-surface-sunk);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  gap: 5px;
+}
+
+.paper .stamptile {
+  border-radius: var(--radius-sm);
+  background-color: var(--color-ground);
+  border: 1px dashed var(--color-line-strong);
+  color: var(--color-ink-mute);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  opacity: 0.75;
+}
+
+.paper .stamptile--on {
+  border: 1px solid var(--color-mint-ink);
+  border-style: solid;
+  background-color: var(--color-mint-wash);
+  box-shadow: inset 0 0 0 2px var(--color-surface);
+  opacity: 1;
+}
+
+/* ── 반응형 ──────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .paper .accesscode { font-size: 34px; }
+  .figure { font-size: 44px; }
+  .stamp--lg { width: 108px; height: 108px; font-size: 15px; }
+  .rcpt__name { max-width: 60%; }
+}
+
+/* ── 퀴즈 보기 ────────────────────────────────────────────────
+   한 손에 먹거리를 든 채로 야외에서 누른다. 보기는 크고, 눌린 상태가
+   색만으로 구분되지 않아야 한다(직사광선 아래에서는 색이 안 보인다).
+   그래서 선택은 테두리 두께와 번호 칩의 반전으로도 함께 표시한다. */
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-primary);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font: inherit;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.choice:hover:not(:disabled) {
+  background: var(--color-surface-sunk);
+}
+
+.choice__no {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--color-line-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-mute);
+}
+
+.choice--on {
+  border-color: var(--color-mint-ink);
+  border-width: 2px;
+  /* 2px 테두리가 늘어난 만큼 안쪽을 줄여 글자가 밀리지 않게 한다. */
+  padding: calc(var(--space-3) - 1px) calc(var(--space-4) - 1px);
+  background: var(--color-mint-wash);
+}
+
+.choice--on .choice__no {
+  background: var(--color-mint-ink);
+  border-color: var(--color-mint-ink);
+  color: var(--color-surface);
+}
+
+/* 오답은 색만으로 말하지 않는다 — 번호 칩이 ✗ 로 바뀐다. */
+.choice--wrong {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.choice--wrong .choice__no {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
+  font-size: 0;
+}
+
+.choice--wrong .choice__no::after {
+  content: '✗';
+  font-size: var(--text-sm);
+}
+
+.choice:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── 뽑기 ─────────────────────────────────────────────────────
+   조각을 다 모은 사람만 본다. 봉인된 봉투를 뜯는 모양으로 둔다 —
+   결과를 이미 아는 카드처럼 보이면 뜯을 이유가 없다. */
+
+.draw {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--color-mint-ink);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      var(--color-mint-wash) 0 12px,
+      transparent 12px 24px
+    ),
+    var(--color-surface);
+}
+
+/* 봉투 아귀 — 위쪽 삼각 접힘. 장식이지만 "뜯는 것"이라는 신호다. */
+.draw__flap {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 64px;
+  background: var(--color-mint-fill);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.draw__body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+}
+
+.draw__prizes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.draw__chip {
+  padding: 5px 13px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--color-line-strong);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-soft);
+}
+
+.draw__chip--blank {
+  opacity: 0.6;
+}
+
+/* 당첨 결과 — 도장이 찍히듯 들어온다. */
+.draw__result {
+  animation: draw-stamp var(--duration-slow) var(--ease-pop) both;
+}
+
+@keyframes draw-stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.6) rotate(-14deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw__result {
+    animation: none;
+  }
+}
+
+.draw__name {
+  font-size: var(--text-h2);
+  font-weight: var(--weight-black);
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+
+/* ── 스탬프 랠리 지도 (board_style = trail) ───────────────────
+   격자 퍼즐과 같은 타일을 다르게 그린다. 길을 따라간다는 은유라
+   노드가 자로 잰 듯 정렬되지 않게 줄마다 살짝 어긋나 있다. */
+
+.trail {
+  position: relative;
+  width: 100%;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunk);
+  border: 1px solid var(--color-line);
+}
+
+/* 좌표가 % 라서 컨테이너 비율이 어떻든 노드와 정확히 만난다. */
+.trail__links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.trail__link {
+  stroke: var(--color-line-strong);
+  stroke-width: 2;
+  stroke-dasharray: 3 5;
+  stroke-linecap: round;
+  opacity: 0.65;
+}
+
+/* 다음 노드를 방문했다면 그 구간은 '지나온 길'이다. */
+.trail__link--on {
+  stroke: var(--color-mint-ink);
+  stroke-dasharray: none;
+  opacity: 1;
+}
+
+.trail__node {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;   /* 좌표가 노드의 중심이 되도록 */
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px dashed var(--color-line-strong);
+  color: var(--color-ink-mute);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+/* 방문한 곳은 도장이 찍힌 모양. 색이 아니라 ✓ 와 테두리로도 구분된다. */
+.trail__node--on {
+  border-style: solid;
+  border-color: var(--color-mint-ink);
+  background: var(--color-mint-fill);
+  color: var(--color-mint-ink);
+  box-shadow: inset 0 0 0 2px var(--color-surface);
+  font-size: var(--text-body);
+}
+
+@media (max-width: 400px) {
+  .trail__node {
+    width: 38px;
+    height: 38px;
+    margin: -19px 0 0 -19px;
+  }
+}
+
+/* 두구두구 — 이름이 빠르게 바뀔 때 글자가 튀지 않게 자리를 잡아 둔다. */
+.draw__rolling {
+  min-height: 2.2em;
+  display: grid;
+  place-items: center;
+  color: var(--color-mint-ink);
+  animation: draw-shake 220ms var(--ease-in-out) infinite;
+}
+
+@keyframes draw-shake {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw__rolling {
+    animation: none;
+  }
+}

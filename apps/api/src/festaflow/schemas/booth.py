@@ -33,6 +33,13 @@ class MissionCreate(MissionIn):
 
 
 class MissionOut(BaseModel):
+    """**운영자 전용 응답.**
+
+    `experience_config` 에는 quiz 의 `answer_index` 가 그대로 들어 있습니다.
+    이 타입을 참여자 경로에 쓰면 정답이 새어 나갑니다 — 참여자에게는
+    `PublicMission` 과 `ScanContextMission` 만 나갑니다.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -43,6 +50,7 @@ class MissionOut(BaseModel):
     points: int
     is_active: bool
     experience_type: ExperienceType
+    experience_config: dict = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 
@@ -103,10 +111,25 @@ class MissionList(BaseModel):
 
 
 class ScanToken(BaseModel):
-    """부스 화면이 30초마다 다시 받아 QR 을 갱신한다 — 계약 §8.2."""
+    """부스 QR 한 장 — 계약 §8.2, §14.4.
+
+    회전(`rotating`)이면 부스 화면이 30초마다 다시 받아 갱신하고,
+    인쇄(`printed`)면 한 번 받아 종이에 인쇄해 붙입니다. 인쇄 QR 은
+    `qr_secret` 을 재발행할 때까지 바뀌지 않으므로 `expires_at` 이 없습니다.
+    """
 
     booth_id: int
+    qr_mode: BoothQrMode
+    #: 오리진이 빠진 경로. **브라우저는 이걸 쓰고 자기 오리진을 앞에 붙인다.**
+    #: 그래야 localhost·사내망 IP·운영 도메인 어디서 열어도 QR 이 맞는 곳을 가리킨다.
+    scan_path: str
+    #: 서버가 짐작한 전체 주소. `PUBLIC_WEB_ORIGIN` 이 없으면 요청이 도착한
+    #: 주소(=API 서버)를 쓰므로 개발 환경에서는 틀릴 수 있다. 브라우저가 아닌
+    #: 클라이언트(인쇄물 생성 등)를 위한 값이다.
     scan_url: str
-    window_index: int
-    expires_at: datetime
-    refresh_after_seconds: int
+    #: 회전 QR 에서만 의미가 있다. 인쇄 QR 은 window 에 묶이지 않는다.
+    window_index: int | None = None
+    #: 인쇄 QR 은 만료되지 않으므로 None.
+    expires_at: datetime | None = None
+    #: 화면이 다시 받아야 하는 주기(초). 인쇄 QR 은 None — 다시 받을 일이 없다.
+    refresh_after_seconds: int | None = None

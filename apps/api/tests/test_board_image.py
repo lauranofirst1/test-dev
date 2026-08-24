@@ -108,7 +108,7 @@ def test_jpg_and_webp_are_accepted(client, festival):
 def test_non_image_is_422(client, festival):
     r = _upload(client, festival, b"<html>not an image</html>", "sneaky.png")
     assert r.status_code == 422
-    assert r.json()["detail"]["error"]["code"] == "VALIDATION_FAILED"
+    assert r.json()["error"]["code"] == "VALIDATION_FAILED"
 
 
 def test_empty_file_is_422(client, festival):
@@ -120,6 +120,6 @@ def test_oversized_file_is_413_and_leaves_nothing_behind(client, festival, monke
     monkeypatch.setattr(media, "MAX_BYTES", 1024, raising=False)
     r = _upload(client, festival, PNG + b"\x00" * 4096)
     assert r.status_code == 413
-    assert r.json()["detail"]["error"]["code"] == "FILE_TOO_LARGE"
+    assert r.json()["error"]["code"] == "FILE_TOO_LARGE"
     # 자른 파일이 남아 있으면 깨진 그림이 보드에 걸린다.
     assert list(Path(media.media_root()).glob("board-*")) == []

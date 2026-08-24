@@ -111,7 +111,7 @@ def test_other_org_gets_404_not_403(client, db: Session):
 
     r = client.get(f"/api/festivals/{fid}")
     assert r.status_code == 404
-    assert r.json()["detail"]["error"]["code"] == "NOT_FOUND"
+    assert r.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_board_grid_is_chosen_not_fixed(client):
@@ -159,11 +159,11 @@ def test_not_found_message_picks_right_particle(client):
 
     fid = client.post("/api/festivals", json=PAYLOAD).json()["festival"]["id"]
 
-    missing = client.get("/api/festivals/999999").json()["detail"]["error"]["message"]
+    missing = client.get("/api/festivals/999999").json()["error"]["message"]
     assert "축제를 찾을 수 없습니다." in missing
     r = client.get(f"/api/festivals/{fid}/diagnoses/latest")
     assert r.status_code == 404
-    assert "진단을 찾을 수 없습니다." in r.json()["detail"]["error"]["message"]
+    assert "진단을 찾을 수 없습니다." in r.json()["error"]["message"]
 
     from festaflow.core.errors import subject_particle
 
@@ -214,7 +214,7 @@ def test_quota_exceeded_returns_402(client, db: Session, org: Organization):
     client.post("/api/festivals", json=PAYLOAD)
     r = client.post("/api/festivals", json={**PAYLOAD, "name": "두번째"})
     assert r.status_code == 402
-    assert r.json()["detail"]["error"]["code"] == "QUOTA_EXCEEDED"
+    assert r.json()["error"]["code"] == "QUOTA_EXCEEDED"
 
 
 # ── 진단 조회 ───────────────────────────────────────────────────────────────

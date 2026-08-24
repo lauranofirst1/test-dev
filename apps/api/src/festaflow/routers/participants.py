@@ -15,12 +15,13 @@ from sqlalchemy.orm import Session
 
 from festaflow.core.deps import CurrentParticipant, DbSession
 from festaflow.core.errors import ApiError, not_found
-from festaflow.models import Booth, Festival, Mission, Participation
-from festaflow.models.enums import BoothVerifyMode
+from festaflow.models import Booth, Festival, Mission, Participation, Prize
+from festaflow.models.enums import BoothQrMode, BoothVerifyMode
 from festaflow.schemas.participation import (
     ActiveCampaign,
     GrantResult,
     MissionStatus,
+    ParticipantIssue,
     ParticipantIssued,
     ParticipantMe,
     PublicBooth,
@@ -30,7 +31,14 @@ from festaflow.schemas.participation import (
     ScanContextMission,
     ScanGrantIn,
 )
+from festaflow.schemas.prize import (
+    PrizeDrawOut,
+    PrizeDrawStatus,
+    PrizePreview,
+)
+from festaflow.services import experience as exp
 from festaflow.services import grants as svc
+from festaflow.services import prizes as prize_svc
 
 router = APIRouter(prefix="/api/festivals/{festival_id}", tags=["participants"])
 
@@ -104,6 +112,7 @@ def public_festival(festival_id: int, db: DbSession) -> PublicFestival:
             )
             for b in _active_booths(db, festival_id)
         ],
+        identity_mode=festival.identity_mode,
     )
 
 
@@ -113,14 +122,34 @@ def public_festival(festival_id: int, db: DbSession) -> PublicFestival:
 @router.post(
     "/participants", response_model=ParticipantIssued, status_code=status.HTTP_201_CREATED
 )
-def issue_participant(festival_id: int, db: DbSession) -> ParticipantIssued:
-    """참여 코드를 발급한다. 이름·연락처를 받지 않는다 — 익명 참여가 기본이다."""
+def issue_participant(
+    festival_id: int, db: DbSession, payload: ParticipantIssue | None = None
+) -> ParticipantIssued:
+    """참여 코드를 발급한다.
+
+    익명 축제에서는 이름도 연락처도 받지 않습니다 — 지나가는 관광객에게 신원을
+    요구할 수 없기 때문입니다.
+
+    학번 축제(교내 행사)에서는 학번을 받습니다. **1 학번 = 1 참여자**이며, 이미
+    발급된 학번이면 새로 만들지 않고 비밀만 새로 냅니다. 여기서 새 참여자를
+    만들면 학번 하나가 코드 여러 개를 갖게 되고, 그건 종이 스티커를 여러 장
+    붙이는 것과 정확히 같습니다.
+    """
     festival = _live_festival(db, festival_id)
-    participant, secret = svc.issue_participant(db, festival)
+    before = svc.find_by_student_no(db, festival.id, payload.student_no) if (
+        payload and payload.student_no
+    ) else None
+
+    participant, secret = svc.issue_participant(
+        db, festival, student_no=payload.student_no if payload else None
+    )
     db.commit()
     db.refresh(participant)
     return ParticipantIssued(
-        code=participant.code, secret=secret, festival_id=festival.id
+        code=participant.code,
+        secret=secret,
+        festival_id=festival.id,
+        resumed=before is not None,
     )
 
 
@@ -219,23 +248,36 @@ def scan_context(
     db: DbSession,
     participant: CurrentParticipant,
     booth_id: int = Query(...),
-    token: str = Query(...),
+    # 회전 QR 은 `t`(토큰), 인쇄 QR 은 `s`(고정 서명)를 담아 온다 — 계약 §14.4.
+    # 어느 쪽을 받을지는 부스의 qr_mode 가 정한다.
+    token: str | None = Query(None),
+    signature: str | None = Query(None, alias="s"),
 ) -> ScanContext:
-    """스캔 직후 미션 선택 화면에 필요한 것만 돌려준다.
+    """스캔 직후 체험 화면에 필요한 것만 돌려준다.
 
-    `experience_config` 는 내려가지 않는다 — quiz 의 `answer_index` 가 거기 있고,
-    채점은 서버에서만 한다.
+    `experience_config` 는 **정답을 뺀 사본**이다. quiz 의 `answer_index` 는
+    여기 담기지 않으며 채점은 서버에서만 한다 — 문항과 보기는 화면이 그려야
+    하므로 내려가지만, 정답이 함께 가면 개발자 도구로 전부 통과된다.
     """
     _live_festival(db, festival_id)
     booth = _scan_booth(db, festival_id, booth_id)
-    window = svc.verify_scan_token(booth, token)
+
+    # 예산을 먼저 정한다. 퀴즈가 붙은 부스는 30초로 끝나지 않는다.
+    missions = [m for m in _active_missions(db, festival_id) if m.booth_id == booth.id]
+    windows = exp.accepted_windows(missions)
+    window = svc.verify_scan_proof(
+        booth, token=token, signature=signature, windows=windows
+    )
 
     from festaflow.core import security
 
     expires_at = security.window_expires_at(window)
-    # 서버는 현재와 직전 window 를 모두 인정한다. 이 토큰이 직전 window 것이면
-    # 이미 만료 시각을 지난 뒤에도 한 window 동안 더 받아준다.
-    accepted_until = security.window_expires_at(window + 1)
+    # 서버가 **실제로 받아주는** 마지막 시각. 화면은 이 값으로 카운트다운해야
+    # 서버가 아직 받아줄 시간을 화면이 먼저 포기하지 않는다.
+    accepted_until = security.window_expires_at(window + windows - 1)
+    # 인쇄 QR 은 만료되지 않는다. 카운트다운을 내려보내면 화면이 없는 제한 시간을
+    # 만들어 내고, 0 이 되는 순간 멀쩡한 QR 을 두고 "다시 찍으라"고 말한다.
+    printed = booth.qr_mode == BoothQrMode.PRINTED
     granted = {
         p.mission_id
         for p in db.execute(
@@ -246,7 +288,6 @@ def scan_context(
         ).scalars()
     }
 
-    missions = [m for m in _active_missions(db, festival_id) if m.booth_id == booth.id]
     return ScanContext(
         booth_id=booth.id,
         booth_name=booth.name,
@@ -255,7 +296,12 @@ def scan_context(
         window_index=window,
         expires_at=expires_at,
         accepted_until=accepted_until,
-        seconds_remaining=max(0, int((accepted_until - datetime.now(UTC)).total_seconds())),
+        seconds_remaining=(
+            None
+            if printed
+            else max(0, int((accepted_until - datetime.now(UTC)).total_seconds()))
+        ),
+        qr_mode=booth.qr_mode,
         missions=[
             ScanContextMission(
                 mission_id=m.id,
@@ -263,6 +309,10 @@ def scan_context(
                 description=m.description,
                 points=m.points,
                 already_granted=m.id in granted,
+                experience_type=m.experience_type,
+                # 정답이 빠진 설정만. 화이트리스트는 서비스가 쥔다.
+                experience_config=exp.public_config(m),
+                attempts_left=exp.attempts_left(db, m, participant.id),
             )
             for m in missions
         ],
@@ -279,14 +329,40 @@ def scan_grant(
     db: DbSession,
     participant: CurrentParticipant,
 ) -> GrantResult:
-    """참여자가 부스 QR 을 스캔해 지급받는다. 1 스캔 = 1 미션."""
+    """참여자가 부스 QR 을 스캔해 지급받는다. 1 스캔 = 1 미션.
+
+    체험(퀴즈·안내)은 **여기서 채점한 뒤에야** 지급으로 넘어갑니다. 통과하지
+    못하면 참여 이력을 만들지 않습니다 — 계약 §11 대로 집계에 섞이지 않게
+    하기 위함입니다.
+    """
     festival = _live_festival(db, festival_id)
     booth = _scan_booth(db, festival_id, payload.booth_id)
-    window = svc.verify_scan_token(booth, payload.token)
 
     mission = db.get(Mission, payload.mission_id)
     if mission is None or mission.festival_id != festival_id:
         raise not_found("미션")
+
+    # 예산은 부스 단위다 — `GET /scan` 이 세어 준 카운트다운과 같은 값이어야 한다.
+    windows = exp.accepted_windows(
+        [m for m in _active_missions(db, festival_id) if m.booth_id == booth.id]
+    )
+    window = svc.verify_scan_proof(
+        booth, token=payload.token, signature=payload.signature, windows=windows
+    )
+
+    used = exp.attempts_used(db, participant_id=participant.id, mission_id=mission.id)
+    try:
+        graded = exp.grade(
+            mission, payload.response, attempts_used=used, window_index=window
+        )
+    except ApiError as exc:
+        # 오답은 시도를 하나 먹는다. **커밋해야** 한다 — 실패 응답과 함께
+        # 롤백되면 새로고침만으로 시도 횟수가 초기화된다.
+        code = (exc.detail or {}).get("error", {}).get("code")
+        if code == "EXPERIENCE_WRONG_ANSWER":
+            exp.record_attempt(db, participant_id=participant.id, mission_id=mission.id)
+            db.commit()
+        raise
 
     outcome = svc.grant(
         db,
@@ -297,9 +373,76 @@ def scan_grant(
         verified_via=BoothVerifyMode.PARTICIPANT_SCAN,
         scan_window_index=window,
         client_request_id=payload.client_request_id,
+        queued_at=payload.queued_at,
+        response=graded.response,
+        attempt_count=graded.attempt_count,
     )
     db.commit()
 
     from festaflow.routers.booths import _result
 
-    return _result(outcome)
+    result = _result(outcome)
+    # 해설은 맞힌 사람에게만 간다. 재전송(was_already_granted)에도 실어야
+    # 화면을 새로고침한 사람이 읽던 글을 잃지 않는다.
+    result.explanation = graded.explanation
+    return result
+
+
+# ── 경품 뽑기 ───────────────────────────────────────────────────────────────
+
+
+def _draw_out(draw, prize: Prize | None) -> PrizeDrawOut:
+    return PrizeDrawOut(
+        id=draw.id,
+        drawn_at=draw.drawn_at,
+        prize_name=prize.name if prize else None,
+        prize_description=prize.description if prize else None,
+        is_blank=bool(prize.is_blank) if prize else False,
+        claimed_at=draw.claimed_at,
+    )
+
+
+@router.get("/prize-draw/me", response_model=PrizeDrawStatus)
+def prize_draw_status(
+    festival_id: int, db: DbSession, participant: CurrentParticipant
+) -> PrizeDrawStatus:
+    """뽑기 카드를 그리는 데 필요한 전부.
+
+    상품 미리보기에 **재고와 가중치는 담지 않는다.** 남은 재고가 보이면 언제
+    뽑을지를 재는 사람이 생기고, 그 순간 추첨이 아니게 된다.
+    """
+    _live_festival(db, festival_id)
+
+    prizes = prize_svc.active_prizes(db, festival_id)
+    board = svc.get_board(db, festival_id)
+    progress = svc.progress_of(db, board, participant.id)
+    existing = prize_svc.existing_draw(db, festival_id, participant.id)
+
+    return PrizeDrawStatus(
+        enabled=bool(prizes),
+        can_draw=bool(prizes) and progress.is_complete and existing is None,
+        revealed_count=progress.revealed_count,
+        total_tiles=progress.total_tiles,
+        is_complete=progress.is_complete,
+        draw=(
+            _draw_out(existing, db.get(Prize, existing.prize_id) if existing.prize_id else None)
+            if existing
+            else None
+        ),
+        prizes=[
+            PrizePreview(name=p.name, description=p.description, is_blank=p.is_blank)
+            for p in prizes
+        ],
+    )
+
+
+@router.post("/prize-draw", response_model=PrizeDrawOut)
+def prize_draw(
+    festival_id: int, db: DbSession, participant: CurrentParticipant
+) -> PrizeDrawOut:
+    """뽑기 1회. 조각을 다 모은 참여자만, 축제당 한 번."""
+    _live_festival(db, festival_id)
+    outcome = prize_svc.draw(db, festival_id=festival_id, participant=participant)
+    db.commit()
+    db.refresh(outcome.draw)
+    return _draw_out(outcome.draw, outcome.prize)

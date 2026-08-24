@@ -7,6 +7,13 @@
 # 포트는 API_PORT / WEB_PORT 로 바꿀 수 있다. 브라우저는 프론트엔드 주소만 열면 되고,
 # /api 요청은 vite 가 백엔드로 프록시한다(apps/web/vite.config.ts).
 #
+# 같은 네트워크의 휴대폰에서 열려면(부스 QR 을 실제로 찍어 보려면):
+#
+#   WEB_HOST=1 ./dev.sh
+#
+# 기본값은 localhost 전용이다. 개발 서버를 네트워크에 여는 것은 명시적으로 고를
+# 일이지 기본값일 수 없다 — 카페나 공용 와이파이에서는 옆자리도 접속할 수 있다.
+#
 # 최초 1회 셋업(가상환경·의존성·DB·.env)은 이 스크립트가 하지 않는다.
 # 빠진 게 있으면 무엇을 실행해야 하는지 알려주고 멈춘다. README '개발 환경 준비' 참고.
 
@@ -71,7 +78,11 @@ set -m
 (cd apps/api && exec ./.venv/bin/uvicorn festaflow.main:app --reload --port "$API_PORT") &
 api_pid=$!
 
-(cd apps/web && exec npm run dev -- --port "$WEB_PORT" --strictPort) &
+# WEB_HOST=1 이면 사내망에 연다. vite 가 접속 가능한 주소를 직접 찍어 준다.
+web_args=(--port "$WEB_PORT" --strictPort)
+[ -n "${WEB_HOST:-}" ] && web_args+=(--host)
+
+(cd apps/web && exec npm run dev -- "${web_args[@]}") &
 web_pid=$!
 
 set +m
@@ -79,6 +90,8 @@ set +m
 echo ""
 echo "  백엔드    http://localhost:$API_PORT/docs"
 echo "  프론트엔드 http://localhost:$WEB_PORT   ← 여기로 접속"
+echo ""
+[ -n "${WEB_HOST:-}" ] && echo "  ⚠ 네트워크에 열려 있습니다. 같은 와이파이의 다른 기기도 접속할 수 있습니다."
 echo ""
 echo "  Ctrl-C 로 둘 다 종료"
 echo ""

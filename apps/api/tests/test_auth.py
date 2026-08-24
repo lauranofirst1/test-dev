@@ -132,7 +132,7 @@ def test_wrong_code_is_401_and_counts_up(client, db, festival):
         json={"festival_id": festival.id, "staff_id": staff.id, "access_code": "WRONG1"},
     )
     assert r.status_code == 401
-    assert r.json()["detail"]["error"]["code"] == "INVALID_CREDENTIALS"
+    assert r.json()["error"]["code"] == "INVALID_CREDENTIALS"
     db.refresh(staff)
     assert staff.failed_attempts == 1
 
@@ -152,7 +152,7 @@ def test_failures_do_not_say_which_part_was_wrong(client, db, festival):
         LOGIN, json={"festival_id": other.id, "staff_id": staff.id, "access_code": CODE}
     )
 
-    bodies = {r.json()["detail"]["error"]["message"] for r in (bad_code, bad_staff, bad_festival)}
+    bodies = {r.json()["error"]["message"] for r in (bad_code, bad_staff, bad_festival)}
     codes = {r.status_code for r in (bad_code, bad_staff, bad_festival)}
     assert codes == {401}
     assert len(bodies) == 1, bodies
@@ -184,7 +184,7 @@ def test_locks_after_max_attempts_and_refuses_the_right_code(client, db, festiva
         LOGIN, json={"festival_id": festival.id, "staff_id": staff.id, "access_code": CODE}
     )
     assert r.status_code == 429
-    body = r.json()["detail"]["error"]
+    body = r.json()["error"]
     assert body["code"] == "ACCOUNT_LOCKED"
     assert 0 < body["details"]["retry_after_seconds"] <= settings.login_lock_minutes * 60
 
@@ -224,7 +224,7 @@ def test_token_scopes_requests_to_its_own_festival(client, db, festival):
     assert client.get(f"/api/festivals/{festival.id}", headers=headers).status_code == 200
     r = client.get(f"/api/festivals/{other.id}", headers=headers)
     assert r.status_code == 403
-    assert r.json()["detail"]["error"]["code"] == "FORBIDDEN"
+    assert r.json()["error"]["code"] == "FORBIDDEN"
 
 
 def test_token_decides_the_org_scope_not_the_header(client, db, festival):
@@ -252,7 +252,7 @@ def test_booth_manager_can_read_but_not_mutate(client, db, festival):
     assert client.get(f"/api/festivals/{festival.id}", headers=headers).status_code == 200
     r = client.post(f"/api/festivals/{festival.id}/archive", headers=headers)
     assert r.status_code == 403
-    assert r.json()["detail"]["error"]["details"]["required_roles"] == ["operator", "planner"]
+    assert r.json()["error"]["details"]["required_roles"] == ["operator", "planner"]
 
 
 def test_garbage_and_expired_tokens_are_401(client, db, festival):
@@ -277,7 +277,7 @@ def test_garbage_and_expired_tokens_are_401(client, db, festival):
     )
     r = client.get(path, headers={"Authorization": f"Bearer {expired}"})
     assert r.status_code == 401
-    assert r.json()["detail"]["error"]["code"] == "INVALID_TOKEN"
+    assert r.json()["error"]["code"] == "INVALID_TOKEN"
 
 
 def test_token_signed_with_another_secret_is_rejected(client, db, festival):
@@ -319,7 +319,7 @@ def test_header_fallback_is_closed_outside_local(client, db, festival, monkeypat
 
     r = client.get("/api/festivals")
     assert r.status_code == 401
-    assert r.json()["detail"]["error"]["code"] == "AUTH_REQUIRED"
+    assert r.json()["error"]["code"] == "AUTH_REQUIRED"
 
     r = client.get("/api/festivals", headers={"X-Organization-Id": str(festival.organization_id)})
     assert r.status_code == 401

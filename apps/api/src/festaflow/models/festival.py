@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     Text,
     func,
@@ -22,7 +23,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from festaflow.db.base import ArchivableMixin, Base, TimestampMixin
-from festaflow.models.enums import FestivalStatus, PlanStage, PlanTier, StaffRole
+from festaflow.models.enums import (
+    FestivalStatus,
+    IdentityMode,
+    PlanStage,
+    PlanTier,
+    StaffRole,
+)
 
 
 class Organization(Base):
@@ -80,6 +87,28 @@ class Festival(Base, TimestampMixin, ArchivableMixin):
     ends_on: Mapped[date] = mapped_column(Date, nullable=False)
     expected_visitors: Mapped[int] = mapped_column(Integer, nullable=False)
     total_budget: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    #: 참여자를 어떻게 식별하는가. 익명이 기본이라 기존 관광 축제는 그대로 돈다.
+    identity_mode: Mapped[IdentityMode] = mapped_column(
+        Enum(IdentityMode, name="identity_mode", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        server_default=IdentityMode.ANONYMOUS.value,
+    )
+
+    # ── 전시 심사 ──
+    #: 관객 한 명이 쓸 수 있는 표 수. 무제한이면 인기 작품에 몰아주기가 되고,
+    #: 1표면 "가장 좋은 하나"만 남아 부문 시상이 안 나온다.
+    audience_votes_per_participant: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default="3"
+    )
+    #: 최종 점수에서 심사위원이 차지하는 비율(%). 관객은 나머지다.
+    judge_weight_percent: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default="70"
+    )
+    #: 투표를 받고 있는가. 전시가 시작되기 전에 표가 들어오면 안 된다.
+    voting_open: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
 
     status: Mapped[FestivalStatus] = mapped_column(
         Enum(FestivalStatus, name="festival_status", values_callable=lambda e: [m.value for m in e]),

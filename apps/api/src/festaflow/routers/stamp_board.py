@@ -69,6 +69,7 @@ def _out(db: Session, board: StampBoard, *, tiles: list[StampTile] | None = None
         total_tiles=board.total_tiles,
         reveal_mode=board.reveal_mode,
         grant_unit=board.grant_unit,
+        board_style=board.board_style,
         image_url=board.image_url,
         complete_message=board.complete_message,
         tiles=[
@@ -160,9 +161,13 @@ def update_stamp_board(
                 {"affected_participants": affected, "revealed_count": revealed_count},
             )
 
-    # image_url / complete_message 만 바꾸는 요청은 버전을 올리지 않는다 — 진행 유지.
+    # 표현·문구만 바꾸는 요청은 버전을 올리지 않는다 — 진행 유지.
+    # board_style 이 여기 있는 이유: 격자↔지도는 같은 타일을 다르게 그릴 뿐이라
+    # 타일 집합이 그대로다. STRUCTURAL 에 넣으면 표현을 바꿀 때마다 참여자
+    # 전원의 수집이 초기화된다.
     board.image_url = payload.image_url
     board.complete_message = payload.complete_message
+    board.board_style = payload.board_style
 
     if structural_change:
         board.rows = payload.rows

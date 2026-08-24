@@ -25,7 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from festaflow.db.base import Base
-from festaflow.models.enums import GrantUnit, RevealMode
+from festaflow.models.enums import BoardStyle, GrantUnit, RevealMode
 
 
 def _pg_enum(enum_cls, name: str):
@@ -57,6 +57,11 @@ class StampBoard(Base):
     #: booth = 부스당 1조각(순회 유도), mission = 미션 완료마다 1조각
     grant_unit: Mapped[GrantUnit] = mapped_column(
         _pg_enum(GrantUnit, "grant_unit"), nullable=False, server_default=GrantUnit.BOOTH.value
+    )
+
+    #: 표현만 정한다. 바꿔도 타일과 공개 기록은 그대로라 진행이 초기화되지 않는다.
+    board_style: Mapped[BoardStyle] = mapped_column(
+        _pg_enum(BoardStyle, "board_style"), nullable=False, server_default=BoardStyle.GRID.value
     )
 
     image_url: Mapped[str] = mapped_column(

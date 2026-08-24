@@ -87,6 +87,14 @@ export function WorkspacePage() {
             <Link to={`/festivals/${f.id}/booths`} className="fcard__sub">
               부스 · 미션 관리 →
             </Link>
+            {/* 축제 당일에 여는 화면. 준비 단계에서는 볼 것이 없지만, 당일
+                아침에 어디로 들어가는지를 미리 알아 두어야 한다. */}
+            <Link to={`/festivals/${f.id}/dashboard`} className="fcard__sub">
+              운영 대시보드 →
+            </Link>
+            <Link to={`/festivals/${f.id}/report`} className="fcard__sub">
+              사후 리포트 →
+            </Link>
             </div>
           ))}
         </div>

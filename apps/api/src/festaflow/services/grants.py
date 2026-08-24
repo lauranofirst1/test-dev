@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import secrets
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -33,8 +33,10 @@ from festaflow.models import (
     StampTile,
 )
 from festaflow.models.enums import (
+    BoothQrMode,
     BoothVerifyMode,
     GrantUnit,
+    IdentityMode,
     ParticipationStatus,
     RevealMode,
 )
@@ -60,8 +62,75 @@ def normalize_code(raw: str) -> str:
     return "".join(raw.split()).upper()
 
 
-def issue_participant(db: Session, festival: Festival) -> tuple[Participant, str]:
-    """참여자를 발급하고 평문 비밀을 함께 돌려준다. 비밀은 이때만 나온다."""
+def normalize_student_no(raw: str) -> str:
+    """학번 표기를 하나로 모은다.
+
+    사람이 손으로 입력하는 값이라 공백과 하이픈이 섞입니다. 정규화하지 않으면
+    `2025-1234` 와 `20251234` 가 서로 다른 학번이 되고, **1 학번 = 1 참여자**가
+    그 순간 무너집니다 — 두 표기로 두 번 투표할 수 있게 됩니다.
+    """
+    return "".join(ch for ch in raw if ch.isalnum()).upper()
+
+
+def find_by_student_no(
+    db: Session, festival_id: int, student_no: str
+) -> Participant | None:
+    return db.execute(
+        select(Participant).where(
+            Participant.festival_id == festival_id,
+            Participant.student_no == normalize_student_no(student_no),
+        )
+    ).scalar_one_or_none()
+
+
+def reissue_for_student(
+    db: Session, participant: Participant
+) -> tuple[Participant, str]:
+    """같은 학번으로 다시 들어온 경우 — **새 참여자를 만들지 않는다.**
+
+    기기를 바꿨거나 브라우저 저장소를 지운 학생입니다. 여기서 새 참여자를 만들면
+    학번 하나가 참여 코드 여러 개를 갖게 되고, 그건 스티커를 여러 장 붙이는
+    것과 정확히 같습니다.
+
+    대신 비밀만 새로 발급합니다. 옛 기기는 그 순간 로그아웃되고, 지금 기기가
+    이어받습니다. 모은 조각도 투표도 그대로입니다.
+
+    재발급 횟수를 셉니다. 남의 학번을 넣어 가로채는 시도는 이 숫자로 드러나며,
+    운영자 화면이 그것을 보여줍니다.
+    """
+    secret = security.generate_participant_secret()
+    participant.secret_hash = security.hash_participant_secret(secret)
+    participant.recovery_attempts = (participant.recovery_attempts or 0) + 1
+    participant.last_seen_at = datetime.now(UTC)
+    db.flush()
+    return participant, secret
+
+
+def issue_participant(
+    db: Session, festival: Festival, *, student_no: str | None = None
+) -> tuple[Participant, str]:
+    """참여자를 발급하고 평문 비밀을 함께 돌려준다. 비밀은 이때만 나온다.
+
+    `identity_mode` 가 `student_id` 면 학번이 필요합니다. 이미 발급된 학번이면
+    새로 만들지 않고 기존 참여자의 비밀만 새로 냅니다.
+    """
+    if festival.identity_mode == IdentityMode.STUDENT_ID:
+        if not student_no or not normalize_student_no(student_no):
+            raise ApiError(
+                422,
+                "STUDENT_NO_REQUIRED",
+                "학번을 입력해 주세요. 이 행사는 학번으로 1인 1참여를 확인합니다.",
+                {"field": "student_no"},
+            )
+        normalized = normalize_student_no(student_no)
+        existing = find_by_student_no(db, festival.id, normalized)
+        if existing is not None:
+            return reissue_for_student(db, existing)
+    else:
+        # 익명 축제에 학번이 들어와도 저장하지 않는다. 받지 않겠다고 한 것을
+        # 조용히 받아 두면 그 약속이 거짓이 된다.
+        normalized = None
+
     secret = security.generate_participant_secret()
 
     # 코드 충돌은 32^8 중 하나라 사실상 없지만, 있으면 조용히 실패하는 대신 다시 뽑는다.
@@ -69,6 +138,7 @@ def issue_participant(db: Session, festival: Festival) -> tuple[Participant, str
         participant = Participant(
             festival_id=festival.id,
             code=security.generate_participant_code(),
+            student_no=normalized,
             secret_hash=security.hash_participant_secret(secret),
         )
         try:
@@ -79,6 +149,12 @@ def issue_participant(db: Session, festival: Festival) -> tuple[Participant, str
                 db.flush()
         except IntegrityError:
             _forget(db, participant)
+            # 같은 학번이 방금 다른 요청으로 들어왔다. 코드 충돌과 달리 다시
+            # 뽑아도 해결되지 않으므로, 그 참여자를 찾아 이어받는다.
+            if normalized:
+                raced = find_by_student_no(db, festival.id, normalized)
+                if raced is not None:
+                    return reissue_for_student(db, raced)
             continue
         return participant, secret
 
@@ -298,10 +374,18 @@ def _pick_tile(
             # 이 부스는 보드에 올라가 있지 않다. 포인트만 지급한다.
             return None
         if assigned.id in taken:
+            # **문구가 롤백 사실을 숨기면 안 된다.**
+            #
+            # 조각 공개가 실패하면 참여 완료까지 롤백된다(스펙 §8.1 — 미션만
+            # 완료되고 조각은 없는 상태를 막기 위해서다). 즉 포인트도 안 나갔다.
+            #
+            # "조각은 이미 받았습니다" 만 말하면 스태프는 "포인트는 갔겠지" 로
+            # 읽고 넘어가고, 참여자는 아무것도 못 받는다.
             raise ApiError(
                 409,
                 "NO_TILE_AVAILABLE",
-                "이 부스의 조각은 이미 받았습니다.",
+                "이 부스의 조각을 이미 받아서 지급되지 않았습니다. "
+                "포인트도 나가지 않았습니다 — 다른 부스 미션으로 안내해 주세요.",
                 {"tile_index": assigned.tile_index},
             )
         return assigned
@@ -325,8 +409,20 @@ class GrantOutcome:
 
 
 def _existing(
-    db: Session, participant_id: int, mission_id: int, client_request_id: str | None
+    db: Session,
+    festival_id: int,
+    participant_id: int,
+    mission_id: int,
+    client_request_id: str | None,
 ) -> Participation | None:
+    """이미 지급된 건을 찾는다. 참여자·미션으로 먼저, 없으면 재전송 키로.
+
+    **재전송 키 조회에 축제 스코프가 붙어 있다.** `client_request_id` 는
+    클라이언트가 만들어 보내는 값이고 유니크 제약은 전역이라, 스코프가 없으면
+    남의 축제 지급 기록이 `was_already_granted: true` 와 함께 그대로 돌아온다 —
+    포인트·미션·부스·완료 시각이 전부 실려서. 우연한 UUID 충돌은 없다시피 하지만
+    이건 **공격자가 고르는 값**이다.
+    """
     stmt = select(Participation).where(
         Participation.participant_id == participant_id,
         Participation.mission_id == mission_id,
@@ -336,7 +432,10 @@ def _existing(
         return found
     if client_request_id:
         return db.execute(
-            select(Participation).where(Participation.client_request_id == client_request_id)
+            select(Participation).where(
+                Participation.client_request_id == client_request_id,
+                Participation.festival_id == festival_id,
+            )
         ).scalar_one_or_none()
     return None
 
@@ -355,6 +454,45 @@ def _already(db: Session, board: StampBoard, existing: Participation) -> GrantOu
     )
 
 
+#: `queued_at` 을 믿어 줄 범위. 이 값은 **클라이언트가 정하는 시각**이라
+#: 그대로 쓰면 부스 폰 하나로 완료 시각을 마음대로 적을 수 있다.
+#:
+#: 뒤쪽은 폰 시계가 조금 빠른 경우를 위한 여유다. 앞쪽은 오프라인 큐가 하루를
+#: 넘겨 남아 있을 일이 없다는 판단이다 — 축제 하루가 끝나면 그 큐는 의미가 없다.
+QUEUED_AT_FUTURE_TOLERANCE = timedelta(minutes=2)
+QUEUED_AT_MAX_AGE = timedelta(hours=24)
+
+
+def _trusted_queued_at(value: datetime | None, at: datetime) -> datetime | None:
+    """범위를 벗어난 `queued_at` 은 **버린다.**
+
+    거부하지 않고 버리는 이유는 지급 자체는 반드시 성공해야 하기 때문이다.
+    오프라인 우선 지급의 요점은 현장에서 줄이 멈추지 않는 것이고, 폰 시계가
+    틀렸다고 스탬프를 못 주면 그 요점이 사라진다. 시각만 서버 시각으로
+    떨어뜨리면 최악의 경우가 "오프라인 큐를 안 쓴 것과 같음" 이 된다.
+    """
+    if value is None:
+        return None
+    aware = value if value.tzinfo else value.replace(tzinfo=UTC)
+    skew = (aware - at).total_seconds()
+    if aware > at + QUEUED_AT_FUTURE_TOLERANCE or aware < at - QUEUED_AT_MAX_AGE:
+        # **조용히 버리지 않는다.**
+        #
+        # 버리면 `queued_at` 도 `synced_at` 도 비어, 그 지급은 DB 에서 온라인
+        # 지급과 구분되지 않는다. 부스 폰 시계가 3분만 빨라도 그 부스의 오프라인
+        # 흔적이 통째로 사라지고, 아무도 그 사실을 모른다.
+        #
+        # 로그가 유일한 단서다. 운영자가 "저 부스만 시간대 분포가 이상하다" 를
+        # 발견했을 때 여기서 답을 찾을 수 있어야 한다.
+        log.warning(
+            "queued_at 이 신뢰 범위를 벗어나 서버 시각을 씁니다 "
+            "(오차 %.0f초). 부스 단말 시계를 확인하세요.",
+            skew,
+        )
+        return None
+    return aware
+
+
 def grant(
     db: Session,
     *,
@@ -367,27 +505,43 @@ def grant(
     scan_window_index: int | None = None,
     client_request_id: str | None = None,
     queued_at: datetime | None = None,
+    response: dict | None = None,
+    attempt_count: int = 1,
     now: datetime | None = None,
 ) -> GrantOutcome:
     """미션 지급 + 조각 공개를 한 트랜잭션으로 처리한다.
 
     `queued_at` 이 있으면 `completed_at` 을 그 값으로 기록한다 — 오프라인 큐가
     복구된 시각에 완료가 몰려 보이면 운영 인사이트의 편중 판정이 망가진다.
+
+    `response` 와 `attempt_count` 는 **이미 통과한** 체험의 결과다. 채점은
+    services/experience.py 가 하고 여기서는 하지 않는다 — 이 함수는 스태프
+    지급에서도 불리는데, 그쪽은 체험 없이 사람이 확인해 지급한다.
     """
     at = now or datetime.now(UTC)
+    queued_at = _trusted_queued_at(queued_at, at)
     board = get_board(db, festival.id)
 
     # ── 계약 §8.1 의 검증 순서 ──
     if mission.booth_id != booth.id:
         raise ApiError(409, "MISSION_NOT_IN_BOOTH", "이 미션은 해당 부스의 미션이 아닙니다.")
+    # **이미 지급된 건은 활성 검사보다 먼저 답한다.**
+    #
+    # 오프라인 큐는 재전송한다. 그 사이 운영자가 부스를 중지하면, 이미 지급이
+    # 끝난 건이 재전송에서 `BOOTH_INACTIVE` 로 거절된다. 스태프 화면에는
+    # "보내지 못했다" 로 뜨지만 실제로는 이미 지급돼 있다 — 그 상태의 진실은
+    # 실패가 아니라 **성공**이다.
+    #
+    # 지급은 일어난 시점에 일어난 것이고, 나중에 부스를 닫았다고 없던 일이
+    # 되지 않는다. 그래서 멱등 조회를 앞에 둔다.
+    existing = _existing(db, festival.id, participant.id, mission.id, client_request_id)
+    if existing is not None:
+        return _already(db, board, existing)
+
     if not booth.is_active or booth.archived_at is not None:
         raise ApiError(409, "BOOTH_INACTIVE", "중지된 부스입니다.")
     if not mission.is_active or mission.archived_at is not None:
         raise ApiError(409, "MISSION_INACTIVE", "중지된 미션입니다.")
-
-    existing = _existing(db, participant.id, mission.id, client_request_id)
-    if existing is not None:
-        return _already(db, board, existing)
 
     # 스캔 사용 기록을 **지급보다 먼저** 넣는다. 1 스캔 = 1 미션이라
     # 유니크 제약이 여기서 걸려야 두 번째 미션이 같은 스캔으로 넘어가지 못한다.
@@ -408,8 +562,22 @@ def grant(
                 409, "SCAN_ALREADY_USED", "이 부스에서 방금 스탬프를 받았습니다."
             ) from None
 
+    # 보너스는 **누른 시각** 기준으로 찾는다.
+    #
+    # 도달 시각으로 찾으면 통신이 끊겼다는 이유만으로 참여자가 보너스를 잃는다 —
+    # 14시 50분에 "지금 두 배" 를 보고 미션을 했는데 큐가 15시 10분에 풀리면
+    # 캠페인이 이미 끝나 있다. 참여자는 화면에서 약속받은 점수를 못 받고,
+    # 그 사이 아무것도 잘못한 적이 없다.
+    #
+    # 완료 시각도 같은 값을 쓰므로(아래 `completed_at`), 이렇게 해야 리포트의
+    # 캠페인 전후 분석에서 "캠페인 중 완료인데 보너스가 0" 인 행이 사라진다.
+    effective_at = queued_at or at
     campaign = pick_campaign(
-        db, festival_id=festival.id, booth_id=booth.id, mission_id=mission.id, now=at
+        db,
+        festival_id=festival.id,
+        booth_id=booth.id,
+        mission_id=mission.id,
+        now=effective_at,
     )
 
     participation = Participation(
@@ -427,6 +595,8 @@ def grant(
         client_request_id=client_request_id,
         queued_at=queued_at,
         synced_at=at if queued_at else None,
+        response=response,
+        attempt_count=attempt_count,
     )
     try:
         with db.begin_nested():
@@ -435,7 +605,7 @@ def grant(
     except IntegrityError:
         # 동시 요청이 먼저 넣었다. 조건문으로는 막을 수 없는 경로다.
         _forget(db, participation)
-        raced = _existing(db, participant.id, mission.id, client_request_id)
+        raced = _existing(db, festival.id, participant.id, mission.id, client_request_id)
         if raced is None:
             raise
         return _already(db, board, raced)
@@ -474,15 +644,48 @@ def grant(
 # ── 부스 스캔 ───────────────────────────────────────────────────────────────
 
 
-def verify_scan_token(booth: Booth, token: str, *, now: datetime | None = None) -> int:
-    """토큰이 맞는 window 를 돌려준다. 계약 §8.3 의 오류 코드로 실패한다."""
-    window = security.match_scan_window(booth.qr_secret, booth.id, token, now)
+def verify_print_signature(booth: Booth, signature: str, *, now: datetime | None = None) -> int:
+    """인쇄 QR 의 고정 서명을 확인한다. 성공하면 **현재** window 를 돌려준다.
+
+    서명에는 시각이 들어 있지 않습니다. 인쇄물은 바뀌지 않으니까요. 그래서
+    "언제 스캔했나"는 서버 시각으로 정합니다.
+
+    현재 window 를 돌려주는 이유는 `booth_scan_uses` 때문입니다. 1 스캔 = 1 미션
+    규칙이 인쇄 부스에서도 의미를 갖게 하려면 무언가로 묶어야 하는데, 토큰이
+    고정이라 토큰으로는 묶을 수 없습니다. 서버 시각의 window 로 묶으면 한 부스에서
+    30초에 한 건씩만 받게 되어, 한 번 찍고 그 부스 미션을 전부 쓸어담는 것을
+    막습니다 — 줄을 선 사람들 사이에서 실제로 필요한 간격입니다.
+    """
+    if security.match_print_signature(booth.qr_secret, booth.id, signature):
+        return security.current_window(now)
+    raise ApiError(
+        400,
+        "SCAN_TOKEN_INVALID",
+        "이 부스의 QR 이 아닙니다. 부스에 붙은 QR 을 다시 찍어 주세요.",
+    )
+
+
+def verify_scan_token(
+    booth: Booth,
+    token: str,
+    *,
+    windows: int = security.DEFAULT_ACCEPTED_WINDOWS,
+    now: datetime | None = None,
+) -> int:
+    """토큰이 맞는 window 를 돌려준다. 계약 §8.3 의 오류 코드로 실패한다.
+
+    `windows` 는 인정할 window 수다. 체험이 붙은 부스는 호출자가 늘려 넘긴다 —
+    퀴즈를 30초 안에 못 풀면 지급이 막히기 때문이다.
+    """
+    window = security.match_scan_window(booth.qr_secret, booth.id, token, now, windows=windows)
     if window is not None:
         return window
 
     # 만료와 위조를 구분한다 — 참여자 화면의 안내 문구가 달라야 한다.
     # 만료면 "다시 스캔", 위조면 다시 스캔해도 안 되므로 그렇게 안내하면 안 된다.
-    for back in range(2, 12):
+    # 인정 범위 **바로 뒤**부터 훑는다. windows 를 늘렸는데 여기를 2 로 두면
+    # 인정 범위 안의 토큰을 위조로 오판한다.
+    for back in range(windows, windows + 10):
         candidate = security.current_window(now) - back
         if security.booth_scan_token(booth.qr_secret, booth.id, candidate) == token:
             raise ApiError(410, "SCAN_TOKEN_EXPIRED", "부스 화면의 QR 을 다시 스캔해 주세요.")
@@ -502,3 +705,37 @@ def scan_used_in_window(
         ).scalar_one_or_none()
         is not None
     )
+
+
+def verify_scan_proof(
+    booth: Booth,
+    *,
+    token: str | None,
+    signature: str | None,
+    windows: int = security.DEFAULT_ACCEPTED_WINDOWS,
+    now: datetime | None = None,
+) -> int:
+    """부스 모드에 맞는 증명을 확인한다 — 기획서 E4.
+
+    **부스가 정한 모드만 받습니다.** 인쇄 부스가 회전 토큰도 받아 주면, 모드를
+    `printed` 로 내려 둔 부스에서 예전 태블릿 QR 이 계속 통하게 됩니다.
+    반대로 회전 부스가 고정 서명을 받으면 회전의 의미가 없어집니다.
+    """
+    if booth.qr_mode == BoothQrMode.PRINTED:
+        if not signature:
+            raise ApiError(
+                400,
+                "SCAN_SIGNATURE_REQUIRED",
+                "이 부스는 인쇄된 QR 을 씁니다. 부스에 붙은 QR 을 찍어 주세요.",
+                {"qr_mode": booth.qr_mode.value},
+            )
+        return verify_print_signature(booth, signature, now=now)
+
+    if not token:
+        raise ApiError(
+            400,
+            "SCAN_TOKEN_REQUIRED",
+            "이 부스는 화면에 뜨는 QR 을 씁니다. 부스 화면의 QR 을 찍어 주세요.",
+            {"qr_mode": booth.qr_mode.value},
+        )
+    return verify_scan_token(booth, token, windows=windows, now=now)

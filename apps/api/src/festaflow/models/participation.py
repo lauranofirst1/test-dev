@@ -40,6 +40,16 @@ class Participant(Base):
     __table_args__ = (
         UniqueConstraint("festival_id", "code", name="uq_participants_festival_code"),
         CheckConstraint("code ~ '^FF-[0-9A-Z]{8}$'", name="code_format"),
+        # 1 학번 = 1 참여자. **이 인덱스가 투표 부정 방지의 뿌리다.**
+        # 애플리케이션 조건문으로 두면 동시 요청에서 뚫리고, 뚫리는 순간
+        # 스티커를 여러 장 붙이던 행위가 그대로 재현된다.
+        Index(
+            "uq_participants_student_no",
+            "festival_id",
+            "student_no",
+            unique=True,
+            postgresql_where="student_no IS NOT NULL",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -47,6 +57,16 @@ class Participant(Base):
         BigInteger, ForeignKey("festivals.id", ondelete="CASCADE"), nullable=False
     )
     code: Mapped[str] = mapped_column(Text, nullable=False)
+
+    #: 학번. `identity_mode = student_id` 인 축제에서만 채워진다.
+    #:
+    #: **해시가 아니라 평문입니다.** 공결이 걸린 특강은 학교에 낼 출석 명단이
+    #: 필요한데, 해시만 저장하면 그 명단을 만들 수 없어 기능 자체가 죽습니다.
+    #: 대신 노출 경계를 좁힙니다 — 참여자 응답에는 절대 나가지 않고 운영자
+    #: 응답에서만 나옵니다(schemas 가 유일한 경계입니다).
+    #:
+    #: 익명 축제에서는 NULL 입니다. 부분 유니크 인덱스가 그 경우를 비워 둡니다.
+    student_no: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: 조회 인증용. 발급 시 1회만 평문 전달. 코드는 부스에서 노출되므로 분리해야 한다.
     secret_hash: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -82,8 +102,15 @@ class Participation(Base):
             postgresql_where="mission_id IS NOT NULL",
         ),
         # 오프라인 재전송이 중복 지급이 되지 않게.
+        #
+        # **축제 단위다.** 재전송은 언제나 같은 축제로 가고(URL 에 축제가 있다),
+        # 전역으로 두면 두 가지가 깨진다 — 다른 축제가 우연히 같은 키를 쓰면
+        # 500 으로 막히고, 조회에 스코프가 없으면 남의 축제 지급 기록이
+        # `was_already_granted` 와 함께 그대로 돌아간다. 이 값은 클라이언트가
+        # 만들어 보내는 값이라 우연에만 기대면 안 된다.
         Index(
             "uq_participations_client_request",
+            "festival_id",
             "client_request_id",
             unique=True,
             postgresql_where="client_request_id IS NOT NULL",
@@ -186,5 +213,37 @@ class BoothScanUse(Base):
         BigInteger, ForeignKey("participations.id", ondelete="SET NULL"), nullable=True
     )
     used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MissionAttempt(Base):
+    """체험 시도 횟수.
+
+    계약(§11)은 오답과 시도 소진이 **참여 이력을 만들지 않는다**고 못박습니다.
+    집계에 섞이면 안 되기 때문입니다. 그런데 이력을 만들지 않으면 시도 횟수를
+    둘 곳이 없어지고, `max_attempts` 는 클라이언트 말을 믿는 값이 됩니다.
+    집에서 답을 세 번 틀려도 새로고침하면 처음으로 돌아갑니다.
+
+    그래서 시도만 따로 셉니다. 이 테이블은 집계 대상이 아니며, 어떤 리포트도
+    읽지 않습니다. 지급이 성사되면 이 값이 `participations.attempt_count` 로
+    옮겨 적히고, 그때부터는 참여 이력이 진실입니다.
+    """
+
+    __tablename__ = "mission_attempts"
+    __table_args__ = (
+        UniqueConstraint("participant_id", "mission_id", name="uq_mission_attempts_key"),
+        CheckConstraint("attempt_count >= 0", name="attempt_count_non_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    participant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("participants.id", ondelete="CASCADE"), nullable=False
+    )
+    mission_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("missions.id", ondelete="CASCADE"), nullable=False
+    )
+    attempt_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
+    last_attempt_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

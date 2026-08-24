@@ -3,12 +3,32 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from festaflow.models.enums import BoothType, BoothVerifyMode, GrantUnit, RevealMode
+from festaflow.models.enums import (
+    BoardStyle,
+    BoothQrMode,
+    BoothType,
+    BoothVerifyMode,
+    ExperienceType,
+    GrantUnit,
+    IdentityMode,
+    RevealMode,
+)
 
 # ── 참여자 ──────────────────────────────────────────────────────────────────
+
+
+class ParticipantIssue(BaseModel):
+    """참여 시작 요청.
+
+    익명 축제에서는 본문이 필요 없습니다. 학번 축제에서는 학번이 필수이며,
+    이미 발급된 학번이면 **새 참여자를 만들지 않고** 기존 참여를 이어받습니다.
+    """
+
+    student_no: str | None = Field(None, max_length=32)
 
 
 class ParticipantIssued(BaseModel):
@@ -17,6 +37,8 @@ class ParticipantIssued(BaseModel):
     code: str
     secret: str
     festival_id: int
+    #: 이미 있던 학번이라 기존 참여를 이어받았는가. 화면 문구가 달라진다.
+    resumed: bool = False
 
 
 class MissionStatus(BaseModel):
@@ -83,6 +105,8 @@ class PublicFestival(BaseModel):
     starts_on: str
     ends_on: str
     booths: list[PublicBooth]
+    #: 참여 시작 화면이 학번을 물어야 하는지 여기서 정해진다.
+    identity_mode: IdentityMode = IdentityMode.ANONYMOUS
     #: 화면에 반드시 함께 표시해야 하는 출처 표기
     source_note: str = "출처: ⓒ한국관광공사"
 
@@ -107,6 +131,8 @@ class StampBoardOut(BaseModel):
     total_tiles: int
     reveal_mode: RevealMode
     grant_unit: GrantUnit
+    #: 표현만 정한다 — 바꿔도 진행이 초기화되지 않는다.
+    board_style: BoardStyle = BoardStyle.GRID
     image_url: str
     complete_message: str
     tiles: list[BoardTile]
@@ -118,6 +144,8 @@ class StampBoardUpdate(BaseModel):
     cols: int = Field(ge=2, le=5)
     reveal_mode: RevealMode
     grant_unit: GrantUnit
+    #: 구조가 아니라 표현이므로 STRUCTURAL 에 넣지 않는다 — 버전을 올리지 않는다.
+    board_style: BoardStyle = BoardStyle.GRID
     image_url: str = Field(min_length=1)
     complete_message: str = Field(min_length=1)
 
@@ -167,16 +195,41 @@ class StaffGrantIn(BaseModel):
     participant_code: str = Field(min_length=1, max_length=32)
     mission_id: int
     #: 오프라인 큐 재전송이 중복 지급이 되지 않게 하는 키.
-    client_request_id: str | None = None
+    #:
+    #: **형식을 여기서 검사한다.** DB 컬럼이 `UUID` 라 아무 문자열이나 통과시키면
+    #: Postgres 에서 터져 500 이 되고, 500 은 큐가 **재시도하는** 응답이라
+    #: 그 항목 하나가 큐 앞에서 영원히 돈다. 422 로 답해야 큐가 사람에게 넘긴다.
+    #:
+    #: **버전은 강제하지 않는다.** 우리 화면은 v4 를 만들지만, 다른 클라이언트가
+    #: v1 이나 v7 을 보낼 이유가 충분하고 그게 재전송 키로서 못할 일이 없다.
+    #: 여기서 막아야 하는 것은 "UUID 가 아닌 값" 이지 "v4 가 아닌 값" 이 아니다.
+    client_request_id: UUID | None = None
+    #: 스태프가 **현장에서 버튼을 누른** 시각. 도달 시각이 아니다.
+    #:
+    #: 이 값이 없으면 오프라인에 쌓였던 지급이 전부 통신 복구 시점으로 기록되어,
+    #: 운영 인사이트의 "최근 30분 편중" 과 리포트 시간축이 통째로 왜곡된다.
+    #: 서버는 이 값을 `completed_at` 으로 쓴다 — 계약 §14.3.
+    queued_at: datetime | None = None
 
 
 class ScanGrantIn(BaseModel):
-    """계약 §8.3."""
+    """계약 §8.3, §11.
+
+    `response` 는 체험 제출입니다 — quiz 는 `{"choice_index": 0}`,
+    info 는 `{"dwell_seconds": 7}`. stamp 는 비워 둡니다.
+    채점은 서버에서만 하므로 여기에 정답 여부를 실어 보내도 무시됩니다.
+    """
 
     booth_id: int
-    token: str = Field(min_length=1, max_length=64)
+    #: 회전 QR 의 토큰. 인쇄 부스에서는 비운다.
+    token: str | None = Field(None, min_length=1, max_length=64)
+    #: 인쇄 QR 의 고정 서명. 회전 부스에서는 비운다 — 계약 §14.4.
+    signature: str | None = Field(None, min_length=1, max_length=64)
     mission_id: int
-    client_request_id: str | None = None
+    response: dict | None = None
+    client_request_id: UUID | None = None
+    #: 참여자 화면도 오프라인 큐를 쓸 수 있다. 의미는 `StaffGrantIn.queued_at` 과 같다.
+    queued_at: datetime | None = None
 
 
 class ParticipationOut(BaseModel):
@@ -191,6 +244,8 @@ class ParticipationOut(BaseModel):
     reward_campaign_id: int | None
     verified_via: BoothVerifyMode | None
     completed_at: datetime | None
+    #: 지급까지 걸린 시도 횟수. 퀴즈에서만 1 보다 커진다.
+    attempt_count: int = 1
 
 
 class RevealedTile(BaseModel):
@@ -205,6 +260,9 @@ class GrantResult(BaseModel):
     participation: ParticipationOut
     revealed_tile: RevealedTile | None
     board_progress: BoardProgress
+    #: 퀴즈 해설. 맞힌 뒤에만 내려간다 — 설정에 담아 미리 내리면 정답이 새고,
+    #: 틀린 직후에 내리면 남은 시도가 공짜가 된다.
+    explanation: str | None = None
 
 
 class RecentGrant(BaseModel):
@@ -223,6 +281,13 @@ class ScanContextMission(BaseModel):
     #: 이미 받았으면 화면에서 흐리게 처리한다.
     already_granted: bool
 
+    # ── 체험 (§11) ──
+    experience_type: ExperienceType = ExperienceType.STAMP
+    #: **정답이 빠진** 설정. quiz 의 answer_index 는 여기 절대 담기지 않는다.
+    experience_config: dict = Field(default_factory=dict)
+    #: 남은 시도 횟수. 제한이 없는 유형이면 None.
+    attempts_left: int | None = None
+
 
 class ScanContext(BaseModel):
     """스캔 직후 미션 선택 화면 — 계약 §8.3."""
@@ -238,7 +303,10 @@ class ScanContext(BaseModel):
     #: expires_at 보다 한 window 뒤다. 화면은 이 값으로 카운트다운해야 한다 —
     #: expires_at 로 잠그면 서버가 받아줄 30초를 화면이 먼저 포기한다.
     accepted_until: datetime
-    seconds_remaining: int
+    #: 인쇄 QR 은 만료되지 않으므로 None. 화면은 이때 카운트다운을 그리지 않는다.
+    seconds_remaining: int | None
+    #: 이 부스가 인쇄 QR 인지 회전 QR 인지. 화면 문구가 달라진다.
+    qr_mode: BoothQrMode = BoothQrMode.ROTATING
     missions: list[ScanContextMission]
     #: 이 window 에서 이미 한 건 받았으면 다시 스캔해야 한다.
     scan_already_used: bool

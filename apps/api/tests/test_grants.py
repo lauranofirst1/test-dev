@@ -29,6 +29,7 @@ from festaflow.models import (
     StampTile,
 )
 from festaflow.models.enums import (
+    BoothQrMode,
     BoothType,
     BoothVerifyMode,
     GrantUnit,
@@ -87,6 +88,9 @@ def _make_booth(
     *,
     name: str = "막국수 체험존",
     verify_mode: BoothVerifyMode = BoothVerifyMode.STAFF_SCAN,
+    # 이 파일의 스캔 테스트는 **회전 QR** 을 검증한다. 모델 기본값은 인쇄이므로
+    # (지역 축제 천막 부스에 태블릿이 없다는 전제) 여기서 명시해야 한다.
+    qr_mode: BoothQrMode = BoothQrMode.ROTATING,
     is_active: bool = True,
     missions: int = 1,
     points: int = 100,
@@ -96,6 +100,7 @@ def _make_booth(
         name=name,
         booth_type=BoothType.EXPERIENCE,
         verify_mode=verify_mode,
+        qr_mode=qr_mode,
         is_active=is_active,
         qr_secret=b"x" * 32,
     )
@@ -130,7 +135,7 @@ def _grant(client, festival, booth, mission, code, **kw):
 
 
 def _err(r) -> str:
-    return r.json()["detail"]["error"]["code"]
+    return r.json()["error"]["code"]
 
 
 # ── 부스 · 미션 (§4) ────────────────────────────────────────────────────────
@@ -403,7 +408,7 @@ def test_booth_manager_cannot_grant_for_another_booth(client, festival, db):
         headers=headers,
     )
     assert denied.status_code == 403
-    assert denied.json()["detail"]["error"]["details"]["assigned_booth_id"] == mine.id
+    assert denied.json()["error"]["details"]["assigned_booth_id"] == mine.id
 
 
 # ── 보상 캠페인 보너스 ──────────────────────────────────────────────────────
@@ -709,7 +714,7 @@ def test_structural_change_needs_confirmation_when_progress_exists(client, festi
 
     r = _put_board(client, festival, rows=2, cols=2)
     assert r.status_code == 409
-    body = r.json()["detail"]["error"]
+    body = r.json()["error"]
     assert body["code"] == "BOARD_RESET_REQUIRES_CONFIRMATION"
     assert body["details"] == {"affected_participants": 1, "revealed_count": 1}
     assert _board(db, festival).version == 1  # 아무것도 바뀌지 않았다

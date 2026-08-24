@@ -80,6 +80,15 @@ export const RevealMode = {
 } as const;
 export type RevealMode = (typeof RevealMode)[keyof typeof RevealMode];
 
+/** 진행 보드의 표현. 구조가 아니라 보여주는 방식이라 바꿔도 진행이 초기화되지 않는다. */
+export const BoardStyle = {
+  /** 그림 한 장을 격자로 쪼갠 퍼즐 */
+  Grid: 'grid',
+  /** 점선으로 이어진 스탬프 랠리 지도 */
+  Trail: 'trail',
+} as const;
+export type BoardStyle = (typeof BoardStyle)[keyof typeof BoardStyle];
+
 /** 조각 지급 단위. 타일 수 > 지급 단위 수이면 완성 불가 경고. */
 export const GrantUnit = {
   Booth: 'booth',
@@ -211,5 +220,24 @@ export const ErrorCode = {
   ExperienceAttemptsExceeded: 'EXPERIENCE_ATTEMPTS_EXCEEDED',
   ExperienceConsentRequired: 'EXPERIENCE_CONSENT_REQUIRED',
   ExperienceDwellTooShort: 'EXPERIENCE_DWELL_TOO_SHORT',
+  NotUrgent: 'NOT_URGENT',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+/** 공지를 누가 보는가. **스태프 공지가 관객에게 새면 안 된다** —
+ *  그래서 관객용 조회 경로는 이 값을 파라미터로 받지 않는다. */
+export const AnnouncementChannel = {
+  Audience: 'audience',
+  Staff: 'staff',
+  Both: 'both',
+} as const;
+export type AnnouncementChannel =
+  (typeof AnnouncementChannel)[keyof typeof AnnouncementChannel];
+
+/** 공지의 급함. `normal` 은 배너, `urgent` 는 화면을 덮고 확인을 받는다. */
+export const AnnouncementLevel = {
+  Normal: 'normal',
+  Urgent: 'urgent',
+} as const;
+export type AnnouncementLevel =
+  (typeof AnnouncementLevel)[keyof typeof AnnouncementLevel];

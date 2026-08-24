@@ -1,6 +1,6 @@
 """업로드 파일 저장.
 
-조각 보드 그림은 기획자가 올립니다. 업로드는 조용히 위험한 경로라 세 가지를
+조각 보드 그림과 전시 포스터를 올립니다. 업로드는 조용히 위험한 경로라 세 가지를
 지킵니다.
 
 1. **클라이언트가 준 `content_type` 과 파일명을 믿지 않습니다.** 매직 바이트로
@@ -48,14 +48,18 @@ def media_root() -> Path:
     return root
 
 
-def save_board_image(stream: BinaryIO, festival_id: int) -> str:
-    """그림을 저장하고 화면이 쓸 URL 경로를 돌려준다."""
+def save_image(stream: BinaryIO, festival_id: int, *, prefix: str) -> str:
+    """이미지를 저장하고 화면이 쓸 URL 경로를 돌려준다.
+
+    `prefix` 는 파일 이름 앞머리일 뿐이며 경로에 쓰이지 않습니다 — 저장 위치는
+    항상 `media_root()` 이고, 이름의 나머지는 서버가 난수로 만듭니다.
+    """
     head = stream.read(32)
     if not head:
         raise validation_failed("빈 파일입니다.", "file")
     ext = _sniff(head)
 
-    name = f"board-{festival_id}-{secrets.token_urlsafe(8)}{ext}"
+    name = f"{prefix}-{festival_id}-{secrets.token_urlsafe(8)}{ext}"
     path = media_root() / name
 
     written = 0
@@ -77,3 +81,13 @@ def save_board_image(stream: BinaryIO, festival_id: int) -> str:
             out.write(chunk)
 
     return f"/media/{name}"
+
+
+def save_board_image(stream: BinaryIO, festival_id: int) -> str:
+    """조각 보드 그림."""
+    return save_image(stream, festival_id, prefix="board")
+
+
+def save_poster(stream: BinaryIO, festival_id: int) -> str:
+    """전시 작품 포스터. 보드 그림과 같은 검사를 거친다."""
+    return save_image(stream, festival_id, prefix="poster")
