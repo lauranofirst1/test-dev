@@ -441,13 +441,30 @@ button.rcpt__row:disabled {
 }
 
 /* ── 스탬프 랠리 지도 (board_style = trail) ───────────────────
-   격자 퍼즐과 같은 타일을 다르게 그린다. 길을 따라간다는 은유라
-   노드가 자로 잰 듯 정렬되지 않게 줄마다 살짝 어긋나 있다. */
+   격자 퍼즐과 같은 타일을 다르게 그린다. 은유가 다르다 — 퍼즐은 "그림이
+   완성된다", 지도는 "길을 따라간다".
+
+   ## 폭을 묶는다
+
+   예전에는 폭 100% 였다. 넓은 화면에서는 1022px 중 좌우 203px 씩이 빈 채로
+   남아 노드가 흩어져 보였다 — 40% 가 죽은 공간이었다. 길은 한 눈에 이어져
+   보여야 길이고, 그러려면 넓어지는 만큼 늘어나면 안 된다.
+
+   ## 선은 실선이다
+
+   점선이었는데, SVG 가 `preserveAspectRatio="none"` 으로 늘어나면서 가로
+   구간과 대각선 구간의 점 간격이 서로 달라졌다. `vector-effect` 는 굵기만
+   지키고 점 간격은 못 지킨다. 실선으로 두면 그 문제가 사라지고, 지나온 길과
+   아직인 길은 굵기와 색으로 이미 갈린다.
+   ============================================================ */
 
 .trail {
   position: relative;
+  /* 걸어 다니는 경로다. 화면이 넓다고 경로가 넓어질 이유는 없다. */
   width: 100%;
-  padding: var(--space-4);
+  max-width: 460px;
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--color-surface-sunk);
   border: 1px solid var(--color-line);
@@ -465,15 +482,15 @@ button.rcpt__row:disabled {
 .trail__link {
   stroke: var(--color-line-strong);
   stroke-width: 2;
-  stroke-dasharray: 3 5;
   stroke-linecap: round;
-  opacity: 0.65;
+  opacity: 0.45;
 }
 
-/* 다음 노드를 방문했다면 그 구간은 '지나온 길'이다. */
+/* 다음 노드를 방문했다면 그 구간은 '지나온 길'이다. 굵기와 색이 함께
+   바뀌므로 색을 못 보는 경우에도 남는다. */
 .trail__link--on {
-  stroke: var(--color-act-ink);
-  stroke-dasharray: none;
+  stroke: var(--color-gold-solid);
+  stroke-width: 4;
   opacity: 1;
 }
 
@@ -481,16 +498,19 @@ button.rcpt__row:disabled {
   position: absolute;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin: -22px 0 0 -22px;   /* 좌표가 노드의 중심이 되도록 */
+  width: 42px;
+  height: 42px;
+  margin: -21px 0 0 -21px;   /* 좌표가 노드의 중심이 되도록 */
   border-radius: 50%;
-  background: var(--color-pip-empty);
-  border: 2px solid transparent;
+  /* 아직인 곳은 **테두리만** 있는 원이다. 회색으로 꽉 채우면 "비활성" 으로
+     읽혀 갈 곳이 아니라 못 가는 곳처럼 보인다. */
+  background: var(--color-surface);
+  border: 2px solid var(--color-line-strong);
   color: var(--color-ink-mute);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 4px var(--color-surface-sunk);
 }
 
 /* 방문한 곳. **조각 보드의 열린 칸과 같은 금색**이다 — 둘 다 "이미 이룬 것"
@@ -499,7 +519,10 @@ button.rcpt__row:disabled {
   background: var(--color-gold-solid);
   border-color: var(--color-gold-solid);
   color: var(--color-on-gold);
-  font-size: var(--text-body);
+  font-size: var(--text-body-lg);
+  box-shadow:
+    0 0 0 4px var(--color-surface-sunk),
+    0 2px 8px rgba(20, 24, 31, 0.16);
 }
 
 @media (max-width: 400px) {
@@ -586,15 +609,46 @@ button.rcpt__row:disabled {
 }
 
 /* 탭이 fixed 라 문서 흐름에서 빠진다. 그만큼 바닥에 자리를 비워 두지 않으면
-   마지막 줄이 탭 아래로 들어가 영영 안 보인다. */
-.paper:has(.atabs) .shell {
+   마지막 줄이 탭 아래로 들어가 영영 안 보인다.
+
+   **`.shell` 이 아니라 껍데기에 준다.** 본문에만 주면 그 아래 푸터가 여전히
+   탭 밑으로 들어간다 — 실제로 그랬다. */
+.paper:has(.atabs) {
   padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
 }
 
-/* `:has()` 를 못 쓰는 브라우저에서도 마지막 줄이 잘리지는 않게 한다.
+/* `:has()` 를 못 쓰는 브라우저에서도 바닥이 잘리지는 않게 한다.
    탭이 없는 화면에서 여백이 조금 남는 것이 잘리는 것보다 낫다. */
 @supports not selector(:has(*)) {
-  .paper .shell {
+  .paper {
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+/* ── 보드 카드의 폭 ──────────────────────────────────────────
+   관객 화면은 모바일이 기준이라 카드 안쪽 폭이 좁다. 넓은 화면(운영자가
+   «다른 사람 화면» 으로 열어 보는 경우)에서는 카드가 1000px 을 넘어가면서
+   조각 수치는 왼쪽 끝에, 지도는 가운데에 떨어져 서로 남남처럼 보였다.
+
+   같은 것을 말하는 둘이므로 같은 폭 안에 묶는다. */
+.paper .boardcard > * {
+  width: 100%;
+  max-width: 460px;
+  margin-inline: auto;
+}
+
+/* ── 관객 푸터 ───────────────────────────────────────────────
+   하단 탭이 붙박여 있으므로 그 위에 한 줄로만 앉는다. 관객에게 «이용약관»
+   같은 링크는 할 일이 아니고, 출처 표기만 남는다. */
+
+.afoot--audience {
+  border-top: 1px solid var(--color-line);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+}
+
+.afoot--audience p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-ink-mute);
 }

@@ -17,6 +17,7 @@ import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-
 
 import { api } from './api/client';
 import { AnnouncementProvider } from './components/announcements/AnnouncementProvider';
+import { AppFooter } from './components/AppFooter';
 import { AudienceTabs } from './components/AudienceTabs';
 import { AnnouncementSurface } from './components/announcements/AnnouncementSurface';
 import { FestivalNav } from './components/FestivalNav';
@@ -148,7 +149,6 @@ export function PlannerLayout() {
           {/* 레일에서 뺀 현장 화면들이 여기로 온다. 축제가 정해지지 않았으면
               열 현장 화면도 없다. */}
           {id && <FieldScreensMenu festivalId={id} />}
-          <span className="muted only-wide">출처: ⓒ한국관광공사</span>
           <AccountMenu />
         </div>
       </header>
@@ -183,6 +183,8 @@ export function PlannerLayout() {
           {body}
         </main>
       </div>
+
+      <AppFooter />
     </div>
   );
 }
@@ -268,7 +270,6 @@ export function AudienceLayout() {
         <span className="brand brand--plain">
           {festival.data?.name ?? '축제 참여'}
         </span>
-        <span className="muted">출처: ⓒ한국관광공사</span>
       </header>
       {/* 공지는 껍데기에 단다. 페이지마다 붙이면 어느 화면에 있느냐에 따라
           우천 중단 공지를 보기도 하고 못 보기도 한다. */}
@@ -280,6 +281,9 @@ export function AudienceLayout() {
       {/* 탭은 껍데기에 단다. 화면마다 붙이면 어느 화면에서는 있고 어느
           화면에서는 없어져, 그건 탭이 아니라 버튼이다. */}
       <AudienceTabs festival={festival.data} />
+
+      {/* 하단 탭이 붙박여 있으므로 푸터는 그 위에 한 줄로만 앉는다. */}
+      <AppFooter variant="audience" />
     </div>
   );
 }

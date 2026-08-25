@@ -261,7 +261,7 @@ export function JoinPage() {
       )}
 
       {b && progress && (
-        <div className="card stack" style={{ gap: 'var(--space-4)' }}>
+        <div className="card stack boardcard" style={{ gap: 'var(--space-4)' }}>
           <div
             className="row"
             style={{ justifyContent: 'space-between', alignItems: 'center' }}
