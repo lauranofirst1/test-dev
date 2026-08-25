@@ -169,6 +169,12 @@ export function AnnouncementProvider({
         // 않고, 이 브라우저에서만 확인으로 친다.
         return Promise.resolve(null);
       }
+      if (channel === 'staff' && qc.getQueryData(['session'])) {
+        // 기관 세션으로 보고 있다. 확인 기록에는 스태프·참여자 자리밖에 없어
+        // 서버에 남길 곳이 없다 — 401 을 받고 로컬로 떨어지는 대신 처음부터
+        // 로컬로 친다. 덮개는 어차피 닫힌다.
+        return Promise.resolve(null);
+      }
       return api.post(
         `/api/festivals/${festivalId}/announcements/${id}/${suffix}`,
         undefined,
