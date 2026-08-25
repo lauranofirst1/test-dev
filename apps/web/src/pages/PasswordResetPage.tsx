@@ -91,7 +91,7 @@ export function PasswordResetRequestPage() {
       )}
 
       <Link to="/login" className="muted" style={{ textAlign: 'center' }}>
-        ← 로그인으로 돌아가기
+        로그인으로 돌아가기
       </Link>
     </div>
   );

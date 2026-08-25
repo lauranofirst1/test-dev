@@ -1,211 +1,266 @@
 /* ============================================================
-   FestaFlow Design Tokens
-   - 라이트/다크 모두 정의. 한쪽만 있는 토큰은 없다.
-   - 뷰어 테마는 3상태: 명시적 light / 명시적 dark / 미지정(OS)
-     → 바닥 :root = light, 미디어쿼리 = OS dark, [data-theme] = 토글
-   - 색은 전부 WCAG 대비를 계산해 통과시킨 값 (05-ui.md §5)
+   FestaFlow Design Tokens — 조각판 (Piece Board)
+   ============================================================
+
+   이 시스템의 중심 은유는 **한 칸씩 열리는 격자**입니다. 부스를 돌면 그림이
+   한 조각씩 열리는 것이 이 제품에서 실제로 벌어지는 일이고, 그래서 진행을
+   막대가 아니라 칸으로 셉니다 — 이 제품에서 개수는 의미가 있습니다.
+   부스 수가 곧 조각 수이고, 조각이 다 안 차면 아무도 완성하지 못합니다.
+
+   ## 색이 지키는 규칙
+
+   **파랑(울트라마린)은 액션 전용입니다.** 예전에는 파랑이 "혼잡도 낮음"
+   상태색이자 차트 카테고리 5번이었습니다. 파랑을 기본 액션으로 쓰기로 한 이상
+   "안전한 상태"와 "누를 것"이 같은 색일 수 없어, 상태 스케일과 차트
+   카테고리에서 파랑을 **뺐습니다**. 상태는 청록–호박–주홍 3단입니다.
+
+   **금색은 성취 전용입니다.** 파랑이 "누를 것"이라면 금색은 "이미 이룬 것" —
+   열린 조각, 완성된 보드, 경품 당첨. 초록(여유)과 다릅니다. 초록은 *지금
+   안전하다*, 금색은 *끝냈다* 입니다.
+
+   **금색은 글자로 쓰지 않습니다.** `--color-gold-solid` 는 흰 바탕에서
+   1.88:1 이라 읽히지 않습니다. 칩·배지 채움에만 쓰고, 같은 뜻을 글자로 써야
+   하면 `--color-gold-ink` 를 씁니다. 다크에서는 밝은 값 하나가 둘 다 합니다.
+
+   ## 테마
+
+   뷰어 테마는 3상태입니다: 명시적 light / 명시적 dark / 미지정(OS 따름).
+   바닥 `:root` 가 라이트 전체를 정의하고, 미디어쿼리가 OS 다크를,
+   `[data-theme]` 가 토글을 받습니다. 한쪽에만 있는 토큰은 없습니다.
+
+   ⚠ 관객 화면(`paper.css`)은 `.paper` 안에서 이 토큰들을 덮어씁니다.
+     이 재설계는 기획자·운영자 콘솔만 대상이고, 관객 화면은 종이 테마를
+     그대로 유지합니다. 새로 추가한 토큰(`--color-act-solid`, `--color-on-act`,
+     `--color-pip-*`)을 관객 화면에서 쓰게 되면 `paper.css` 에도 짝을 넣어야
+     합니다.
+
+   색은 전부 WCAG 대비를 계산해 통과시킨 값입니다(본문 4.5:1, 경계 3:1).
    ============================================================ */
 
 :root {
   color-scheme: light;
 
-  /* ── 표면 ── 순수 회색이 아니라 민트 쪽으로 기운 웜그레이 */
-  --color-ground:        #EFF1EC;
+  /* ── 표면 ── 중성색은 액션(울트라마린) 쪽으로 살짝 기운 슬레이트.
+     순수 회색은 고르지 않은 것처럼 보입니다. */
+  --color-ground:        #EEF1F7;
   --color-surface:       #FFFFFF;
-  --color-surface-sunk:  #F6F7F3;
-  --color-line:          #E1E4DC;
-  --color-line-strong:   #C9CEC5;
+  --color-surface-sunk:  #F7F9FC;
+  --color-line:          #DDE2ED;
+  --color-line-strong:   #8892A6;   /* 3.13:1 on surface — 입력 테두리 기준 통과 */
 
   /* ── 텍스트 ── */
-  --color-ink:           #101311;
-  --color-ink-soft:      #4A5049;
-  --color-ink-mute:      #666E64;   /* 5.28:1 on surface — 본문 AA 통과 */
-  --color-ink-inverse:   #EFF1EC;
+  --color-ink:           #14181F;   /* 15.7:1 on ground */
+  --color-ink-soft:      #3E4657;   /* 9.47:1 on surface */
+  --color-ink-mute:      #5A6376;   /* 6.03:1 on surface — 본문 AA 통과 */
+  --color-ink-inverse:   #FFFFFF;
 
-  /* ── 브랜드: 민트 ── */
-  --color-mint-fill:     #BEE3D4;
-  --color-mint-wash:     #DDF0E7;
-  --color-mint-ink:      #256048;   /* 5.32:1 on mint-fill */
+  /* ── 액션: 울트라마린 ── 이 색은 "누를 것" 에만 씁니다. */
+  --color-act-solid:     #2F44CC;   /* 버튼 배경 · 채워진 조각 · 활성 인디케이터 */
+  --color-act-fill:      #D5DBF7;
+  --color-act-wash:      #E9ECFB;
+  --color-act-ink:       #2F44CC;   /* 7.45:1 on surface · 5.43:1 on act-fill */
+  --color-on-act:        #FFFFFF;   /* 7.45:1 on act-solid */
 
-  /* ── 브랜드: 라벤더 ── */
-  --color-lav-fill:      #D6CBF3;
-  --color-lav-wash:      #ECE6FA;
-  --color-lav-ink:       #4C3B86;   /* 6.01:1 on lav-fill */
+  /* ── 성취: 금색 ── 이미 이룬 것. solid 는 채움 전용입니다. */
+  --color-gold-solid:    #E8B62C;   /* 흰 바탕 1.88:1 — 글자로 쓰지 말 것 */
+  --color-gold-fill:     #F7E4B4;
+  --color-gold-wash:     #FCF3DC;
+  --color-gold-ink:      #7D5805;   /* 5.11:1 on gold-fill */
 
-  /* ── 상태 (예약됨 · 차트 카테고리로 재사용 금지) ── */
-  --color-state-low:     #1B72A0;
-  --color-state-caution: #BC8400;
-  --color-state-high:    #C22E44;
-  --color-state-none:    #666E64;
-  --color-state-low-bg:     #E7F1F7;
-  --color-state-caution-bg: #F8F0DC;
-  --color-state-high-bg:    #F9E8EA;
-  --color-state-none-bg:    #F1F2EF;
+  /* ── 조각 격자 ── 진행바를 대신합니다. */
+  --color-pip-empty:     #C9D0DE;
+  --color-pip-on:        var(--color-act-solid);
+  --color-pip-done:      var(--color-gold-solid);
+
+  /* ── 상태 3단 ── 파랑 없음(액션이 파랑이므로).
+     색만으로 뜻이 실리지 않게, 알약에는 항상 글자가 함께 들어갑니다. */
+  --color-state-low:     #0B7A61;   /* 여유 */
+  --color-state-caution: #8E6109;   /* 주의 */
+  --color-state-high:    #C42A38;   /* 위험 */
+  --color-state-none:    #5A6376;
+  --color-state-low-bg:     #E0F2EC;
+  --color-state-caution-bg: #FBF0DB;
+  --color-state-high-bg:    #FBE9EB;
+  --color-state-none-bg:    #EEF1F7;
 
   /* ── 피드백 ── */
-  --color-danger:        #C22E44;
-  --color-danger-bg:     #F9E8EA;
-  --color-success:       #256048;
-  --color-success-bg:    #DDF0E7;
+  --color-danger:        #C42A38;
+  --color-danger-bg:     #FBE9EB;
+  --color-success:       #0B7A61;
+  --color-success-bg:    #E0F2EC;
 
-  /* ── 차트: 카테고리 (고정 순서 · 순환 금지) ── */
-  --chart-series-1: #12855C;
-  --chart-series-2: #C98400;
-  --chart-series-3: #6A4BC4;
-  --chart-series-4: #D6403C;
-  --chart-series-5: #1F6FD0;
-  --chart-series-6: #C4479B;
+  /* ── 차트: 카테고리 (고정 순서 · 순환 금지 · 파랑 없음) ── */
+  --chart-series-1: #0B7A61;
+  --chart-series-2: #B4740E;
+  --chart-series-3: #7A4FBF;
+  --chart-series-4: #C42A38;
+  --chart-series-5: #4E6E1F;
+  --chart-series-6: #B33F86;
 
   /* ── 차트: 순차 (한 색조 light→dark) ── */
-  --chart-seq-1: #6BC29E;
-  --chart-seq-2: #3AA97D;
-  --chart-seq-3: #12855C;
-  --chart-seq-4: #0B6845;
-  --chart-seq-5: #084E34;
+  --chart-seq-1: #8FD3BC;
+  --chart-seq-2: #4FBA9A;
+  --chart-seq-3: #17936A;
+  --chart-seq-4: #0B6A4C;
+  --chart-seq-5: #064733;
 
-  /* ── 차트: 발산 (중간은 무채색) ── */
-  --chart-div-neg: #1F6FD0;
-  --chart-div-mid: #E6E8E2;
-  --chart-div-pos: #D6403C;
+  /* ── 차트: 발산 (중간은 무채색) ──
+     여기서는 청록빛 파랑을 씁니다. 액션(#2F44CC)과 충분히 멀고, 발산 척도는
+     연속 램프라 카테고리와 달리 "누를 것"으로 오독되지 않습니다. */
+  --chart-div-neg: #1E6F8C;
+  --chart-div-mid: #DDE2ED;
+  --chart-div-pos: #C42A38;
 
   /* ── 차트: 크롬 ── */
-  --chart-grid:    #E4E7E0;
-  --chart-axis:    #C9CEC5;
+  --chart-grid:    #E9EDF4;
+  --chart-axis:    #C9D0DE;
   --chart-surface: #FFFFFF;
 
-  /* ── 그림자 ── */
-  --shadow-sm: 0 1px 2px rgba(16,19,17,.04), 0 4px 12px rgba(16,19,17,.04);
-  --shadow-md: 0 2px 4px rgba(16,19,17,.05), 0 12px 32px rgba(16,19,17,.07);
-  --shadow-lg: 0 4px 8px rgba(16,19,17,.06), 0 24px 56px rgba(16,19,17,.10);
-  --shadow-focus: 0 0 0 3px rgba(37,96,72,.45);
+  /* ── 그림자 ── 슬레이트 쪽으로 기운 그림자. 순수 검정은 탁합니다. */
+  --shadow-sm: 0 1px 2px rgba(20,24,31,.05), 0 4px 14px rgba(20,24,31,.05);
+  --shadow-md: 0 1px 2px rgba(20,24,31,.06), 0 8px 28px rgba(20,24,31,.07);
+  --shadow-lg: 0 2px 4px rgba(20,24,31,.07), 0 18px 48px rgba(20,24,31,.11);
+  --shadow-focus: 0 0 0 3px rgba(47,68,204,.40);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --color-ground:        #131614;
-    --color-surface:       #1C201D;
-    --color-surface-sunk:  #171A18;
-    --color-line:          #2C312D;
-    --color-line-strong:   #3D443E;
+    --color-ground:        #12161F;
+    --color-surface:       #1B212D;
+    --color-surface-sunk:  #171D27;
+    --color-line:          #2A3242;
+    --color-line-strong:   #69738A;   /* 3.39:1 on surface */
 
-    --color-ink:           #F0F3EE;
-    --color-ink-soft:      #C2C8BF;
-    --color-ink-mute:      #949B92;
-    --color-ink-inverse:   #131614;
+    --color-ink:           #E9EDF5;
+    --color-ink-soft:      #B7C0D2;
+    --color-ink-mute:      #98A2B8;   /* 6.29:1 on surface */
+    --color-ink-inverse:   #12161F;
 
-    --color-mint-fill:     #2E4A3E;
-    --color-mint-wash:     #22332C;
-    --color-mint-ink:      #8ECFB1;
+    --color-act-solid:     #8C9BFF;
+    --color-act-fill:      #2C3660;
+    --color-act-wash:      #232B4A;
+    --color-act-ink:       #8C9BFF;   /* 6.33:1 on surface · 4.57:1 on act-fill */
+    --color-on-act:        #101426;   /* 7.17:1 on act-solid */
 
-    --color-lav-fill:      #3A3157;
-    --color-lav-wash:      #272038;
-    --color-lav-ink:       #B7A6E8;
+    /* 다크에서는 금색 하나가 채움과 글자를 겸합니다 — 어두운 바탕에서는
+       밝은 금색이 충분히 읽힙니다(6.73:1 on gold-fill). */
+    --color-gold-solid:    #F0C558;
+    --color-gold-fill:     #4A3A14;
+    --color-gold-wash:     #33290F;
+    --color-gold-ink:      #F0C558;
 
-    --color-state-low:     #4E9ECB;
-    --color-state-caution: #BE8A22;
-    --color-state-high:    #E06A7E;
-    --color-state-none:    #949B92;
-    --color-state-low-bg:     #1B2A33;
-    --color-state-caution-bg: #2E2718;
-    --color-state-high-bg:    #331C21;
-    --color-state-none-bg:    #222623;
+    --color-pip-empty:     #3A4356;
 
-    --color-danger:        #E06A7E;
-    --color-danger-bg:     #331C21;
-    --color-success:       #8ECFB1;
-    --color-success-bg:    #22332C;
+    --color-state-low:     #2BC9A6;
+    --color-state-caution: #E5A93F;
+    --color-state-high:    #FF6B75;
+    --color-state-none:    #98A2B8;
+    --color-state-low-bg:     #10322B;
+    --color-state-caution-bg: #33270F;
+    --color-state-high-bg:    #3A1A1E;
+    --color-state-none-bg:    #232B38;
 
-    --chart-series-1: #2E9A6E;
-    --chart-series-2: #C87A26;
-    --chart-series-3: #8B72D8;
-    --chart-series-4: #D85F5A;
-    --chart-series-5: #4A88D8;
-    --chart-series-6: #CB5FA4;
+    --color-danger:        #FF6B75;
+    --color-danger-bg:     #3A1A1E;
+    --color-success:       #2BC9A6;
+    --color-success-bg:    #10322B;
 
-    --chart-seq-1: #0D6A4A;
-    --chart-seq-2: #17936A;
-    --chart-seq-3: #3AB289;
-    --chart-seq-4: #6BC9A8;
-    --chart-seq-5: #9DDDC5;
+    --chart-series-1: #2BC9A6;
+    --chart-series-2: #E5A93F;
+    --chart-series-3: #A98BFA;
+    --chart-series-4: #FF7A82;
+    --chart-series-5: #9DC44E;
+    --chart-series-6: #E77BBE;
 
-    --chart-div-neg: #4A88D8;
-    --chart-div-mid: #333834;
-    --chart-div-pos: #D85F5A;
+    --chart-seq-1: #064733;
+    --chart-seq-2: #0B6A4C;
+    --chart-seq-3: #17936A;
+    --chart-seq-4: #4FBA9A;
+    --chart-seq-5: #8FD3BC;
 
-    --chart-grid:    #2C312D;
-    --chart-axis:    #3D443E;
-    --chart-surface: #1C201D;
+    --chart-div-neg: #56A9C4;
+    --chart-div-mid: #2A3242;
+    --chart-div-pos: #FF7A82;
 
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.30), 0 4px 12px rgba(0,0,0,.25);
-    --shadow-md: 0 2px 4px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.35);
-    --shadow-lg: 0 4px 8px rgba(0,0,0,.40), 0 24px 56px rgba(0,0,0,.45);
-    --shadow-focus: 0 0 0 3px rgba(142,207,177,.50);
+    --chart-grid:    #232B38;
+    --chart-axis:    #3A4356;
+    --chart-surface: #1B212D;
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.24);
+    --shadow-md: 0 1px 2px rgba(0,0,0,.32), 0 8px 28px rgba(0,0,0,.28);
+    --shadow-lg: 0 2px 4px rgba(0,0,0,.38), 0 18px 48px rgba(0,0,0,.42);
+    --shadow-focus: 0 0 0 3px rgba(140,155,255,.45);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-ground:        #131614;
-  --color-surface:       #1C201D;
-  --color-surface-sunk:  #171A18;
-  --color-line:          #2C312D;
-  --color-line-strong:   #3D443E;
+  --color-ground:        #12161F;
+  --color-surface:       #1B212D;
+  --color-surface-sunk:  #171D27;
+  --color-line:          #2A3242;
+  --color-line-strong:   #69738A;
 
-  --color-ink:           #F0F3EE;
-  --color-ink-soft:      #C2C8BF;
-  --color-ink-mute:      #949B92;
-  --color-ink-inverse:   #131614;
+  --color-ink:           #E9EDF5;
+  --color-ink-soft:      #B7C0D2;
+  --color-ink-mute:      #98A2B8;
+  --color-ink-inverse:   #12161F;
 
-  --color-mint-fill:     #2E4A3E;
-  --color-mint-wash:     #22332C;
-  --color-mint-ink:      #8ECFB1;
+  --color-act-solid:     #8C9BFF;
+  --color-act-fill:      #2C3660;
+  --color-act-wash:      #232B4A;
+  --color-act-ink:       #8C9BFF;
+  --color-on-act:        #101426;
 
-  --color-lav-fill:      #3A3157;
-  --color-lav-wash:      #272038;
-  --color-lav-ink:       #B7A6E8;
+  --color-gold-solid:    #F0C558;
+  --color-gold-fill:     #4A3A14;
+  --color-gold-wash:     #33290F;
+  --color-gold-ink:      #F0C558;
 
-  --color-state-low:     #4E9ECB;
-  --color-state-caution: #BE8A22;
-  --color-state-high:    #E06A7E;
-  --color-state-none:    #949B92;
-  --color-state-low-bg:     #1B2A33;
-  --color-state-caution-bg: #2E2718;
-  --color-state-high-bg:    #331C21;
-  --color-state-none-bg:    #222623;
+  --color-pip-empty:     #3A4356;
 
-  --color-danger:        #E06A7E;
-  --color-danger-bg:     #331C21;
-  --color-success:       #8ECFB1;
-  --color-success-bg:    #22332C;
+  --color-state-low:     #2BC9A6;
+  --color-state-caution: #E5A93F;
+  --color-state-high:    #FF6B75;
+  --color-state-none:    #98A2B8;
+  --color-state-low-bg:     #10322B;
+  --color-state-caution-bg: #33270F;
+  --color-state-high-bg:    #3A1A1E;
+  --color-state-none-bg:    #232B38;
 
-  --chart-series-1: #2E9A6E;
-  --chart-series-2: #C87A26;
-  --chart-series-3: #8B72D8;
-  --chart-series-4: #D85F5A;
-  --chart-series-5: #4A88D8;
-  --chart-series-6: #CB5FA4;
+  --color-danger:        #FF6B75;
+  --color-danger-bg:     #3A1A1E;
+  --color-success:       #2BC9A6;
+  --color-success-bg:    #10322B;
 
-  --chart-seq-1: #0D6A4A;
-  --chart-seq-2: #17936A;
-  --chart-seq-3: #3AB289;
-  --chart-seq-4: #6BC9A8;
-  --chart-seq-5: #9DDDC5;
+  --chart-series-1: #2BC9A6;
+  --chart-series-2: #E5A93F;
+  --chart-series-3: #A98BFA;
+  --chart-series-4: #FF7A82;
+  --chart-series-5: #9DC44E;
+  --chart-series-6: #E77BBE;
 
-  --chart-div-neg: #4A88D8;
-  --chart-div-mid: #333834;
-  --chart-div-pos: #D85F5A;
+  --chart-seq-1: #064733;
+  --chart-seq-2: #0B6A4C;
+  --chart-seq-3: #17936A;
+  --chart-seq-4: #4FBA9A;
+  --chart-seq-5: #8FD3BC;
 
-  --chart-grid:    #2C312D;
-  --chart-axis:    #3D443E;
-  --chart-surface: #1C201D;
+  --chart-div-neg: #56A9C4;
+  --chart-div-mid: #2A3242;
+  --chart-div-pos: #FF7A82;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.30), 0 4px 12px rgba(0,0,0,.25);
-  --shadow-md: 0 2px 4px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.35);
-  --shadow-lg: 0 4px 8px rgba(0,0,0,.40), 0 24px 56px rgba(0,0,0,.45);
-  --shadow-focus: 0 0 0 3px rgba(142,207,177,.50);
+  --chart-grid:    #232B38;
+  --chart-axis:    #3A4356;
+  --chart-surface: #1B212D;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.24);
+  --shadow-md: 0 1px 2px rgba(0,0,0,.32), 0 8px 28px rgba(0,0,0,.28);
+  --shadow-lg: 0 2px 4px rgba(0,0,0,.38), 0 18px 48px rgba(0,0,0,.42);
+  --shadow-focus: 0 0 0 3px rgba(140,155,255,.45);
 }
 
 /* ============================================================
@@ -213,35 +268,40 @@
    ============================================================ */
 :root {
   /* ── 타이포 ──
-     한글 웹폰트는 용량이 커서 인라인이 비현실적이고 축제장 통신은 느리다.
-     글꼴을 늘리는 대신 무게·자간·크기로 위계를 만든다. */
-  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
-               'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+     라틴·숫자는 Archivo. 넓고 단단해서 큰 숫자가 멀리서도 뭉치지 않습니다 —
+     운영본부 스크린을 생각한 선택입니다. 한글은 IBM Plex Sans KR, 데이터·코드는
+     같은 가족인 IBM Plex Mono. 한 스택에 순서대로 두면 글자마다 알아서 갈립니다.
+     (로딩은 index.html 의 Google Fonts 링크) */
+  --font-sans: 'Archivo', 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont,
+               'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 
-  --text-display:  2.5rem;   /* 40px · w800 · -0.035em */
-  --text-stat:     2.875rem; /* 46px · w250 · -0.04em · tabular */
-  --text-h1:       2.125rem; /* 34px · w800 */
-  --text-h2:       1.5rem;   /* 24px · w700 */
-  --text-h3:       1.25rem;  /* 20px · w700 */
-  --text-body-lg:  1.0625rem;/* 17px · w400 */
+  --text-display:  2.5rem;   /* 40px · w700 · -0.03em */
+  --text-stat:     2rem;     /* 32px · w700 · -0.03em · tabular */
+  --text-stat-lg:  3rem;     /* 48px · w700 — 당일 관제 화면 전용 */
+  --text-h1:       1.625rem; /* 26px · w700 */
+  --text-h2:       1.25rem;  /* 20px · w700 */
+  --text-h3:       1rem;     /* 16px · w700 */
+  --text-body-lg:  1rem;     /* 16px · w400 */
   --text-body:     0.9375rem;/* 15px · w400 */
-  --text-sm:       0.8125rem;/* 13px · w400 */
-  --text-label:    0.6875rem;/* 11px · w700 · +0.12em */
+  --text-sm:       0.875rem; /* 14px · w400 */
+  --text-label:    0.75rem;  /* 12px · w700 · +0.05em · CAPS */
 
-  --weight-stat: 250;
+  /* 숫자는 굵게. 예전의 250 은 종이 테마의 얇은 획이었고, 콘솔에서는
+     숫자가 가장 먼저 읽혀야 합니다. */
+  --weight-stat: 700;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-bold: 700;
   --weight-black: 800;
 
-  --leading-tight: 1.15;
+  --leading-tight: 1.12;
   --leading-snug:  1.4;
   --leading-body:  1.65;
 
-  --tracking-display: -0.035em;
-  --tracking-tight:   -0.02em;
-  --tracking-label:    0.12em;
+  --tracking-display: -0.03em;
+  --tracking-tight:   -0.018em;
+  --tracking-label:    0.05em;
 
   /* ── 간격 (4px 베이스) ── */
   --space-1:  0.25rem;  /*  4px */
@@ -257,14 +317,19 @@
   --space-16: 4rem;     /* 64px */
   --space-18: 4.5rem;   /* 72px */
 
-  /* ── 반경 ── 큰 면일수록 크게, 작은 칩은 완전히 둥글게.
-     중간에서 어중간한 값을 쓰면 전체가 물러 보인다. */
-  --radius-sm:   0.5rem;   /*  8px — 인풋, 작은 태그 */
-  --radius-md:   0.75rem;  /* 12px — 막대, 셀 */
-  --radius-lg:   1.25rem;  /* 20px — 중첩 카드 */
-  --radius-xl:   1.5rem;   /* 24px — 패널 */
-  --radius-2xl:  1.875rem; /* 30px — 최상위 카드 */
+  /* ── 반경 ── 콘솔은 각이 섭니다. 예전의 30px 카드는 종이 은유의 값이었고,
+     데이터를 나란히 비교하는 화면에서는 둥근 모서리가 열을 흐립니다. */
+  --radius-sm:   0.375rem;  /*  6px — 인풋, 작은 태그 */
+  --radius-md:   0.5rem;    /*  8px — 버튼, 셀 */
+  --radius-lg:   0.625rem;  /* 10px — 카드 */
+  --radius-xl:   0.75rem;   /* 12px — 패널 */
+  --radius-2xl:  0.875rem;  /* 14px — 최상위 카드 */
+  --radius-pip:  0.125rem;  /*  2px — 조각 칸 */
   --radius-pill: 999px;
+
+  /* ── 콘솔 셸 ── */
+  --rail-width:  68px;
+  --topbar-h:    56px;
 
   /* ── 터치 타겟 ── 한 손에 먹거리를 든 상태가 기본값 */
   --tap-min:      44px;
@@ -313,7 +378,7 @@ body {
 }
 
 *:focus-visible {
-  outline: 3px solid var(--color-mint-ink);
+  outline: 2px solid var(--color-act-ink);
   outline-offset: 2px;
 }
 

@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from festaflow.core.config import settings
@@ -72,6 +72,71 @@ def _completed(festival_id: int):
         Participation.status == ParticipationStatus.COMPLETED,
         Participation.completed_at.is_not(None),
     )
+
+
+#: 당일 화면의 시간대 그래프. 10분 칸은 "방금 몰린 것" 이 한 점으로 뭉개지지
+#: 않는 가장 성긴 눈금입니다. 1분은 잡음만 커지고, 1시간은 축제가 끝나야 모양이
+#: 보입니다.
+TIMELINE_BUCKET_MINUTES = 10
+TIMELINE_DEFAULT_HOURS = 6
+TIMELINE_MAX_HOURS = 24
+
+
+@dataclass
+class TimelinePoint:
+    at: datetime
+    completions: int
+
+
+def timeline(
+    db: Session,
+    festival_id: int,
+    *,
+    hours: int = TIMELINE_DEFAULT_HOURS,
+    now: datetime | None = None,
+) -> list[TimelinePoint]:
+    """최근 N시간의 완료 건수를 10분 칸으로 묶는다.
+
+    **빈 칸을 0 으로 채웁니다.** DB 는 완료가 있는 칸만 돌려주는데, 그대로 선을
+    그으면 참여가 없던 30분이 사라지고 양옆 점이 곧장 이어집니다. 그러면 아무도
+    안 오던 시간이 완만한 하강으로 보입니다 — 그래프가 형태를 거짓말합니다.
+
+    시각은 UTC 로 나갑니다. 화면이 자기 시간대로 찍습니다 — 리포트와 달리 이
+    그래프는 지금 옆에 있는 사람이 보는 것이라, 서버가 KST 로 못박을 이유가
+    없습니다.
+    """
+    span = max(1, min(int(hours), TIMELINE_MAX_HOURS))
+    at = now or datetime.now(UTC)
+    step = timedelta(minutes=TIMELINE_BUCKET_MINUTES)
+
+    # 지금이 속한 칸의 시작으로 내림. 그래야 마지막 칸이 "아직 채워지는 중" 인
+    # 한 칸이 되고, 매초 눈금이 흔들리지 않는다.
+    epoch = int(at.timestamp())
+    end = datetime.fromtimestamp(epoch - epoch % (TIMELINE_BUCKET_MINUTES * 60), tz=UTC)
+    start = end - timedelta(hours=span)
+
+    bucket = func.date_bin(
+        text(f"interval '{TIMELINE_BUCKET_MINUTES} minutes'"),
+        Participation.completed_at,
+        start,
+    ).label("bucket")
+    rows = db.execute(
+        select(bucket, func.count(Participation.id))
+        .where(
+            *_completed(festival_id),
+            Participation.completed_at >= start,
+            Participation.completed_at < end + step,
+        )
+        .group_by(bucket)
+    ).all()
+    counts = {b.astimezone(UTC): int(n) for b, n in rows}
+
+    points: list[TimelinePoint] = []
+    cursor = start
+    while cursor <= end:
+        points.append(TimelinePoint(at=cursor, completions=counts.get(cursor, 0)))
+        cursor += step
+    return points
 
 
 def _classify(share: float, *, enough: bool, count: int, total: int):

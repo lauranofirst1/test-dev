@@ -64,9 +64,6 @@ export function BoothPosterPage() {
     <div className="poster">
       {/* 인쇄에는 나가지 않는 조작부. */}
       <div className="poster__bar">
-        <Link to={`/festivals/${id}/booths`} className="btn btn--ghost">
-          ← 부스 관리
-        </Link>
         <div className="row" style={{ gap: 'var(--space-3)' }}>
           {!all && scannable.length > 1 && (
             <Link to={`/festivals/${id}/booths/poster?all=1`} className="btn btn--ghost">

@@ -73,7 +73,7 @@ export function PrizeSettings({ festivalId }: { festivalId: string }) {
           </p>
         </div>
         {/* 현장에서 실물을 건네는 화면. 창구 태블릿에 따로 띄운다. */}
-        <Link to={`/festivals/${festivalId}/claim`} className="btn btn--mint" target="_blank">
+        <Link to={`/festivals/${festivalId}/claim`} className="btn btn--soft" target="_blank">
           경품 수령대 열기 ↗
         </Link>
       </div>
@@ -275,7 +275,7 @@ function Winners({
             {/* 꽝은 건넬 실물이 없다. 여기에 확인 버튼을 두면 미수령 집계가 거짓이 된다. */}
             {!d.is_blank && d.prize_name && !d.claimed_at && (
               <button
-                className="btn btn--mint"
+                className="btn btn--soft"
                 onClick={() => claim.mutate(d)}
                 disabled={claim.isPending}
               >

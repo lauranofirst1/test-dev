@@ -18,6 +18,34 @@ export interface StoredParticipant {
 
 const key = (festivalId: number | string) => `festaflow-participant-${festivalId}`;
 
+/** 참여 자격이 생기거나 사라졌다는 신호.
+ *
+ * `localStorage` 는 같은 탭에서 바뀔 때 `storage` 이벤트를 내지 않습니다
+ * (다른 탭에만 갑니다). 그래서 화면이 저장소를 한 번 읽고 마는 컴포넌트는
+ * 참여 직후에도 "아직 참여 안 함" 인 채로 남습니다 — 하단 탭이 실제로 그랬습니다.
+ * 저장·삭제 자리에서 직접 알립니다. */
+const CHANGED = 'festaflow:participant-changed';
+
+function announce(festivalId: number | string): void {
+  try {
+    window.dispatchEvent(new CustomEvent(CHANGED, { detail: String(festivalId) }));
+  } catch {
+    /* 이벤트를 못 내도 저장 자체는 끝났다 */
+  }
+}
+
+/** 참여 자격이 바뀌면 부른다. 정리 함수를 돌려준다. */
+export function onParticipantChange(handler: () => void): () => void {
+  window.addEventListener(CHANGED, handler);
+  // 다른 탭에서 바뀐 것도 받는다 — 관객이 QR 화면과 보드를 두 탭에 띄우는
+  // 일이 실제로 있다.
+  window.addEventListener('storage', handler);
+  return () => {
+    window.removeEventListener(CHANGED, handler);
+    window.removeEventListener('storage', handler);
+  };
+}
+
 export function loadParticipant(festivalId: number | string): StoredParticipant | null {
   try {
     const raw = localStorage.getItem(key(festivalId));
@@ -37,6 +65,7 @@ export function saveParticipant(festivalId: number | string, p: StoredParticipan
   } catch {
     /* 저장 못 해도 이번 세션은 메모리 상태로 계속 쓴다 */
   }
+  announce(festivalId);
 }
 
 export function clearParticipant(festivalId: number | string): void {
@@ -45,6 +74,7 @@ export function clearParticipant(festivalId: number | string): void {
   } catch {
     /* 무시 */
   }
+  announce(festivalId);
 }
 
 const auth = (secret: string) => ({ 'X-Participant-Secret': secret });

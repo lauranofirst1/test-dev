@@ -2,7 +2,7 @@
    관객 화면 — 페이퍼 테마 (티켓 · 영수증 · 고무도장)
    ============================================================
 
-   기획자 화면은 데이터를 비교하는 도구라 민트 계열 SaaS 룩을 그대로 둡니다.
+   기획자 화면은 데이터를 비교하는 도구라 콘솔 룩(울트라마린)을 그대로 둡니다.
    관객 화면은 다릅니다. 하는 일이 "부스를 돌며 도장을 모아 그림을 완성한다"
    이므로 화면당 아티팩트가 하나고, 종이 은유가 장식이 아니라 그 행위의 이름입니다.
 
@@ -10,8 +10,10 @@
    `.card` · `.btn` · `.notice` · `.badge` · `.stampgrid` 는 손대지 않아도
    따라옵니다. 기획자 화면으로 새는 경로가 없습니다.
 
-   ⚠ `--color-mint-*` 슬롯은 이 안에서 민트가 아니라 **도장 잉크**를 담습니다.
-     이름을 바꾸려면 공용 컴포넌트를 전부 고쳐야 해서, 이름은 두고 뜻만 바꿉니다.
+   ⚠ `--color-act-*` 슬롯은 이 안에서 액션 색이 아니라 **도장 잉크**를 담습니다.
+     공용 컴포넌트가 이 이름을 부르므로 슬롯은 그대로 두고 뜻만 바꿉니다.
+     기획자 콘솔이 울트라마린으로 바뀌어도 이 안은 따라오지 않습니다 —
+     관객 화면은 그 재설계의 범위가 아닙니다.
 
    색은 전부 대비를 계산해 통과시킨 값입니다(본문 4.5:1, 테두리·포커스 3:1).
    라이트/다크 모두 정의하며, 3상태(명시 light / 명시 dark / OS) 규칙은
@@ -32,15 +34,28 @@
   --color-ink-mute:      #6B6152;   /*  5.69:1 on surface · 4.89:1 on sunk — AA */
   --color-ink-inverse:   #FBF7EF;
 
-  /* ── 도장 잉크 (mint 슬롯을 빌려 씀) ── */
-  --color-mint-fill:     #F2B824;   /* 도장 노랑 */
-  --color-mint-wash:     #F7E9C6;
-  --color-mint-ink:      #7A3B1E;   /* 4.72:1 on fill · 7.95:1 on surface */
+  /* ── 도장 잉크 (액션 슬롯을 빌려 씀) ── */
+  --color-act-fill:     #F2B824;   /* 도장 노랑 */
+  --color-act-wash:     #F7E9C6;
+  --color-act-ink:      #7A3B1E;   /* 4.72:1 on fill · 7.95:1 on surface */
+
+  /* 기본 버튼이 쓰는 두 값. **여기 짝이 없으면 콘솔의 울트라마린이 그대로
+     새어 나온다** — 실제로 «참여 시작하기» 버튼이 한 번 그렇게 됐다.
+     콘솔 토큰이 늘어날 때마다 이 블록에 짝을 넣어야 경계가 유지된다. */
+  --color-act-solid:    #7A3B1E;   /* 도장 잉크. 흰 글자 7.95:1 */
+  --color-on-act:       #FBF7EF;
+
+  /* 조각 칸. 관객 화면의 조각 보드가 이 색을 쓰게 되면 그때 함께 산다. */
+  --color-pip-empty:    #DED4C2;
+
+  /* ── 숫자 ── 종이의 숫자는 가늘다. 콘솔은 700 이지만 여기서는 그 무게가
+     영수증이 아니라 대시보드처럼 보이게 만든다. */
+  --weight-stat: 250;
 
   /* ── 보조 ── 테라코타 */
-  --color-lav-fill:      #E8C9BC;
-  --color-lav-wash:      #F7DFD6;
-  --color-lav-ink:       #A83E22;   /* 5.82:1 on surface */
+  --color-gold-fill:      #E8C9BC;
+  --color-gold-wash:      #F7DFD6;
+  --color-gold-ink:       #A83E22;   /* 5.82:1 on surface */
 
   /* ── 상태 ── */
   --color-state-low:     #2F6141;
@@ -98,13 +113,13 @@
     --color-ink-mute:      #9E9382;   /*  5.49:1 on surface · 5.68:1 on sunk */
     --color-ink-inverse:   #191612;
 
-    --color-mint-fill:     #4A3212;
-    --color-mint-wash:     #2E2415;
-    --color-mint-ink:      #F2C25A;   /* 7.20:1 on fill · 9.98:1 on surface */
+    --color-act-fill:     #4A3212;
+    --color-act-wash:     #2E2415;
+    --color-act-ink:      #F2C25A;   /* 7.20:1 on fill · 9.98:1 on surface */
 
-    --color-lav-fill:      #43291F;
-    --color-lav-wash:      #2E1C17;
-    --color-lav-ink:       #E88A6E;
+    --color-gold-fill:      #43291F;
+    --color-gold-wash:      #2E1C17;
+    --color-gold-ink:       #E88A6E;
 
     --color-state-low:     #8FC79B;
     --color-state-caution: #E0B255;
@@ -143,13 +158,13 @@
   --color-ink-mute:      #9E9382;
   --color-ink-inverse:   #191612;
 
-  --color-mint-fill:     #4A3212;
-  --color-mint-wash:     #2E2415;
-  --color-mint-ink:      #F2C25A;
+  --color-act-fill:     #4A3212;
+  --color-act-wash:     #2E2415;
+  --color-act-ink:      #F2C25A;
 
-  --color-lav-fill:      #43291F;
-  --color-lav-wash:      #2E1C17;
-  --color-lav-ink:       #E88A6E;
+  --color-gold-fill:      #43291F;
+  --color-gold-wash:      #2E1C17;
+  --color-gold-ink:       #E88A6E;
 
   --color-state-low:     #8FC79B;
   --color-state-caution: #E0B255;
@@ -198,8 +213,8 @@
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-pill);
-  background: var(--color-mint-fill);
-  color: var(--color-mint-ink);
+  background: var(--color-act-fill);
+  color: var(--color-act-ink);
   font-family: var(--font-mono);
   font-size: var(--text-label);
   font-weight: var(--weight-bold);
@@ -306,9 +321,9 @@
   height: 92px;
   flex: none;
   border-radius: 50%;
-  border: 2px solid var(--color-mint-ink);
-  box-shadow: inset 0 0 0 3px var(--color-surface), inset 0 0 0 5px var(--color-mint-ink);
-  color: var(--color-mint-ink);
+  border: 2px solid var(--color-act-ink);
+  box-shadow: inset 0 0 0 3px var(--color-surface), inset 0 0 0 5px var(--color-act-ink);
+  color: var(--color-act-ink);
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: var(--weight-black);
@@ -405,11 +420,11 @@
 }
 
 .rcpt__value--muted { color: var(--color-ink-mute); }
-.rcpt__value--done  { color: var(--color-mint-ink); }
+.rcpt__value--done  { color: var(--color-act-ink); }
 
 button.rcpt__row { cursor: pointer; }
 
-button.rcpt__row:hover:not(:disabled) .rcpt__value { color: var(--color-mint-ink); }
+button.rcpt__row:hover:not(:disabled) .rcpt__value { color: var(--color-act-ink); }
 button.rcpt__row:hover:not(:disabled) .rcpt__lead  { opacity: 1; }
 
 button.rcpt__row:disabled {
@@ -464,9 +479,9 @@ button.rcpt__row:disabled {
 }
 
 .paper .stamptile--on {
-  border: 1px solid var(--color-mint-ink);
+  border: 1px solid var(--color-act-ink);
   border-style: solid;
-  background-color: var(--color-mint-wash);
+  background-color: var(--color-act-wash);
   box-shadow: inset 0 0 0 2px var(--color-surface);
   opacity: 1;
 }
@@ -527,16 +542,16 @@ button.rcpt__row:disabled {
 }
 
 .choice--on {
-  border-color: var(--color-mint-ink);
+  border-color: var(--color-act-ink);
   border-width: 2px;
   /* 2px 테두리가 늘어난 만큼 안쪽을 줄여 글자가 밀리지 않게 한다. */
   padding: calc(var(--space-3) - 1px) calc(var(--space-4) - 1px);
-  background: var(--color-mint-wash);
+  background: var(--color-act-wash);
 }
 
 .choice--on .choice__no {
-  background: var(--color-mint-ink);
-  border-color: var(--color-mint-ink);
+  background: var(--color-act-ink);
+  border-color: var(--color-act-ink);
   color: var(--color-surface);
 }
 
@@ -570,11 +585,11 @@ button.rcpt__row:disabled {
 .draw {
   position: relative;
   overflow: hidden;
-  border: 2px solid var(--color-mint-ink);
+  border: 2px solid var(--color-act-ink);
   background:
     repeating-linear-gradient(
       45deg,
-      var(--color-mint-wash) 0 12px,
+      var(--color-act-wash) 0 12px,
       transparent 12px 24px
     ),
     var(--color-surface);
@@ -585,7 +600,7 @@ button.rcpt__row:disabled {
   position: absolute;
   inset: 0 0 auto;
   height: 64px;
-  background: var(--color-mint-fill);
+  background: var(--color-act-fill);
   clip-path: polygon(0 0, 100% 0, 50% 100%);
   opacity: 0.35;
   pointer-events: none;
@@ -683,7 +698,7 @@ button.rcpt__row:disabled {
 
 /* 다음 노드를 방문했다면 그 구간은 '지나온 길'이다. */
 .trail__link--on {
-  stroke: var(--color-mint-ink);
+  stroke: var(--color-act-ink);
   stroke-dasharray: none;
   opacity: 1;
 }
@@ -707,9 +722,9 @@ button.rcpt__row:disabled {
 /* 방문한 곳은 도장이 찍힌 모양. 색이 아니라 ✓ 와 테두리로도 구분된다. */
 .trail__node--on {
   border-style: solid;
-  border-color: var(--color-mint-ink);
-  background: var(--color-mint-fill);
-  color: var(--color-mint-ink);
+  border-color: var(--color-act-ink);
+  background: var(--color-act-fill);
+  color: var(--color-act-ink);
   box-shadow: inset 0 0 0 2px var(--color-surface);
   font-size: var(--text-body);
 }
@@ -727,7 +742,7 @@ button.rcpt__row:disabled {
   min-height: 2.2em;
   display: grid;
   place-items: center;
-  color: var(--color-mint-ink);
+  color: var(--color-act-ink);
   animation: draw-shake 220ms var(--ease-in-out) infinite;
 }
 
@@ -739,5 +754,74 @@ button.rcpt__row:disabled {
 @media (prefers-reduced-motion: reduce) {
   .draw__rolling {
     animation: none;
+  }
+}
+
+/* ── 하단 탭 ─────────────────────────────────────────────────
+   축제장에서 이 화면을 쓰는 사람은 한 손에 먹거리를 들고 서 있다. 엄지가
+   닿는 곳은 화면 아래쪽이고, 위쪽 모서리는 손을 고쳐 잡아야 닿는다.
+   ============================================================ */
+
+/* **sticky 가 아니라 fixed 다.** sticky 는 컨테이너가 뷰포트보다 길 때만
+   바닥에 붙는다 — 내용이 짧은 화면(특강 하나, 작품 몇 점)에서는 그냥 흐름에
+   놓여 화면 한가운데에 떠 버린다. 탭은 늘 엄지 있는 자리에 있어야 한다. */
+.paper .atabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-line);
+  /* 홈 인디케이터(아이폰 하단 바) 밑으로 내용이 깔리지 않게 한다. */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -2px 12px rgba(31, 26, 20, 0.06);
+}
+
+.paper .atabs__tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  /* 한 손 조작. 아이콘 크기가 아니라 누를 수 있는 면적이 기준이다. */
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-1) var(--space-3);
+  color: var(--color-ink-mute);
+  text-decoration: none;
+}
+
+.paper .atabs__icon {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.paper .atabs__label {
+  font-size: 11.5px;
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+/* 지금 어디에 있는지. **색만으로 알리지 않는다** — 위쪽 굵은 선과 굵은
+   글씨가 색을 못 보는 경우에도 남는다. react-router 가 aria-current 를 준다. */
+.paper .atabs__tab[aria-current='page'] {
+  color: var(--color-act-ink);
+  box-shadow: inset 0 3px 0 var(--color-act-fill);
+  background: var(--color-act-wash);
+}
+
+/* 탭이 fixed 라 문서 흐름에서 빠진다. 그만큼 바닥에 자리를 비워 두지 않으면
+   마지막 줄이 탭 아래로 들어가 영영 안 보인다. */
+.paper:has(.atabs) .shell {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+/* `:has()` 를 못 쓰는 브라우저에서도 마지막 줄이 잘리지는 않게 한다.
+   탭이 없는 화면에서 여백이 조금 남는 것이 잘리는 것보다 낫다. */
+@supports not selector(:has(*)) {
+  .paper .shell {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 }

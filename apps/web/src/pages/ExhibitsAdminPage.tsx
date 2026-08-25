@@ -9,6 +9,8 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { Drawer } from '../components/Drawer';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
@@ -26,6 +28,12 @@ export function ExhibitsAdminPage() {
   const { id = '' } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [form, setForm] = useState(EMPTY);
+  /** 작품 목록과 심사 설정은 여는 시점이 다르다 — 작품은 계속 들어오고,
+   *  항목·가중치는 행사 전에 한 번 정하고 만다. 한 화면에 세로로 쌓으면
+   *  매번 설정을 지나 스크롤해야 작품이 나온다. */
+  const [tab, setTab] = useState<'works' | 'judging'>('works');
+  /** 열려 있는 작품. id 로 든다 — 포스터를 올린 뒤 목록이 갱신돼야 한다. */
+  const [openId, setOpenId] = useState<number | null>(null);
 
   const festival = useQuery({
     queryKey: ['festival', id],
@@ -73,9 +81,6 @@ export function ExhibitsAdminPage() {
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
-        <Link to={`/festivals/${id}/booths`} className="muted">
-          ← 부스 · 미션 관리
-        </Link>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
           <div className="stack" style={{ gap: 4 }}>
             <p className="eyebrow">전시 심사</p>
@@ -83,17 +88,63 @@ export function ExhibitsAdminPage() {
               {festival.data?.name ?? '불러오는 중…'}
             </h1>
           </div>
-          <Link to={`/festivals/${id}/judging`} className="btn btn--mint" target="_blank">
+          <Link to={`/festivals/${id}/judging`} className="btn btn--soft" target="_blank">
             심사표 열기 ↗
           </Link>
         </div>
       </div>
 
-      {results.data && <Settings festivalId={id} results={results.data} onChanged={reload} />}
+      <div className="tabs" role="tablist" aria-label="전시 심사">
+        <button
+          type="button"
+          role="tab"
+          className="tabs__tab"
+          aria-selected={tab === 'works'}
+          onClick={() => setTab('works')}
+        >
+          작품
+          {results.data && (
+            <b className="tabs__num tabular">{results.data.items.length}</b>
+          )}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="tabs__tab"
+          aria-selected={tab === 'judging'}
+          onClick={() => setTab('judging')}
+        >
+          심사 설정
+          <b className="tabs__num tabular">{criteria.data?.length ?? 0}</b>
+        </button>
+      </div>
 
-      <Criteria festivalId={id} items={criteria.data ?? []} onChanged={reload} />
+      {/* 심사 항목이 없으면 심사위원이 열 화면이 비어 있다. 작품 탭에서도
+          보이게 둔다 — 설정 탭에 들어가야만 보이면 아무도 모른 채 행사일이
+          온다. */}
+      {tab === 'works' && (criteria.data?.length ?? 0) === 0 && (
+        <div className="notice notice--warn">
+          <span>⚠</span>
+          <span>
+            <strong>심사 항목이 없습니다.</strong> 항목을 만들어야 심사위원이 점수를
+            매길 수 있습니다.{' '}
+            <button className="linkish" onClick={() => setTab('judging')}>
+              심사 설정으로
+            </button>
+          </span>
+        </div>
+      )}
+
+      {tab === 'judging' && results.data && (
+        <Settings festivalId={id} results={results.data} onChanged={reload} />
+      )}
+
+      {tab === 'judging' && (
+        <Criteria festivalId={id} items={criteria.data ?? []} onChanged={reload} />
+      )}
 
       {/* 작품 등록 */}
+      {tab === 'works' && (
       <form
         className="card stack"
         style={{ gap: 'var(--space-4)' }}
@@ -164,8 +215,17 @@ export function ExhibitsAdminPage() {
           {create.isPending ? '등록 중…' : '＋ 작품 등록'}
         </button>
       </form>
+      )}
 
-      {results.data && <Results festivalId={id} results={results.data} onChanged={reload} />}
+      {tab === 'works' && results.data && (
+        <Results
+          festivalId={id}
+          results={results.data}
+          onChanged={reload}
+          openId={openId}
+          onOpen={setOpenId}
+        />
+      )}
     </div>
   );
 }
@@ -381,10 +441,14 @@ function Results({
   festivalId,
   results,
   onChanged,
+  openId,
+  onOpen,
 }: {
   festivalId: string;
   results: ExhibitionResults;
   onChanged: () => void;
+  openId: number | null;
+  onOpen: (id: number | null) => void;
 }) {
   const upload = useMutation({
     mutationFn: (v: { exhibitId: number; file: File }) => {
@@ -400,6 +464,8 @@ function Results({
       api.post(`/api/festivals/${festivalId}/exhibits/${exhibitId}/archive`),
     onSuccess: onChanged,
   });
+
+  const open = results.items.find((r) => r.exhibit.id === openId) ?? null;
 
   if (results.items.length === 0) {
     return (
@@ -427,62 +493,126 @@ function Results({
         </div>
       ))}
 
-      <div className="stack" style={{ gap: 'var(--space-4)' }}>
-        {results.items.map((r, i) => (
-          <div className="resultrow" key={r.exhibit.id}>
-            <span className="resultrow__rank tabular">{i + 1}</span>
-
-            <div className="stack" style={{ gap: 'var(--space-2)', minWidth: 0, flex: 1 }}>
-              <div className="row wrap" style={{ gap: 'var(--space-2)', alignItems: 'baseline' }}>
-                <span className="exhibit__no tabular">{r.exhibit.entry_no}</span>
-                <strong style={{ fontSize: 'var(--text-h3)' }}>{r.exhibit.title}</strong>
-                {r.exhibit.team_name && <span className="muted">{r.exhibit.team_name}</span>}
-              </div>
-
-              {/* 항목별 근거. 이게 없으면 최종 점수는 선언이다. */}
-              <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
-                {r.criteria.map((c) => (
-                  <span key={c.criterion_id} className="critchip">
-                    {c.label}{' '}
-                    <b className="tabular">
-                      {c.average === null ? '—' : c.average}
-                    </b>
-                    <span className="muted">/{c.max_score}</span>
+      {/* 작품마다 카드를 세로로 쌓던 자리다. 31점이면 31장이었고, 1위와 5위의
+          최종 점수를 비교하려면 그 사이를 다 지나야 했다. 표는 점수 열이
+          세로로 서므로 눈이 한 번에 훑는다. */}
+      <div className="tablewrap">
+        <table className="table table--wrap">
+          <thead>
+            <tr>
+              <th className="num">순위</th>
+              <th>작품</th>
+              <th className="num">심사</th>
+              <th className="num">관객</th>
+              <th className="num">최종</th>
+              <th className="num">포스터</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.items.map((r, i) => (
+              <tr key={r.exhibit.id}>
+                <td className="num tabular">{i + 1}</td>
+                <td>
+                  <button type="button" className="rowlink" onClick={() => onOpen(r.exhibit.id)}>
+                    <span className="exhibit__no tabular">{r.exhibit.entry_no}</span>{' '}
+                    {r.exhibit.title}
+                  </button>
+                  <span className="rowsub">
+                    {r.exhibit.team_name || '팀명 없음'}
+                    {r.exhibit.location ? ` · ${r.exhibit.location}` : ''}
                   </span>
-                ))}
-              </div>
+                </td>
+                <td className="num tabular">
+                  {r.judge_score ?? '—'}
+                  <span className="rowsub">{r.judge_count}명</span>
+                </td>
+                <td className="num tabular">
+                  {r.audience_score ?? '—'}
+                  <span className="rowsub">{r.votes}표</span>
+                </td>
+                <td className="num tabular">
+                  <strong>{r.final_score ?? '—'}</strong>
+                </td>
+                <td className="num">
+                  {r.exhibit.poster_url ? (
+                    <span className="badge badge--stable">
+                      <i aria-hidden />
+                      있음
+                    </span>
+                  ) : (
+                    <span className="badge badge--none">
+                      <i aria-hidden />
+                      없음
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-              <span className="muted tabular">
-                심사 {r.judge_score ?? '—'} (심사위원 {r.judge_count}명) · 관객{' '}
-                {r.audience_score ?? '—'} ({r.votes}표)
-              </span>
-
-              <div className="row wrap" style={{ gap: 'var(--space-2)' }}>
-                <label className="btn btn--ghost" style={{ cursor: 'pointer' }}>
-                  {r.exhibit.poster_url ? '포스터 교체' : '포스터 등록'}
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    hidden
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) upload.mutate({ exhibitId: r.exhibit.id, file });
-                    }}
-                  />
-                </label>
-                <button className="btn btn--ghost" onClick={() => archive.mutate(r.exhibit.id)}>
-                  작품 내리기
-                </button>
-              </div>
+      <Drawer
+        open={open != null}
+        title={open ? `${open.exhibit.entry_no} ${open.exhibit.title}` : ''}
+        subtitle={open?.exhibit.team_name ?? undefined}
+        onClose={() => onOpen(null)}
+      >
+        {open && (
+          <div className="stack" style={{ gap: 'var(--space-4)' }}>
+            {/* 항목별 근거. 이게 없으면 최종 점수는 선언이다. */}
+            <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
+              {open.criteria.map((c) => (
+                <span key={c.criterion_id} className="critchip">
+                  {c.label}{' '}
+                  <b className="tabular">{c.average === null ? '—' : c.average}</b>
+                  <span className="muted">/{c.max_score}</span>
+                </span>
+              ))}
             </div>
 
-            <div className="resultrow__score">
-              <b className="tabular">{r.final_score ?? '—'}</b>
-              <small>최종</small>
+            <p className="muted tabular">
+              심사 {open.judge_score ?? '—'} (심사위원 {open.judge_count}명) · 관객{' '}
+              {open.audience_score ?? '—'} ({open.votes}표) · 최종{' '}
+              <strong>{open.final_score ?? '—'}</strong>
+            </p>
+
+            {open.exhibit.summary && <p>{open.exhibit.summary}</p>}
+
+            {open.exhibit.poster_url && (
+              <img
+                src={open.exhibit.poster_url}
+                alt={`${open.exhibit.title} 포스터`}
+                className="posterthumb"
+              />
+            )}
+
+            <div className="row wrap" style={{ gap: 'var(--space-2)' }}>
+              <label className="btn btn--soft" style={{ cursor: 'pointer' }}>
+                {open.exhibit.poster_url ? '포스터 교체' : '포스터 등록'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) upload.mutate({ exhibitId: open.exhibit.id, file });
+                  }}
+                />
+              </label>
+              <button
+                className="btn btn--ghost"
+                onClick={() => {
+                  archive.mutate(open.exhibit.id);
+                  onOpen(null);
+                }}
+              >
+                작품 내리기
+              </button>
             </div>
           </div>
-        ))}
-      </div>
+        )}
+      </Drawer>
 
       {upload.error instanceof ApiError && (
         <div className="notice notice--warn">

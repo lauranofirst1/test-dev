@@ -590,3 +590,73 @@ def test_남의_부스로는_판정을_남길_수_없다(
     )
 
     assert r.status_code == 404
+
+
+# ── 시간대 그래프 ───────────────────────────────────────────────────────────
+
+
+def test_시간대_그래프는_빈_칸을_0으로_채운다(
+    db: Session, festival: Festival
+) -> None:
+    """DB 는 완료가 있는 칸만 돌려준다. 그대로 선을 그으면 아무도 안 오던 30분이
+    사라지고 양옆 점이 곧장 이어져, 없던 시간이 완만한 하강으로 보인다."""
+    booth = _booth(db, festival, "A1")
+    _complete(db, festival, booth, count=3, minutes_ago=5)
+    _complete(db, festival, booth, count=2, minutes_ago=95)
+    db.flush()
+
+    points = ins.timeline(db, festival.id, hours=3)
+
+    # 3시간 / 10분 = 18칸 + 지금 칸 하나.
+    assert len(points) == 19
+    assert all(p.completions >= 0 for p in points)
+    filled = [p for p in points if p.completions > 0]
+    assert len(filled) == 2, "완료가 두 시점에만 있으므로 0 이 아닌 칸도 둘이어야 한다"
+    assert sum(p.completions for p in points) == 5
+    # 칸은 10분 간격으로 빠짐없이 이어진다.
+    gaps = {
+        (points[i + 1].at - points[i].at).total_seconds() for i in range(len(points) - 1)
+    }
+    assert gaps == {600}
+
+
+def test_시간대_그래프는_창_밖의_완료를_세지_않는다(
+    db: Session, festival: Festival
+) -> None:
+    booth = _booth(db, festival, "A1")
+    _complete(db, festival, booth, count=4, minutes_ago=10)
+    _complete(db, festival, booth, count=7, minutes_ago=60 * 9)
+    db.flush()
+
+    points = ins.timeline(db, festival.id, hours=2)
+
+    assert sum(p.completions for p in points) == 4
+
+
+def test_시간대_그래프_창_길이는_상한이_있다(
+    db: Session, festival: Festival
+) -> None:
+    """요청자가 정하는 값이라 막지 않으면 한 번의 호출로 임의 크기의 집계를
+    돌릴 수 있다."""
+    huge = ins.timeline(db, festival.id, hours=9999)
+    capped = ins.timeline(db, festival.id, hours=ins.TIMELINE_MAX_HOURS)
+
+    assert len(huge) == len(capped)
+
+
+def test_시간대_엔드포인트가_peak_을_함께_낸다(
+    db: Session, client: TestClient, festival: Festival
+) -> None:
+    """화면이 전체 점을 다시 훑어 최댓값을 찾게 두면, 화면마다 다르게 찾는다."""
+    booth = _booth(db, festival, "A1")
+    _complete(db, festival, booth, count=6, minutes_ago=5)
+    db.commit()
+
+    r = client.get(f"/api/festivals/{festival.id}/operations/timeline?hours=2")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["bucket_minutes"] == 10
+    assert body["window_hours"] == 2
+    assert body["peak"] == 6
+    assert body["peak"] == max(p["completions"] for p in body["points"])

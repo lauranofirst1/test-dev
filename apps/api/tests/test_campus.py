@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from festaflow.db.session import get_db
 from festaflow.main import app
 from festaflow.models import (
+    Exhibit,
     Festival,
     LectureSession,
     Organization,
@@ -173,6 +174,43 @@ def test_public_screen_tells_the_client_whether_to_ask(client, campus, db, org):
     db.commit()
     body = client.get(f"/api/festivals/{campus.id}/public").json()
     assert body["identity_mode"] == "student_id"
+
+
+def test_공개_응답이_특강과_전시_유무를_알려준다(client, campus, db) -> None:
+    """관객 화면의 하단 탭이 이 둘을 본다. 없는데 탭을 띄우면 눌러도
+    "아직 없습니다" 만 나오고, 죽은 링크가 있는 메뉴는 없는 메뉴보다 나쁘다."""
+    db.commit()
+
+    empty = client.get(f"/api/festivals/{campus.id}/public").json()
+
+    assert empty["has_lectures"] is False
+    assert empty["has_exhibits"] is False
+
+
+def test_특강을_만들면_탭이_생긴다(client, campus, db, lecture) -> None:
+    db.commit()
+
+    body = client.get(f"/api/festivals/{campus.id}/public").json()
+
+    assert body["has_lectures"] is True
+    assert body["has_exhibits"] is False
+
+
+def test_내린_작품은_탭을_켜지_않는다(client, campus, db) -> None:
+    """작품을 내리면 관객이 열 것이 없다. 개수가 아니라 살아 있는지를 본다."""
+    db.add(
+        Exhibit(
+            festival_id=campus.id,
+            entry_no=1,
+            title="내린 작품",
+            is_active=False,
+        )
+    )
+    db.commit()
+
+    body = client.get(f"/api/festivals/{campus.id}/public").json()
+
+    assert body["has_exhibits"] is False
 
 
 def test_student_number_never_leaks_to_participants(client, campus, db):

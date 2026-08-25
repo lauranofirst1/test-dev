@@ -15,7 +15,15 @@ from sqlalchemy.orm import Session
 
 from festaflow.core.deps import CurrentParticipant, DbSession
 from festaflow.core.errors import ApiError, not_found
-from festaflow.models import Booth, Festival, Mission, Participation, Prize
+from festaflow.models import (
+    Booth,
+    Exhibit,
+    Festival,
+    LectureSession,
+    Mission,
+    Participation,
+    Prize,
+)
 from festaflow.models.enums import BoothQrMode, BoothVerifyMode
 from festaflow.schemas.participation import (
     ActiveCampaign,
@@ -113,6 +121,21 @@ def public_festival(festival_id: int, db: DbSession) -> PublicFestival:
             for b in _active_booths(db, festival_id)
         ],
         identity_mode=festival.identity_mode,
+        # 있고 없음만. 탭을 띄울지 정하는 데 필요한 전부다.
+        has_lectures=db.execute(
+            select(func.count(LectureSession.id)).where(
+                LectureSession.festival_id == festival_id,
+                LectureSession.is_active.is_(True),
+            )
+        ).scalar_one()
+        > 0,
+        has_exhibits=db.execute(
+            select(func.count(Exhibit.id)).where(
+                Exhibit.festival_id == festival_id,
+                Exhibit.is_active.is_(True),
+            )
+        ).scalar_one()
+        > 0,
     )
 
 

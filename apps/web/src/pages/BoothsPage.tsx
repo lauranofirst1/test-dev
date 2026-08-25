@@ -8,6 +8,8 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { Drawer } from '../components/Drawer';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
@@ -150,6 +152,14 @@ export function BoothsPage() {
     onSuccess: refresh,
   });
 
+  /** 열려 있는 부스. 표에서 한 행을 누르면 드로어가 그 부스로 열린다. */
+  const [openBoothId, setOpenBoothId] = useState<number | null>(null);
+
+  /** 부스 · 조각 보드 · 경품은 서로 다른 일이라 한 화면에 세로로 쌓으면
+   *  스크롤이 길어지기만 한다. 다만 **같은 축제의 같은 준비 작업**이라
+   *  메뉴로 가르지는 않는다 — 탭이 맞는 자리다. */
+  const [tab, setTab] = useState<'booths' | 'board' | 'prizes'>('booths');
+
   const items = booths.data?.items ?? [];
   const active = items.filter((b) => b.is_active);
   const missionCount = items.reduce((n, b) => n + b.missions.length, 0);
@@ -159,13 +169,13 @@ export function BoothsPage() {
     0,
   );
   const joinUrl = `${window.location.origin}/join/${id}`;
+  // 목록이 갱신되면 드로어도 새 값을 본다. id 만 들고 있는 이유다 —
+  // 객체를 들고 있으면 저장한 값이 드로어에 반영되지 않는다.
+  const openBooth = items.find((b) => b.id === openBoothId) ?? null;
 
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
-        <Link to={`/festivals/${id}/diagnosis`} className="muted">
-          ← 사전 진단
-        </Link>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
           <div className="stack" style={{ gap: 4 }}>
             <p className="eyebrow">부스 · 미션</p>
@@ -298,9 +308,42 @@ export function BoothsPage() {
         </form>
       )}
 
-      {booths.isLoading && <div className="skeleton" style={{ height: 140 }} />}
+      <div className="tabs" role="tablist" aria-label="부스 준비">
+        <button
+          type="button"
+          role="tab"
+          className="tabs__tab"
+          aria-selected={tab === 'booths'}
+          onClick={() => setTab('booths')}
+        >
+          부스<b className="tabs__num tabular">{items.length}</b>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="tabs__tab"
+          aria-selected={tab === 'board'}
+          onClick={() => setTab('board')}
+        >
+          조각 보드
+          {board.data && <b className="tabs__num tabular">{board.data.total_tiles}</b>}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="tabs__tab"
+          aria-selected={tab === 'prizes'}
+          onClick={() => setTab('prizes')}
+        >
+          경품
+        </button>
+      </div>
 
-      {items.length === 0 && !booths.isLoading && (
+      {tab === 'booths' && booths.isLoading && (
+        <div className="skeleton" style={{ height: 140 }} />
+      )}
+
+      {tab === 'booths' && items.length === 0 && !booths.isLoading && (
         <div className="card state">
           <p className="eyebrow">아직 부스가 없습니다</p>
           <p className="lede" style={{ textAlign: 'center' }}>
@@ -313,17 +356,77 @@ export function BoothsPage() {
         </div>
       )}
 
-      {items.map((b) => (
-        <BoothCard
-          key={b.id}
-          booth={b}
-          festivalId={id}
-          onChanged={refresh}
-          onToggle={() => toggle.mutate(b)}
-        />
-      ))}
+      {/* 카드를 세로로 쌓던 자리다. 표는 열을 맞춰 주므로 "미션 없는 부스"
+          같은 것이 한 열만 훑으면 보인다. */}
+      {tab === 'booths' && items.length > 0 && (
+        <div className="card" style={{ padding: 'var(--space-4)' }}>
+          <div className="tablewrap">
+            <table className="table table--wrap">
+              <thead>
+                <tr>
+                  <th>부스</th>
+                  <th>확인 방식</th>
+                  <th>미션</th>
+                  <th className="num">포인트</th>
+                  <th className="num">상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((b) => {
+                  const live = b.missions.filter((m) => m.is_active);
+                  const points = live.reduce((n, m) => n + m.points, 0);
+                  return (
+                    <tr key={b.id} data-off={!b.is_active || undefined}>
+                      <td>
+                        <button
+                          type="button"
+                          className="rowlink"
+                          onClick={() => setOpenBoothId(b.id)}
+                        >
+                          {b.name}
+                        </button>
+                        <span className="rowsub">
+                          {b.location || '위치 미정'}
+                          {b.manager_name ? ` · ${b.manager_name}` : ''}
+                        </span>
+                      </td>
+                      <td className="muted">{VERIFY_LABEL[b.verify_mode]}</td>
+                      <td>
+                        {live.length === 0 ? (
+                          // 미션이 없으면 이 부스는 지급할 것이 없다. 0 이라고만
+                          // 쓰면 그 사실이 숫자에 묻힌다.
+                          <span className="badge badge--risk">
+                            <i aria-hidden />
+                            지급할 것 없음
+                          </span>
+                        ) : (
+                          <span className="tabular">{live.length}개</span>
+                        )}
+                      </td>
+                      <td className="num tabular">{points}</td>
+                      <td className="num">
+                        {b.is_active ? (
+                          <span className="badge badge--stable">
+                            <i aria-hidden />
+                            운영 중
+                          </span>
+                        ) : (
+                          <span className="badge badge--none">
+                            <i aria-hidden />
+                            중지
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      {board.data && (
+      {tab === 'board' && board.data && (
         <BoardSettings
           festivalId={id}
           board={board.data}
@@ -333,10 +436,47 @@ export function BoothsPage() {
         />
       )}
 
-      {/* 뽑기는 조각 보드를 다 채운 관객이 돌린다. 보드 설정 바로 아래가 제자리다. */}
-      {items.length > 0 && <PrizeSettings festivalId={id} />}
+      {/* 뽑기는 조각 보드를 다 채운 관객이 돌린다. */}
+      {tab === 'prizes' &&
+        (items.length > 0 ? (
+          <PrizeSettings festivalId={id} />
+        ) : (
+          <div className="card state">
+            <p className="eyebrow">부스가 먼저입니다</p>
+            <p className="lede" style={{ textAlign: 'center' }}>
+              경품은 조각 보드를 다 채운 관객이 뽑습니다. 채울 보드가 없으면
+              아무도 뽑기에 닿지 못합니다.
+            </p>
+          </div>
+        ))}
 
-      {items.length > 0 && (
+      <Drawer
+        open={openBooth != null}
+        title={openBooth?.name ?? ''}
+        subtitle={
+          openBooth
+            ? [
+                VERIFY_LABEL[openBooth.verify_mode],
+                openBooth.location,
+                openBooth.is_active ? null : '중지됨',
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            : undefined
+        }
+        onClose={() => setOpenBoothId(null)}
+      >
+        {openBooth && (
+          <BoothPanel
+            booth={openBooth}
+            festivalId={id}
+            onChanged={refresh}
+            onToggle={() => toggle.mutate(openBooth)}
+          />
+        )}
+      </Drawer>
+
+      {tab === 'booths' && items.length > 0 && (
         <div className="card card--sunk stack" style={{ gap: 'var(--space-3)' }}>
           <p className="eyebrow">관객 참여 링크</p>
           <p className="muted">
@@ -360,7 +500,13 @@ export function BoothsPage() {
   );
 }
 
-function BoothCard({
+/** 드로어 안의 부스 편집 패널.
+ *
+ * 예전에는 이 내용이 목록에 카드로 펼쳐져 있었습니다. 부스 스무 개면 편집
+ * 폼 스무 개가 세로로 쌓여, 1번과 20번을 비교하려면 스무 번 스크롤해야
+ * 했습니다. 목록은 표가 되고 편집은 여기로 들어옵니다.
+ */
+function BoothPanel({
   booth,
   festivalId,
   onChanged,
@@ -389,23 +535,16 @@ function BoothCard({
   });
 
   return (
-    <div className="card stack" style={{ gap: 'var(--space-4)', opacity: booth.is_active ? 1 : 0.6 }}>
+    <div className="stack" style={{ gap: 'var(--space-4)' }}>
+      {/* 확인 방식·위치는 드로어 머리말이 이미 말한다. 여기서는 같은 말을
+          되풀이하지 않고, 이 자리에서만 할 수 있는 일(운영 중지)만 남긴다. */}
       <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-        <div className="stack" style={{ gap: 2 }}>
-          <div className="row" style={{ gap: 'var(--space-3)' }}>
-            <h3 style={{ fontSize: 'var(--text-h3)' }}>{booth.name}</h3>
-            <span className="badge badge--none">{VERIFY_LABEL[booth.verify_mode]}</span>
-            {!booth.is_active && <span className="badge badge--risk">중지</span>}
-          </div>
-          <span className="muted">
-            {[booth.type_label, booth.location].filter(Boolean).join(' · ') || '위치 미정'}
-          </span>
-        </div>
-        <div className="row" style={{ gap: 'var(--space-2)' }}>
-          <button className="btn btn--ghost" onClick={onToggle}>
-            {booth.is_active ? '중지' : '재개'}
-          </button>
-        </div>
+        <span className="muted">
+          {[booth.type_label, booth.location].filter(Boolean).join(' · ') || '위치 미정'}
+        </span>
+        <button className="btn btn--ghost" onClick={onToggle}>
+          {booth.is_active ? '부스 중지' : '부스 재개'}
+        </button>
       </div>
 
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
@@ -578,7 +717,7 @@ function BoothQrSettings({
       <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
         <Link
           to={`/festivals/${festivalId}/booths/${booth.id}/qr`}
-          className="btn btn--mint"
+          className="btn btn--soft"
           target="_blank"
         >
           QR 화면 열기 ↗

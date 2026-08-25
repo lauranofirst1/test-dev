@@ -1,4 +1,6 @@
-/** 축제 사후 성과 리포트.
+/** 리포트 — 축제가 끝난 뒤 여는 화면.
+ *
+ * 담당자는 "사후 성과 리포트" 라고 말하지 않고 "리포트 뽑아야 해" 라고 말합니다.
  *
  * **이 화면이 그리지 않는 것이 그리는 것만큼 중요합니다.**
  *
@@ -15,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
+import { ParticipationChart } from '../components/ParticipationChart';
 import { KpiTargetEditor } from '../components/KpiTargetEditor';
 import { VisitorCountEditor } from '../components/VisitorCountEditor';
 import type { FestivalReport } from '../api/types';
@@ -45,7 +48,7 @@ export function ReportPage() {
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
           <div className="stack" style={{ gap: 4 }}>
-            <p className="eyebrow">사후 성과 리포트</p>
+            <p className="eyebrow">리포트</p>
             <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>
               {d?.festival_name ?? '불러오는 중…'}
             </h1>
@@ -199,24 +202,23 @@ export function ReportPage() {
             <KpiTargetEditor festivalId={id} />
           </section>
 
-          {/* ── 시간대 ── */}
+          {/* ── 시간대 ──
+              막대 열이었다. 하루짜리 축제에서는 읽혔지만 여러 날이 되면 열이
+              수십 개로 늘어 이름표가 겹쳤다. 선으로 바꾸면 며칠이 이어져도
+              모양이 남고, 당일 화면과 같은 그림이라 두 화면을 오갈 때 눈이
+              다시 적응하지 않아도 된다. */}
           {d.timeline.length > 0 && (
             <section className="card stack" style={{ gap: 'var(--space-4)' }}>
               <h2 className="section">시간대별 완료</h2>
-              <p className="muted">한국 표준시(KST) 기준</p>
-              <div className="hours">
-                {d.timeline.map((t) => (
-                  <div key={t.hour_kst} className="hours__col">
-                    <span
-                      className="hours__bar"
-                      style={{ height: `${Math.round((t.completions / peak) * 100)}%` }}
-                      title={`${HOUR(t.hour_kst)}시 ${t.completions}건`}
-                    />
-                    <b className="hours__n">{t.completions}</b>
-                    <span className="hours__label">{HOUR(t.hour_kst)}시</span>
-                  </div>
-                ))}
-              </div>
+              <ParticipationChart
+                points={d.timeline.map((t) => ({
+                  at: t.hour_kst,
+                  completions: t.completions,
+                }))}
+                peak={peak}
+                caption="축제 전체 · 1시간 간격 · 한국 표준시(KST)"
+                emptyNote="완료 기록이 한 시간대에만 있어 추이를 그리지 않았습니다."
+              />
             </section>
           )}
 
@@ -224,30 +226,50 @@ export function ReportPage() {
           {d.booths.length > 0 && (
             <section className="card stack" style={{ gap: 'var(--space-4)' }}>
               <h2 className="section">부스별 성과</h2>
-              <div className="stack" style={{ gap: 'var(--space-3)' }}>
-                {d.booths.map((b) => (
-                  <div key={b.booth_id} className="loadrow">
-                    <div className="loadrow__head">
-                      <span className="loadrow__name">
-                        <b className="rank">{b.rank}위</b> {b.name}
-                      </span>
-                      <span className="muted tabular">
-                        {b.completions}건 · {b.unique_participants}명 · {pct(b.share)}
-                      </span>
-                    </div>
-                    <div className="loadbar">
-                      <span
-                        className="loadbar__fill"
-                        style={{ width: `${Math.round((b.completions / boothPeak) * 100)}%` }}
-                      />
-                    </div>
-                    {b.peak_hour_kst && (
-                      <p className="loadrow__meta muted">
-                        최다 참여 {HOUR(b.peak_hour_kst)}시대 · {b.peak_completions}건
-                      </p>
-                    )}
-                  </div>
-                ))}
+              {/* 카드를 세로로 쌓던 자리다. 부스가 스무 개면 스무 번 스크롤해야
+                  1위와 20위를 비교할 수 있었다. 표는 열을 맞춰 주므로 눈이
+                  한 열만 따라 내려가면 된다. */}
+              <div className="tablewrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th className="num">순위</th>
+                      <th>부스</th>
+                      <th>참여 분포</th>
+                      <th className="num">완료</th>
+                      <th className="num">참여자</th>
+                      <th className="num">비율</th>
+                      <th>최다 시간대</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.booths.map((b) => (
+                      <tr key={b.booth_id}>
+                        <td className="num tabular">{b.rank}</td>
+                        <td>
+                          <strong>{b.name}</strong>
+                        </td>
+                        <td>
+                          <span className="minibar" aria-hidden>
+                            <i
+                              style={{
+                                width: `${Math.round((b.completions / boothPeak) * 100)}%`,
+                              }}
+                            />
+                          </span>
+                        </td>
+                        <td className="num tabular">{b.completions}</td>
+                        <td className="num tabular">{b.unique_participants}</td>
+                        <td className="num tabular">{pct(b.share)}</td>
+                        <td className="muted tabular">
+                          {b.peak_hour_kst
+                            ? `${HOUR(b.peak_hour_kst)}시 · ${b.peak_completions}건`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
               {/* 부스가 보관되어 스냅샷이 풀린 참여. 어디에도 배정하지 않는다. */}

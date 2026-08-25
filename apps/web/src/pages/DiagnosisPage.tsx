@@ -6,7 +6,9 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+
+import { PlanEditor } from '../components/PlanEditor';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import type { Diagnosis, DiagnosisComparison, FestivalDetail } from '../api/types';
@@ -23,6 +25,17 @@ import { ScoreTile } from '../components/charts/ScoreTile';
 export function DiagnosisPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+
+  /** 탭을 주소에 둔다. 새로고침하거나 링크를 건네도 같은 탭이 열려야 하고,
+   *  «기획 고치기» 를 보내 놓고 상대가 점수 탭을 보는 일이 없어야 한다. */
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'plan' ? 'plan' : 'score';
+  const goTab = (next: 'score' | 'plan') => {
+    const p = new URLSearchParams(params);
+    if (next === 'score') p.delete('tab');
+    else p.set('tab', next);
+    setParams(p, { replace: true });
+  };
 
   const festival = useQuery({
     queryKey: ['festival', id],
@@ -70,18 +83,46 @@ export function DiagnosisPage() {
             )}
           </div>
           <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
-            <Link to={`/festivals/${id}/edit`} className="btn btn--ghost">
-              기획 수정
-            </Link>
+            {/* 어느 탭에 있든 여기 있다. 고치는 도중에 "이제 다시 재 보자" 가
+                되는 것이 이 루프의 전부다. */}
             <button
               className="btn btn--primary btn--lg"
-              onClick={() => run.mutate()}
+              onClick={() => {
+                goTab('score');
+                run.mutate();
+              }}
               disabled={run.isPending}
             >
               {run.isPending ? '관광 데이터 조회 중…' : d ? '다시 진단하기' : '진단 실행'}
             </button>
           </div>
         </div>
+      </div>
+
+      {/* 탭은 두 개뿐이고 둘은 한 루프의 두 자리다 — 점수를 보고, 고치고,
+          다시 잰다. 예전에는 별개 화면이라 고치러 가면 점수가 사라졌다. */}
+      <div className="tabs" role="tablist" aria-label="사전 진단">
+        <button
+          type="button"
+          role="tab"
+          className="tabs__tab"
+          aria-selected={tab === 'score'}
+          onClick={() => goTab('score')}
+        >
+          점수
+          {d?.total_score != null && (
+            <b className="tabs__num tabular">{d.total_score.toFixed(1)}</b>
+          )}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="tabs__tab"
+          aria-selected={tab === 'plan'}
+          onClick={() => goTab('plan')}
+        >
+          기획 고치기
+        </button>
       </div>
 
       {run.isPending && (
@@ -102,9 +143,11 @@ export function DiagnosisPage() {
         </div>
       )}
 
-      {diagnosis.isLoading && <DiagnosisSkeleton />}
+      {tab === 'plan' && <PlanEditor onSaved={() => goTab('score')} />}
 
-      {notFound && !run.isPending && (
+      {tab === 'score' && diagnosis.isLoading && <DiagnosisSkeleton />}
+
+      {tab === 'score' && notFound && !run.isPending && (
         <div className="card state">
           <p className="eyebrow">아직 진단 결과가 없습니다</p>
           <p className="lede" style={{ textAlign: 'center' }}>
@@ -122,7 +165,7 @@ export function DiagnosisPage() {
         </div>
       )}
 
-      {d && (
+      {tab === 'score' && d && (
         <DiagnosisResult
           d={d}
           comparison={comparison.data}

@@ -27,6 +27,7 @@ from festaflow.routers import (
     participants,
     prizes,
     reports,
+    search,
     staff,
     stamp_board,
 )
@@ -153,6 +154,7 @@ app.include_router(operations.router)
 app.include_router(campaigns.router)
 app.include_router(reports.router)
 app.include_router(announcements.router)
+app.include_router(search.router)
 # 참여자 라우터는 기관 스코프를 쓰지 않는다. 마지막에 붙여 경로 충돌을 피한다.
 app.include_router(participants.router)
 

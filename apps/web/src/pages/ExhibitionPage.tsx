@@ -206,7 +206,7 @@ function ExhibitCard({
       </div>
 
       <button
-        className={`btn btn--lg ${exhibit.voted ? 'btn--mint' : 'btn--primary'}`}
+        className={`btn btn--lg ${exhibit.voted ? 'btn--soft' : 'btn--primary'}`}
         disabled={disabled}
         onClick={() => onToggle(!exhibit.voted)}
       >
