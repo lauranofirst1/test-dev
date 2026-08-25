@@ -894,23 +894,50 @@ button.rowlink {
 /* ── 푸터 ────────────────────────────────────────────────────
    출처 표기가 사는 자리다. 상단바는 축제 전환·검색·현장 화면·계정이 다투는
    자리라 출처가 끼면 넷 다 좁아지고, 정작 출처는 아무도 안 본다.
+
+   **눈에 띄면 안 되는 자리다.** 흰 면에 테두리를 두르면 본문 카드와 같은
+   무게가 되어, 아무도 읽지 않을 글이 카드 하나만큼의 존재감을 갖는다.
+   바탕색 위에 그대로 눕히고 글자도 한 단 낮춘다 — 찾으면 있고, 안 찾으면
+   보이지 않는 정도.
    ============================================================ */
 
 .afoot {
+  /* 흰 면도 테두리도 없다. 바닥색 위에 그냥 눕는다. */
+  background: transparent;
+}
+
+/* 본문 칼럼을 세로 flex 로 만들어 푸터를 바닥으로 민다. 내용이 짧은
+   화면에서도 푸터가 화면 중간에 뜨지 않는다. */
+.app__main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* **flex 자식에게 폭을 돌려준다.** `margin: 0 auto` 를 가진 자식은 flex
+   안에서 늘어나지 않고 내용 폭으로 줄어든다 — 본문 shell 이 실제로 그렇게
+   좁아져 카드가 200px 가까이 안쪽으로 밀렸다. `width: 100%` 를 주면 늘어난
+   뒤 `max-width` 가 잡고 auto 마진이 가운데로 놓는다. */
+.app__main > * {
+  width: 100%;
+}
+
+.app__main > .afoot {
   margin-top: auto;
-  border-top: 1px solid var(--color-line);
-  background: var(--color-surface);
 }
 
 .afoot__in {
+  /* 본문 shell 과 같은 폭·같은 좌우 여백. 출처가 본문 왼쪽 끝과 줄이 맞아야
+     떠 있는 띠가 아니라 문서의 끝으로 읽힌다. */
   max-width: 1240px;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-7);
+  padding: var(--space-4) var(--space-7) var(--space-8);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  font-size: 12.5px;
+  color: var(--color-ink-mute);
 }
 
 .afoot__brand {
@@ -918,17 +945,14 @@ button.rowlink {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
+  gap: var(--space-2);
 }
 
+/* 브랜드도 굵게 두지 않는다. 상단바에 이미 있는 이름이다. */
 .afoot__brand strong {
-  font-weight: var(--weight-black);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-soft);
   letter-spacing: var(--tracking-tight);
-}
-
-.afoot__brand span {
-  color: var(--color-ink-mute);
 }
 
 .afoot__meta {
@@ -937,21 +961,17 @@ button.rowlink {
   align-items: baseline;
   gap: var(--space-5);
   margin: 0;
-  font-size: 12.5px;
-  color: var(--color-ink-mute);
 }
 
 .afoot__meta p {
   margin: 0;
 }
 
+/* 출처는 조건부로 빼지 않지만, 굵게 할 이유도 없다. */
 .afoot__meta strong {
-  color: var(--color-ink-soft);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-medium);
+  color: inherit;
 }
-
-/* `.app` 은 min-height 100vh 의 세로 flex 라, `margin-top: auto` 가 푸터를
-   바닥으로 민다. 내용이 짧은 화면에서도 푸터가 화면 중간에 뜨지 않는다. */
 
 /* 인쇄물(부스 안내문·리포트)에는 나가지 않는다. 종이에서는 화면 크롬이다. */
 @media print {

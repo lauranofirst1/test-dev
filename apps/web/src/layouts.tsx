@@ -181,10 +181,13 @@ export function PlannerLayout() {
 
         <main id="main" className="app__main">
           {body}
+
+          {/* 푸터는 **본문 칼럼 안에** 둔다. 바깥에 두면 사이드 레일 아래를
+              가로질러 레일이 중간에서 잘린 것처럼 보인다 — 레일은 바닥까지
+              닿는 벽이어야 한다. */}
+          <AppFooter />
         </main>
       </div>
-
-      <AppFooter />
     </div>
   );
 }
