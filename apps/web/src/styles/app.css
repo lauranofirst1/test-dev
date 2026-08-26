@@ -336,17 +336,53 @@ p {
   font-weight: var(--weight-medium);
 }
 
+/* 단위(표·%·초)는 입력칸 **안** 오른쪽 끝에 앉는다.
+   .field 전체를 기준으로 절대배치하면 상자 밖으로 떨어진다 — 아래에 힌트가
+   붙으면 힌트 줄 위로, 격자에서 옆 칸이 더 높아 늘어나면 빈 공간으로 내려간다.
+   둘 다 실제로 일어나 단위가 상자 아래 허공에 떠 있었다. 격자 칸을 지정해
+   입력칸과 같은 행·오른쪽 열에 겹쳐 둔다. */
 .field--inline {
-  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  /* 격자에서 옆 칸이 더 높아 늘어나도 남는 높이를 행 사이에 나눠 주지 않는다 —
+     라벨과 입력칸이 벌어진다. 남는 높이는 아래에 둔다. */
+  align-content: start;
 }
 
-.field--inline .unit {
-  position: absolute;
-  right: var(--space-4);
-  bottom: 12px;
+.field--inline > label {
+  grid-area: 1 / 1 / 2 / -1;
+}
+
+.field--inline > input {
+  grid-area: 2 / 1 / 3 / -1;
+  /* 단위가 앉을 자리를 비운다. 값이 길어져도 글자가 단위 밑으로 들어가지 않는다. */
+  padding-right: var(--space-10);
+}
+
+/* 화살표는 단위와 같은 자리에 뜬다. 겹치면 둘 다 못 읽는다. */
+.field--inline > input[type='number'] {
+  appearance: textfield;
+}
+
+.field--inline > input[type='number']::-webkit-outer-spin-button,
+.field--inline > input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.field--inline > .unit {
+  grid-area: 2 / 2 / 3 / 3;
+  justify-self: end;
+  margin-right: var(--space-4);
   font-size: var(--text-sm);
   color: var(--color-ink-mute);
   pointer-events: none;
+}
+
+.field--inline > .hint,
+.field--inline > .err {
+  grid-column: 1 / -1;
 }
 
 .grid2 {
@@ -1895,8 +1931,12 @@ p {
   opacity: 0.4;
 }
 
+/* 표 안에서는 제목과 **같은 줄**에 놓인다. `grid` 는 블록이라 혼자 줄을
+   차지하고 제목을 아래로 밀어냈다 — 시상 집계의 작품 칸이 번호·제목·팀명
+   석 줄로 쌓여 있었다. 목록·심사표에서는 flex 자식이라 그대로 격자가 된다. */
 .exhibit__no {
-  display: grid;
+  display: inline-grid;
+  vertical-align: middle;
   place-items: center;
   flex: none;
   min-width: 30px;

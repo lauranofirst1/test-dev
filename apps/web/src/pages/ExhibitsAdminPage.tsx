@@ -115,7 +115,6 @@ export function ExhibitsAdminPage() {
           onClick={() => setTab('judging')}
         >
           심사 설정
-          <b className="tabs__num tabular">{criteria.data?.length ?? 0}</b>
         </button>
       </div>
 
@@ -395,42 +394,59 @@ function Criteria({
         </div>
       )}
 
+      {/* 추가가 실패하면(권한 없음·중복 이름) 반드시 말해야 한다. 조용히 삼키면
+          입력값은 그대로 남고 목록만 안 늘어나 "눌러도 아무 일이 없다" 가 된다. */}
+      {create.error instanceof ApiError && (
+        <div className="notice notice--warn">
+          <span>⚠</span>
+          <span>{create.error.message}</span>
+        </div>
+      )}
+
       <form
         className="row wrap"
-        style={{ gap: 'var(--space-3)' }}
+        style={{ gap: 'var(--space-3)', alignItems: 'flex-end' }}
         onSubmit={(e) => {
           e.preventDefault();
           if (draft.label.trim()) create.mutate();
         }}
       >
-        <input
-          value={draft.label}
-          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-          placeholder="항목 이름 (예: 창의성)"
-          style={{ flex: '2 1 200px' }}
-          aria-label="심사 항목 이름"
-        />
-        <input
-          type="number"
-          min={1}
-          max={100}
-          className="tabular"
-          value={draft.max_score}
-          onChange={(e) => setDraft({ ...draft, max_score: e.target.value })}
-          style={{ width: 100 }}
-          aria-label="만점"
-        />
-        <input
-          type="number"
-          min={1}
-          className="tabular"
-          value={draft.weight}
-          onChange={(e) => setDraft({ ...draft, weight: e.target.value })}
-          style={{ width: 100 }}
-          aria-label="가중치"
-        />
+        {/* 숫자 칸에 보이는 라벨을 준다. 5 와 1 만 놓여 있으면 무엇을 넣는
+            칸인지 화면만 보고는 알 수 없다 — aria-label 은 눈으로 못 읽는다. */}
+        <div className="field" style={{ flex: '2 1 200px' }}>
+          <label htmlFor="crit-label">항목 이름</label>
+          <input
+            id="crit-label"
+            value={draft.label}
+            onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+            placeholder="창의성"
+          />
+        </div>
+        <div className="field" style={{ width: 116 }}>
+          <label htmlFor="crit-max">만점</label>
+          <input
+            id="crit-max"
+            type="number"
+            min={1}
+            max={100}
+            className="tabular"
+            value={draft.max_score}
+            onChange={(e) => setDraft({ ...draft, max_score: e.target.value })}
+          />
+        </div>
+        <div className="field" style={{ width: 116 }}>
+          <label htmlFor="crit-weight">가중치</label>
+          <input
+            id="crit-weight"
+            type="number"
+            min={1}
+            className="tabular"
+            value={draft.weight}
+            onChange={(e) => setDraft({ ...draft, weight: e.target.value })}
+          />
+        </div>
         <button className="btn btn--ghost" type="submit" disabled={create.isPending}>
-          추가
+          {create.isPending ? '추가 중…' : '추가'}
         </button>
       </form>
     </div>
@@ -501,7 +517,8 @@ function Results({
           <thead>
             <tr>
               <th className="num">순위</th>
-              <th>작품</th>
+              {/* 표의 남는 폭은 이 칸이 가져간다 — 나머지는 내용만큼만. */}
+              <th className="wide">작품</th>
               <th className="num">심사</th>
               <th className="num">관객</th>
               <th className="num">최종</th>
@@ -512,9 +529,9 @@ function Results({
             {results.items.map((r, i) => (
               <tr key={r.exhibit.id}>
                 <td className="num tabular">{i + 1}</td>
-                <td>
+                <td className="wide">
                   <button type="button" className="rowlink" onClick={() => onOpen(r.exhibit.id)}>
-                    <span className="exhibit__no tabular">{r.exhibit.entry_no}</span>{' '}
+                    <span className="exhibit__no tabular">{r.exhibit.entry_no}</span>
                     {r.exhibit.title}
                   </button>
                   <span className="rowsub">
@@ -532,6 +549,15 @@ function Results({
                 </td>
                 <td className="num tabular">
                   <strong>{r.final_score ?? '—'}</strong>
+                  {/* 한쪽만으로 낸 점수는 그렇다고 말한다. 심사 0명인데 최종
+                      100 이 그냥 놓여 있으면 만점으로 읽히지만, 실제로는
+                      관객 표 하나가 최다 득표라 100 이 된 것이다. */}
+                  {r.final_score !== null && r.judge_score === null && (
+                    <span className="rowsub">관객 점수만</span>
+                  )}
+                  {r.final_score !== null && r.audience_score === null && (
+                    <span className="rowsub">심사 점수만</span>
+                  )}
                 </td>
                 <td className="num">
                   {r.exhibit.poster_url ? (
