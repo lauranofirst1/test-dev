@@ -289,7 +289,7 @@ function Row({
 }) {
   const channel = CHANNELS.find((c) => c.value === item.channel)?.label ?? item.channel;
   return (
-    <div className="camprow" data-live={item.is_live}>
+    <div className="camprow" data-live={item.is_live} data-level={item.level}>
       <div className="row wrap" style={{ justifyContent: 'space-between', gap: 'var(--space-3)' }}>
         <div className="stack" style={{ gap: 4 }}>
           <span className="camprow__title">

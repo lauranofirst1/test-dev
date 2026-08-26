@@ -1,4 +1,7 @@
-/** 운영 대시보드 — 축제 당일에 띄워 두는 화면.
+/** 오늘 — 축제 당일에 띄워 두는 화면.
+ *
+ * 이름이 "운영 대시보드" 였을 때는 언제 여는 화면인지가 이름에 없었습니다.
+ * 이 화면은 당일에만 엽니다.
  *
  * **여기 나오는 것은 혼잡도가 아닙니다.** GPS·카메라·센서로 잰 인원수도, 물리적
  * 밀집도도 아니고, 부스에서 검증된 QR/미션 완료 건수입니다. QR 참여자는 방문객의
@@ -21,8 +24,10 @@ import { Link, useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import { AnnouncementAdmin } from '../components/AnnouncementAdmin';
+import { ParticipationChart } from '../components/ParticipationChart';
 import { CampaignPanel } from '../components/CampaignPanel';
 import type {
+  OperationsTimeline,
   BoothLoad,
   BoothLoadStatus,
   FestivalDetail,
@@ -74,17 +79,30 @@ export function DashboardPage() {
     retry: false,
   });
 
+  /** 시간대 그래프. 인사이트와 **따로** 부른다 — 인사이트는 10초마다 도는데
+   *  10분 칸은 그 사이 거의 바뀌지 않는다. 같은 주기로 묶으면 축제 내내
+   *  60배의 요청이 같은 답을 받는다. */
+  const timeline = useQuery({
+    queryKey: ['operations-timeline', id],
+    queryFn: () =>
+      api.get<OperationsTimeline>(`/api/festivals/${id}/operations/timeline?hours=6`),
+    refetchInterval: 60_000,
+    retry: false,
+  });
+
   const d = insights.data;
   // 완료가 가장 많은 부스를 기준으로 막대 길이를 잡는다. 전체 합 대비로 그리면
   // 부스가 많을수록 모든 막대가 짧아져 서로 비교가 안 된다.
   const peak = Math.max(1, ...(d?.booths.map((b) => b.last_30m) ?? [0]));
 
   return (
-    <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
+    // `ops` 는 당일 밀도다. 같은 토큰으로 숫자를 키우고 카드를 성기게 한다 —
+    // 운영본부에서는 서서 흘끗 보고 3초 안에 판단한다.
+    <div className="shell stack ops" style={{ gap: 'var(--space-6)' }}>
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
           <div className="stack" style={{ gap: 4 }}>
-            <p className="eyebrow">운영 대시보드</p>
+            <p className="eyebrow">오늘</p>
             <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>
               {festival.data?.name ?? '불러오는 중…'}
             </h1>
@@ -134,6 +152,29 @@ export function DashboardPage() {
               icon="▲"
               tone={d.kpi.high_concentration_booths > 0 ? 'high' : undefined}
             />
+          </section>
+
+          {/* 스탯은 "지금 얼마" 를, 부스 표는 "어디가" 를 답한다. 둘 다
+              **언제부터** 를 답하지 못한다 — 최근 30분 96건이 오르는 중인지
+              식는 중인지에 따라 할 일이 정반대다. */}
+          <section className="card stack" style={{ gap: 'var(--space-4)' }}>
+            <div className="row wrap" style={{ justifyContent: 'space-between' }}>
+              <h2 className="section">시간대별 참여</h2>
+              <span className="muted">참여가 없던 구간도 그대로 그립니다</span>
+            </div>
+            {timeline.error instanceof ApiError ? (
+              <p className="muted">
+                추이를 불러오지 못했습니다. {timeline.error.message}
+              </p>
+            ) : timeline.data ? (
+              <ParticipationChart
+                points={timeline.data.points}
+                peak={timeline.data.peak}
+                caption={`최근 ${timeline.data.window_hours}시간 · ${timeline.data.bucket_minutes}분 간격`}
+              />
+            ) : (
+              <div className="skeleton" style={{ height: 132 }} />
+            )}
           </section>
 
           {/* 제한은 각주가 아니라 지표 바로 옆에 둔다. */}
@@ -192,7 +233,9 @@ function Kpi({
   tone?: string;
 }) {
   return (
-    <div className="card kpi">
+    // 지금 손을 써야 하는 카드만 테두리가 선다. 전부 서면 아무것도 안 선 것과
+    // 같다 — 당일 화면에서 눈이 먼저 가야 하는 곳은 하나여야 한다.
+    <div className="card kpi" data-alert={tone === 'high' || undefined}>
       <p className="kpi__label">
         {/* 칩 색은 타일 순서로 돌아간다. **의미를 담지 않는다** —
             상태색과 섞이면 여유·주의·집중이 뜻을 잃는다. */}

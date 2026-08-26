@@ -136,7 +136,7 @@ def staff_login(payload: StaffLogin, response: Response, db: DbSession) -> Staff
     # 브라우저용으로 httpOnly 쿠키에도 싣는다. 화면이 토큰을 손에 쥐지 않아야
     # XSS 로도 새지 않는다. 본문의 `access_token` 은 브라우저가 아닌
     # 클라이언트(부스 태블릿 앱·스크립트·테스트)를 위해 남긴다.
-    _set_session(response, token, expires_in)
+    _set_session(response, token, expires_in, name=settings.staff_cookie_name)
     return StaffSession(
         access_token=token,
         expires_in=expires_in,
@@ -147,8 +147,11 @@ def staff_login(payload: StaffLogin, response: Response, db: DbSession) -> Staff
 # ── 세션 쿠키 ───────────────────────────────────────────────────────────────
 
 
-def _set_session(response: Response, token: str, max_age: int) -> None:
+def _set_session(response: Response, token: str, max_age: int, *, name: str) -> None:
     """세션을 **httpOnly 쿠키로** 내보낸다.
+
+    `name` 으로 기관 계정 세션과 스태프 세션을 가른다. 한 이름을 같이 쓰면
+    나중에 로그인한 쪽이 앞의 세션을 덮어쓴다.
 
     - `httponly` — 스크립트가 읽을 수 없다. XSS 가 나도 토큰이 새지 않는다.
       localStorage 에 두면 XSS 한 번에 전부 털린다.
@@ -160,7 +163,7 @@ def _set_session(response: Response, token: str, max_age: int) -> None:
     - `path="/"` — API 와 화면이 같은 오리진이므로 전체에 실린다.
     """
     response.set_cookie(
-        settings.session_cookie_name,
+        name,
         token,
         max_age=max_age,
         httponly=True,
@@ -171,13 +174,20 @@ def _set_session(response: Response, token: str, max_age: int) -> None:
 
 
 def _clear_session(response: Response) -> None:
-    response.delete_cookie(
-        settings.session_cookie_name,
-        path="/",
-        httponly=True,
-        secure=settings.session_cookie_secure,
-        samesite=settings.session_cookie_samesite,
-    )
+    """이 브라우저의 세션을 **둘 다** 지운다.
+
+    로그아웃 버튼은 콘솔에도 심사표에도 같은 것 하나뿐이다. 한쪽만 지우면
+    공용 태블릿에서 "로그아웃했는데 아직 들어가진다" 가 된다 — 로그아웃이
+    보장해야 하는 단 하나가 그것이다.
+    """
+    for name in (settings.session_cookie_name, settings.staff_cookie_name):
+        response.delete_cookie(
+            name,
+            path="/",
+            httponly=True,
+            secure=settings.session_cookie_secure,
+            samesite=settings.session_cookie_samesite,
+        )
 
 
 # ── 기관 계정 ───────────────────────────────────────────────────────────────
@@ -208,7 +218,7 @@ def sign_up(payload: SignUp, response: Response, db: DbSession) -> AccountSessio
     token, ttl = security.issue_org_token(
         account_id=account.id, organization_id=account.organization_id
     )
-    _set_session(response, token, ttl)
+    _set_session(response, token, ttl, name=settings.session_cookie_name)
     return _session_body(db, account)
 
 
@@ -218,7 +228,7 @@ def log_in(payload: LogIn, response: Response, db: DbSession) -> AccountSession:
     token, ttl = security.issue_org_token(
         account_id=account.id, organization_id=account.organization_id
     )
-    _set_session(response, token, ttl)
+    _set_session(response, token, ttl, name=settings.session_cookie_name)
     return _session_body(db, account)
 
 

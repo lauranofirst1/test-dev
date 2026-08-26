@@ -67,9 +67,14 @@ class Settings(BaseSettings):
     login_max_attempts: int = 5
     login_lock_minutes: int = 10
 
-    #: 세션 쿠키 이름. 토큰을 localStorage 에 두면 XSS 한 번에 전부 털린다.
-    #: httpOnly 쿠키는 스크립트가 읽을 수 없다.
+    #: 기관 계정 세션 쿠키 이름. 토큰을 localStorage 에 두면 XSS 한 번에 전부
+    #: 털린다. httpOnly 쿠키는 스크립트가 읽을 수 없다.
     session_cookie_name: str = "festaflow_session"
+    #: 스태프 세션은 **다른 쿠키**에 담는다. 한 이름을 같이 쓰면 나중에 로그인한
+    #: 쪽이 앞의 세션을 덮어쓴다 — 운영자가 콘솔에서 심사표를 열어 심사위원으로
+    #: 로그인하는 순간(그러라고 만든 링크다) 콘솔의 운영자 세션이 사라졌다.
+    #: 한 브라우저에 기관 세션과 스태프 세션이 함께 있는 것이 정상이다.
+    staff_cookie_name: str = "festaflow_staff"
     #: 쿠키에 Secure 를 붙일지. 로컬(http://192.168.x.x:5173)에서는 붙이면
     #: 브라우저가 아예 저장하지 않으므로 개발에서만 끈다. **배포에서는 반드시 켠다.**
     session_cookie_secure: bool = False

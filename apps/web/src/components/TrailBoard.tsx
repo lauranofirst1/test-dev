@@ -37,8 +37,9 @@ function positionOf(index: number, total: number): Point {
 
   const xGap = 100 / (PER_ROW + 1);
   const yGap = 100 / (rows + 1);
-  // 짝수/홀수 줄에 약간의 어긋남을 준다 — 자로 잰 격자처럼 보이면 '길'로 안 읽힌다.
-  const wobble = row % 2 === 0 ? 3 : -3;
+  // 짝수/홀수 줄에 약간의 어긋남을 준다 — 자로 잰 격자처럼 보이면 '길'로 안
+  // 읽힌다. 폭을 460px 로 묶은 뒤에는 3% 도 과해서 절반으로 줄였다.
+  const wobble = row % 2 === 0 ? 1.5 : -1.5;
 
   return { x: xGap * (dir + 1) + wobble, y: yGap * (row + 1) };
 }
@@ -60,7 +61,7 @@ export function TrailBoard({
     <div
       className="trail"
       // 줄 수에 따라 높이를 늘린다. 고정하면 조각이 많은 축제에서 노드가 겹친다.
-      style={{ height: `${Math.max(200, rows * 96)}px` }}
+      style={{ height: `${Math.max(180, rows * 84)}px` }}
       role="img"
       aria-label={`축제 스탬프 지도, ${totalTiles}곳 중 ${revealedCount}곳 방문`}
     >

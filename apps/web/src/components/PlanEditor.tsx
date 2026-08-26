@@ -22,7 +22,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import type { FestivalDetail } from '../api/types';
@@ -121,9 +121,17 @@ function draftOf(f: FestivalDetail): Draft {
 const list = (v: string) =>
   v.split(',').map((x) => x.trim()).filter(Boolean);
 
-export function EditFestivalPage() {
+/** 기획 편집 폼.
+ *
+ * **화면이 아니라 탭입니다.** 진단 → 교정 → 재진단이 이 제품의 핵심 루프인데
+ * 예전에는 진단과 수정이 별개 화면이라, 점수를 보고 고치러 가면 점수가 화면에서
+ * 사라졌습니다. 무엇을 고쳐야 점수가 오르는지 보면서 고칠 수 없었습니다.
+ *
+ * 그래서 폼만 떼어 `DiagnosisPage` 의 탭으로 들어갑니다. 점수 요약은 탭 위에
+ * 남아 있어, 고치는 동안에도 지금 점수가 보입니다.
+ */
+export function PlanEditor({ onSaved }: { onSaved?: () => void }) {
   const { id = '' } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const [form, setForm] = useState<Draft>(EMPTY);
   const [loaded, setLoaded] = useState(false);
@@ -183,8 +191,9 @@ export function EditFestivalPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['festival', id] });
       qc.invalidateQueries({ queryKey: ['festivals'] });
-      // 고쳤으면 다시 진단해 봐야 한다. 그게 이 화면의 존재 이유다.
-      navigate(`/festivals/${id}/diagnosis`);
+      // 고쳤으면 다시 진단해 봐야 한다. 그게 이 탭의 존재 이유다 —
+      // 점수 탭으로 돌려보내고, 거기서 «다시 진단하기» 가 기다린다.
+      onSaved?.();
     },
   });
 
@@ -194,25 +203,15 @@ export function EditFestivalPage() {
   const err = save.error instanceof ApiError ? save.error : null;
 
   if (festival.isLoading) {
-    return (
-      <div className="shell stack" style={{ gap: 'var(--space-4)' }}>
-        <div className="skeleton" style={{ height: 320 }} />
-      </div>
-    );
+    return <div className="skeleton" style={{ height: 320 }} />;
   }
 
   return (
-    <div className="shell stack" style={{ gap: 'var(--space-5)' }}>
-      <div className="stack" style={{ gap: 4 }}>
-        <p className="eyebrow">기획 수정</p>
-        <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>
-          {festival.data?.name ?? ''}
-        </h1>
-        <p className="muted">
-          고치고 저장하면 진단 화면으로 이동합니다. 다시 진단하면 무엇이 달라졌는지
-          직전 결과와 나란히 비교됩니다.
-        </p>
-      </div>
+    <div className="stack" style={{ gap: 'var(--space-5)' }}>
+      <p className="muted">
+        고치고 저장하면 점수 탭으로 돌아갑니다. 거기서 다시 진단하면 무엇이
+        달라졌는지 직전 결과와 나란히 비교됩니다.
+      </p>
 
       {err && (
         <div className="notice notice--warn">
@@ -302,10 +301,7 @@ export function EditFestivalPage() {
         >
           {save.isPending ? '저장 중…' : '저장하고 진단으로'}
         </button>
-        <button
-          className="btn btn--ghost"
-          onClick={() => navigate(`/festivals/${id}/diagnosis`)}
-        >
+        <button className="btn btn--ghost" onClick={() => onSaved?.()}>
           취소
         </button>
       </div>

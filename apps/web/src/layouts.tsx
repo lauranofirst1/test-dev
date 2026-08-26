@@ -17,8 +17,13 @@ import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-
 
 import { api } from './api/client';
 import { AnnouncementProvider } from './components/announcements/AnnouncementProvider';
+import { AppFooter } from './components/AppFooter';
+import { AudienceTabs } from './components/AudienceTabs';
 import { AnnouncementSurface } from './components/announcements/AnnouncementSurface';
 import { FestivalNav } from './components/FestivalNav';
+import { FieldScreensMenu } from './components/FieldScreensMenu';
+import { FestivalSearch } from './components/FestivalSearch';
+import { FestivalSwitcher } from './components/FestivalSwitcher';
 import { useSession } from './components/RequireAccount';
 import type { PublicFestival } from './api/types';
 
@@ -31,11 +36,19 @@ const PLANNER_TITLE = 'FestaFlow — 축제 기획 진단';
  */
 const COLLAPSE_KEY = 'festaflow-nav-collapsed';
 
+/** 저장된 값이 없으면 **접힌 상태**가 기본이다.
+ *
+ * 메뉴가 열 개에서 여덟 개로 줄고 그룹이 넷에서 넷으로 정리되면서, 아이콘만
+ * 으로도 구분이 됩니다. 펼친 레일은 244px 를 먹는데 그 폭이 표에서는 열
+ * 한두 개입니다 — 콘솔에서 그 교환은 표 쪽이 이깁니다.
+ * 한 번이라도 펼치면 그 선택이 기억되고, 기본값은 다시 쓰이지 않습니다.
+ */
 function loadCollapsed(): boolean {
   try {
-    return localStorage.getItem(COLLAPSE_KEY) === '1';
+    const saved = localStorage.getItem(COLLAPSE_KEY);
+    return saved === null ? true : saved === '1';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -97,7 +110,7 @@ export function PlannerLayout() {
 
   return (
     <div className="app" data-collapsed={collapsed} data-nav={Boolean(id)}>
-      {/* 키보드 사용자가 메뉴 12개를 매번 지나치지 않게 한다. */}
+      {/* 키보드 사용자가 메뉴를 매번 지나치지 않게 한다. */}
       <a href="#main" className="skip">
         본문으로 건너뛰기
       </a>
@@ -127,9 +140,15 @@ export function PlannerLayout() {
           <Link to="/" className="brand">
             FestaFlow <small>축제 기획 진단</small>
           </Link>
+          {/* 축제 안에서만 나온다. 축제가 정해지지 않았으면 전환할 것도,
+              찾을 것도 없다. */}
+          {id && <FestivalSwitcher />}
+          {id && <FestivalSearch festivalId={id} />}
         </div>
-        <div className="row" style={{ gap: 'var(--space-4)' }}>
-          <span className="muted only-wide">출처: ⓒ한국관광공사</span>
+        <div className="row" style={{ gap: 'var(--space-3)' }}>
+          {/* 레일에서 뺀 현장 화면들이 여기로 온다. 축제가 정해지지 않았으면
+              열 현장 화면도 없다. */}
+          {id && <FieldScreensMenu festivalId={id} />}
           <AccountMenu />
         </div>
       </header>
@@ -162,6 +181,11 @@ export function PlannerLayout() {
 
         <main id="main" className="app__main">
           {body}
+
+          {/* 푸터는 **본문 칼럼 안에** 둔다. 바깥에 두면 사이드 레일 아래를
+              가로질러 레일이 중간에서 잘린 것처럼 보인다 — 레일은 바닥까지
+              닿는 벽이어야 한다. */}
+          <AppFooter />
         </main>
       </div>
     </div>
@@ -183,9 +207,6 @@ function FestivalTitle() {
     <div className="side__head">
       <p className="eyebrow">축제</p>
       <strong>{festival.data?.name ?? '불러오는 중…'}</strong>
-      <Link to="/" className="muted">
-        ← 다른 축제
-      </Link>
     </div>
   );
 }
@@ -252,7 +273,6 @@ export function AudienceLayout() {
         <span className="brand brand--plain">
           {festival.data?.name ?? '축제 참여'}
         </span>
-        <span className="muted">출처: ⓒ한국관광공사</span>
       </header>
       {/* 공지는 껍데기에 단다. 페이지마다 붙이면 어느 화면에 있느냐에 따라
           우천 중단 공지를 보기도 하고 못 보기도 한다. */}
@@ -260,6 +280,13 @@ export function AudienceLayout() {
         <AnnouncementSurface />
         <Outlet />
       </AnnouncementProvider>
+
+      {/* 탭은 껍데기에 단다. 화면마다 붙이면 어느 화면에서는 있고 어느
+          화면에서는 없어져, 그건 탭이 아니라 버튼이다. */}
+      <AudienceTabs festival={festival.data} />
+
+      {/* 하단 탭이 붙박여 있으므로 푸터는 그 위에 한 줄로만 앉는다. */}
+      <AppFooter variant="audience" />
     </div>
   );
 }

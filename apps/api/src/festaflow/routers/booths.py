@@ -16,6 +16,7 @@ from festaflow.core.deps import (
     CurrentOrg,
     DbSession,
     FestivalAccess,
+    OptionalAccount,
     OptionalStaff,
     require_booth_scope,
 )
@@ -327,11 +328,12 @@ def archive_mission(festival_id: int, mission_id: int, db: DbSession, org: Curre
 def scan_token(
     festival_id: int, booth_id: int, request: Request, db: DbSession, org: CurrentOrg,
     staff: OptionalStaff,
+    account: OptionalAccount,
 ) -> ScanToken:
     """부스 화면용 회전 토큰. `qr_secret` 은 내려주지 않는다."""
     _festival(db, org.id, festival_id)
     booth = _booth(db, festival_id, booth_id)
-    require_booth_scope(staff, booth.id)
+    require_booth_scope(staff, booth.id, account)
 
     if booth.verify_mode != BoothVerifyMode.PARTICIPANT_SCAN:
         raise ApiError(
@@ -393,7 +395,7 @@ def rotate_booth_qr(
     db.commit()
     db.refresh(booth)
 
-    return scan_token(festival_id, booth_id, request, db, org, staff=None)
+    return scan_token(festival_id, booth_id, request, db, org, staff=None, account=None)
 
 
 # ── 스태프 지급 (§8.1) ──────────────────────────────────────────────────────
@@ -407,6 +409,7 @@ def staff_grant(
     db: DbSession,
     org: CurrentOrg,
     staff: OptionalStaff,
+    account: OptionalAccount,
 ) -> GrantResult:
     """스태프가 참여자 QR 을 스캔해 지급한다.
 
@@ -414,7 +417,7 @@ def staff_grant(
     """
     festival = _festival(db, org.id, festival_id)
     booth = _booth(db, festival_id, booth_id)
-    require_booth_scope(staff, booth.id)
+    require_booth_scope(staff, booth.id, account)
 
     if booth.verify_mode != BoothVerifyMode.STAFF_SCAN:
         raise ApiError(
@@ -475,12 +478,13 @@ def recent_grants(
     db: DbSession,
     org: CurrentOrg,
     staff: OptionalStaff,
+    account: OptionalAccount,
     limit: int = Query(8, ge=1, le=50),
 ) -> list[RecentGrant]:
     """부스 화면의 "방금 지급됨" 목록. 참여자 코드는 부스 스태프에게만 보인다."""
     _festival(db, org.id, festival_id)
     booth = _booth(db, festival_id, booth_id)
-    require_booth_scope(staff, booth.id)
+    require_booth_scope(staff, booth.id, account)
 
     rows = db.execute(
         select(Participation, Participant.code, Mission.title)

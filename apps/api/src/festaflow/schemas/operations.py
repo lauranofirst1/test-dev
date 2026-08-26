@@ -64,6 +64,26 @@ class InsightsOut(BaseModel):
     disclaimer: str
 
 
+class TimelinePointOut(BaseModel):
+    #: 칸의 **시작** 시각(UTC). 화면이 자기 시간대로 찍는다.
+    at: datetime
+    completions: int
+
+
+class TimelineOut(BaseModel):
+    """당일 화면의 시간대 그래프.
+
+    빈 칸도 0 으로 들어 있습니다. 화면이 구멍을 메우게 두면 화면마다 다르게
+    메우고, 그중 하나는 반드시 없던 시간을 완만한 하강으로 그립니다.
+    """
+
+    bucket_minutes: int
+    window_hours: int
+    #: 가장 높은 칸. 화면이 다시 훑지 않게 서버가 함께 낸다.
+    peak: int
+    points: list[TimelinePointOut]
+
+
 class FeedbackIn(BaseModel):
     """추천 카드의 확인함 / 해당 없음.
 

@@ -107,9 +107,6 @@ export function BoothQrPage() {
             </span>
           )}
         </div>
-        <Link to={`/festivals/${id}/booths`} className="btn btn--ghost">
-          ← 부스 관리
-        </Link>
       </div>
 
       {err && (

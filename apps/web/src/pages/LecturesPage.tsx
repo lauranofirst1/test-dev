@@ -10,8 +10,11 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { Drawer } from '../components/Drawer';
+import { Pips } from '../components/Pips';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import type {
@@ -75,13 +78,14 @@ export function LecturesPage() {
   });
 
   const items = lectures.data?.items ?? [];
+  /** 열려 있는 특강. **id 로 들고 있는다** — 객체를 들면 체크인을 연 뒤
+   *  목록이 갱신돼도 드로어는 옛 숫자를 계속 보여준다. */
+  const [openId, setOpenId] = useState<number | null>(null);
+  const openSession = items.find((s) => s.id === openId) ?? null;
 
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
-        <Link to={`/festivals/${id}/booths`} className="muted">
-          ← 부스 · 미션 관리
-        </Link>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
           <div className="stack" style={{ gap: 4 }}>
             <p className="eyebrow">특강 출결</p>
@@ -230,16 +234,122 @@ export function LecturesPage() {
         </div>
       )}
 
-      <div className="stack" style={{ gap: 'var(--space-4)' }}>
-        {items.map((s) => (
-          <LectureCard key={s.id} festivalId={id} session={s} onChanged={reload} />
-        ))}
-      </div>
+      {/* 카드를 세로로 쌓던 자리다. 특강이 여섯 개면 "어느 강의가 체크포인트가
+          모자라지" 를 알려면 여섯 장을 다 읽어야 했다. 표는 한 열만 훑으면
+          된다. */}
+      {items.length > 0 && (
+        <div className="card" style={{ padding: 'var(--space-4)' }}>
+          <div className="tablewrap">
+            <table className="table table--wrap">
+              <thead>
+                <tr>
+                  <th>특강</th>
+                  <th>일시</th>
+                  <th>체크인</th>
+                  <th className="num">찍은 사람</th>
+                  <th className="num">출석 인정</th>
+                  <th className="num"> </th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((s) => {
+                  const when = new Date(s.starts_at);
+                  return (
+                    <tr key={s.id}>
+                      <td>
+                        <button
+                          type="button"
+                          className="rowlink"
+                          onClick={() => setOpenId(s.id)}
+                        >
+                          {s.title}
+                        </button>
+                        <span className="rowsub">
+                          {[s.speaker, s.location].filter(Boolean).join(' · ') || '강사 미정'}
+                          {s.grants_excused_absence ? ' · 공결 대상' : ''}
+                        </span>
+                      </td>
+                      <td className="muted tabular">
+                        {when.toLocaleString('ko-KR', {
+                          month: 'numeric',
+                          day: 'numeric',
+                          weekday: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td>
+                        {/* 출튀를 잡는 자리다. 열린 체크인이 인정 기준에 못
+                            미치면 그 강의는 아무도 출석으로 인정받지 못한다.
+                            칸은 **인정 기준**이 총량이다 — 기준을 넘겨 연
+                            체크인은 채울 칸이 없으므로 아래 줄에 따로 쓴다. */}
+                        <Pips
+                          filled={s.opened_checkpoints}
+                          total={s.required_checkins}
+                          tone={
+                            s.opened_checkpoints >= s.required_checkins ? 'done' : 'caution'
+                          }
+                          label={`${s.title} 인정 기준 ${s.required_checkins}회 중 ${Math.min(
+                            s.opened_checkpoints,
+                            s.required_checkins,
+                          )}회 열림`}
+                        />
+                        {s.opened_checkpoints > s.required_checkins && (
+                          <span className="rowsub tabular">
+                            열린 체크인 {s.opened_checkpoints}회
+                          </span>
+                        )}
+                      </td>
+                      <td className="num tabular">{s.attendee_count}</td>
+                      <td className="num tabular">{s.met_count}</td>
+                      <td className="num">
+                        <button
+                          className="btn btn--soft"
+                          onClick={() => setOpenId(s.id)}
+                        >
+                          열기
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <Drawer
+        open={openSession != null}
+        title={openSession?.title ?? ''}
+        subtitle={
+          openSession
+            ? [
+                openSession.speaker,
+                openSession.location,
+                openSession.grants_excused_absence ? '공결 대상' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            : undefined
+        }
+        onClose={() => setOpenId(null)}
+      >
+        {openSession && (
+          <LecturePanel festivalId={id} session={openSession} onChanged={reload} />
+        )}
+      </Drawer>
     </div>
   );
 }
 
-function LectureCard({
+/** 드로어 안의 특강 패널. 체크인을 열고 명단을 본다.
+ *
+ * 예전에는 이 내용이 목록에 카드로 펼쳐져 있었고, 명단은 카드 아래로 다시
+ * 펼쳐졌습니다. 특강 여섯 개에 명단을 둘만 펼쳐도 화면이 스크롤 지옥이
+ * 됐습니다.
+ */
+function LecturePanel({
   festivalId,
   session,
   onChanged,
@@ -248,8 +358,6 @@ function LectureCard({
   session: LectureSessionDetail;
   onChanged: () => void;
 }) {
-  const [showRoster, setShowRoster] = useState(false);
-
   const open = useMutation({
     mutationFn: () =>
       api.post<CheckpointToken>(
@@ -268,39 +376,25 @@ function LectureCard({
   const roster = useQuery({
     queryKey: ['roster', festivalId, session.id],
     queryFn: () => api.get<Roster>(`/api/festivals/${festivalId}/lectures/${session.id}/roster`),
-    enabled: showRoster,
     retry: false,
   });
 
   const when = new Date(session.starts_at);
 
   return (
-    <article className="card stack" style={{ gap: 'var(--space-4)' }}>
+    <div className="stack" style={{ gap: 'var(--space-4)' }}>
       <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-        <div className="stack" style={{ gap: 4, minWidth: 0 }}>
-          <div className="row wrap" style={{ gap: 'var(--space-2)' }}>
-            <h3 style={{ fontSize: 'var(--text-h3)' }}>{session.title}</h3>
-            {session.grants_excused_absence && (
-              <span className="badge badge--caution">공결 대상</span>
-            )}
-          </div>
-          <span className="muted">
-            {[session.speaker, session.affiliation && `(${session.affiliation})`, session.location]
-              .filter(Boolean)
-              .join(' ')}
-          </span>
-          <span className="muted tabular">
-            {when.toLocaleString('ko-KR', {
-              month: 'long',
-              day: 'numeric',
-              weekday: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-        </div>
+        <span className="muted tabular">
+          {when.toLocaleString('ko-KR', {
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </span>
 
-        {/* 강의 중 예고 없이 누른다. 이 버튼이 이 화면의 전부다. */}
+        {/* 강의 중 예고 없이 누른다. 이 버튼이 이 패널의 전부다. */}
         <button
           className="btn btn--primary btn--lg"
           onClick={() => open.mutate()}
@@ -332,14 +426,11 @@ function LectureCard({
         </div>
       )}
 
-      <div className="row wrap" style={{ gap: 'var(--space-3)' }}>
-        <button className="btn btn--ghost" onClick={() => setShowRoster((v) => !v)}>
-          {showRoster ? '명단 닫기' : '출결 명단 보기'}
-        </button>
-      </div>
-
-      {showRoster && roster.data && <RosterTable roster={roster.data} />}
-    </article>
+      {/* 드로어 안에서는 접을 이유가 없다. 이 패널을 여는 이유의 절반이
+          명단이고, 한 번 더 눌러야 나오면 그 절반이 숨는다. */}
+      {roster.isLoading && <div className="skeleton" style={{ height: 120 }} />}
+      {roster.data && <RosterTable roster={roster.data} />}
+    </div>
   );
 }
 

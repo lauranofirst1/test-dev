@@ -94,9 +94,6 @@ export function CheckpointScreenPage() {
           </p>
           <h1 className="checkscreen__title">{session?.title ?? '특강'}</h1>
         </div>
-        <Link to={`/festivals/${id}/lectures`} className="btn btn--ghost">
-          ← 특강 관리
-        </Link>
       </div>
 
       {err && (

@@ -10,7 +10,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import type {
@@ -83,9 +83,6 @@ export function StaffAdminPage() {
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
-        <Link to={`/festivals/${id}/booths`} className="muted">
-          ← 부스 · 미션 관리
-        </Link>
         <div className="stack" style={{ gap: 4 }}>
           <p className="eyebrow">스태프</p>
           <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>
@@ -291,7 +288,7 @@ function StaffRowItem({
       <span className="rcpt__lead" aria-hidden="true" />
       <span className="row" style={{ gap: 'var(--space-2)' }}>
         {locked && (
-          <button className="btn btn--mint" onClick={() => act.mutate('unlock')}>
+          <button className="btn btn--soft" onClick={() => act.mutate('unlock')}>
             잠금 풀기
           </button>
         )}

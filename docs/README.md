@@ -12,6 +12,8 @@
 | [06-charts.md](06-charts.md) | 차트 시스템 — 검증된 팔레트, 화면별 폼 선택, 금지 목록 |
 | [07-tourapi-catalog.md](07-tourapi-catalog.md) | 한국관광공사 OpenAPI 26종 카탈로그와 활용 매핑 |
 | **[08-contest-submission.md](08-contest-submission.md)** | 🚨 **공모전 제출 요건과 역산 일정 — 마감 9/21 16:00** |
+| [09-campus-event.md](09-campus-event.md) | 교내 행사 — 신원(학번) · 특강 출결과 공결 · 전시 심사 |
+| **[10-team-testing.md](10-team-testing.md)** | 👥 **팀원 테스트 안내 — 계정 하나로 5분 안에 화면 보기** |
 
 ## 에이전트 파이프라인 연결
 

@@ -244,7 +244,7 @@ export function BoothGrantPage() {
           </span>
         </div>
         <Link to={`/festivals/${id}/dashboard`} className="btn btn--ghost">
-          운영 대시보드
+          오늘
         </Link>
       </header>
 

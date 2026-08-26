@@ -15,7 +15,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import type { PrizeClaimLookup, PrizeDrawRow } from '../api/types';
@@ -78,9 +78,6 @@ export function PrizeClaimPage() {
           <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>참여 코드로 찾기</h1>
           <p className="muted">관객이 보여주는 코드를 입력하면 무엇을 뽑았는지 나옵니다.</p>
         </div>
-        <Link to={`/festivals/${id}/booths`} className="btn btn--ghost">
-          ← 부스 관리
-        </Link>
       </div>
 
       <form

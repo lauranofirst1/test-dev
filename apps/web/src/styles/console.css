@@ -1,0 +1,1007 @@
+/* ============================================================
+   콘솔 — 기획자·운영자 데스크톱 전용
+   ============================================================
+
+   `app.css` 다음에 실려 같은 클래스를 덮습니다. 관객 화면(`.paper`)과
+   현장 화면은 여기에 걸리지 않습니다 — 전부 `.app` 안쪽으로 스코프를
+   잡았습니다.
+
+   이 파일이 하는 일은 셋입니다.
+
+   **1. 레일.** 아이콘만 남은 좁은 메뉴가 기본입니다. 활성 항목은 색만으로
+   알리지 않고 왼쪽 굵은 선이 함께 섭니다.
+
+   **2. 조각 격자.** 진행바를 대신하는 이 시스템의 중심 문법(`Pips`).
+
+   **3. 콘솔 밀도.** 같은 토큰으로 두 가지 밀도를 냅니다 — 준비 기간은
+   사무실에서 오래 앉아 편집하고, 당일은 운영본부에서 서서 흘끗 봅니다.
+   `.ops` 를 붙이면 숫자가 커지고 카드가 성깁니다.
+   ============================================================ */
+
+/* 콘솔에서는 버튼에 각이 섭니다. 관객 화면은 한 손으로 누르는 큰 버튼이라
+   알약이 맞고, 그쪽은 `app.css` 의 기본값을 그대로 씁니다. */
+.app {
+  --btn-radius: var(--radius-md);
+}
+
+/* ── 레일 ────────────────────────────────────────────────── */
+
+/* 활성 표시를 왼쪽 선으로. 채운 알약만으로는 접었을 때 아이콘 배경이
+   레일 폭을 거의 다 먹어서 어디가 활성인지 오히려 흐려집니다. */
+.app .snav__item {
+  position: relative;
+}
+
+.app .snav__item[aria-current='page'] {
+  background: var(--color-act-wash);
+  color: var(--color-act-ink);
+}
+
+.app .snav__item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--space-3) * -1);
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-act-solid);
+}
+
+.app[data-collapsed='true'] .snav__item[aria-current='page']::before {
+  left: calc(var(--space-2) * -1);
+}
+
+/* 접힌 레일에서 아이콘이 배경까지 뒤집히면 무거워 보입니다. 색만 바꿉니다. */
+.app .snav__item[aria-current='page'] .snav__icon {
+  background: transparent;
+  color: var(--color-act-ink);
+}
+
+.app .snav__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  flex: none;
+  font-size: 15px;
+  color: var(--color-ink-mute);
+}
+
+/* ── 다른 사람 화면 메뉴 ─────────────────────────────────── */
+
+.fieldmenu {
+  position: relative;
+}
+
+.fieldmenu__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fieldmenu__btn:hover {
+  border-color: var(--color-act-solid);
+  color: var(--color-act-ink);
+}
+
+.fieldmenu__pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-overlay);
+  width: min(320px, calc(100vw - var(--space-8)));
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.fieldmenu__note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: 12px;
+  color: var(--color-ink-mute);
+}
+
+.fieldmenu__item {
+  display: block;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+.fieldmenu__item:hover {
+  background: var(--color-surface-sunk);
+}
+
+.fieldmenu__item strong {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+/* **직계 자식만.** `span` 을 통째로 잡으면 제목 안의 «접근 코드 필요» 배지도
+   블록이 되어 한 줄을 통째로 먹는다. */
+.fieldmenu__item > span {
+  display: block;
+  font-size: 12px;
+  color: var(--color-ink-mute);
+  line-height: 1.45;
+}
+
+/* ── 조각 격자 ───────────────────────────────────────────── */
+
+.pipline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+
+.pips i {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  border-radius: var(--radius-pip);
+  background: var(--color-pip-empty);
+}
+
+/* 찬 칸. 뜻에 따라 색이 갈립니다 — 금색은 "이미 이룬 것" 에만. */
+.pips i[data-on][data-tone='act'] {
+  background: var(--color-act-solid);
+}
+.pips i[data-on][data-tone='done'] {
+  background: var(--color-gold-solid);
+}
+.pips i[data-on][data-tone='caution'] {
+  background: var(--color-state-caution);
+}
+.pips i[data-on][data-tone='risk'] {
+  background: var(--color-state-high);
+}
+
+/* 셀 수 없이 많을 때만 막대로 떨어집니다. */
+.pipbar {
+  display: block;
+  width: 96px;
+  height: 7px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-pip-empty);
+  overflow: hidden;
+}
+
+.pipbar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-act-solid);
+}
+.pipbar i[data-tone='done'] {
+  background: var(--color-gold-solid);
+}
+.pipbar i[data-tone='caution'] {
+  background: var(--color-state-caution);
+}
+.pipbar i[data-tone='risk'] {
+  background: var(--color-state-high);
+}
+
+.pipline__n {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: var(--weight-medium);
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+/* ── 당일 밀도 ───────────────────────────────────────────── */
+
+/* 같은 토큰, 다른 밀도. 운영본부에서는 서서 흘끗 보고 3초 안에 판단합니다 —
+   숫자를 키우고 카드를 줄이는 것으로 충분하고, 스타일을 두 벌 만들 이유는
+   없습니다. */
+.ops .kpi__value {
+  font-size: var(--text-stat-lg);
+  letter-spacing: -0.04em;
+}
+
+/* 단위(명·건·개)는 같이 커지지 않는다. 커지면 숫자와 경쟁한다. */
+.ops .kpi__value small {
+  font-size: var(--text-body);
+}
+
+.ops .pips i {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+}
+
+/* 지금 손을 써야 하는 카드만 테두리가 섭니다. 전부 서면 아무것도 안 선 것과
+   같습니다. */
+.ops .card[data-alert='true'] {
+  border-color: var(--color-state-high);
+}
+
+/* ── 현황 화면 ───────────────────────────────────────────── */
+
+/* 표 안에서 "남은 일" 은 문장이다. `.table` 기본값이 nowrap 이라 그대로 두면
+   가로 스크롤이 생기고, 정작 읽어야 할 문장이 화면 밖으로 나간다. */
+.table--wrap td {
+  white-space: normal;
+}
+
+/* 이름이 첫 칸일 때의 최소폭이다(부스·특강·항목). **숫자 칸에는 걸지
+   않는다** — 폭이 지정된 칸으로 취급돼 표의 남는 폭까지 이 칸이 가져간다.
+   시상 집계에서 순위 칸 하나가 표의 3분의 1(411/1165px)을 먹고 왼쪽이
+   텅 비어 있던 것이 이것이다. */
+.table--wrap td:first-child:not(.num) {
+  min-width: 160px;
+}
+
+/* 표의 남는 폭을 **한 칸이 가져간다.** 표는 width:100% 라 내용보다 넓은데,
+   지정하지 않으면 브라우저가 남는 폭을 모든 칸에 흩어 놓는다 — 숫자 한 자리
+   칸이 240px 이 되고 값들이 서로 멀어져 어느 열의 숫자인지 눈으로 잇기
+   어려워진다. 이름 칸에 몰아주면 숫자 칸은 내용만큼만 차지해 오른쪽에 모인다. */
+.table .wide {
+  width: 100%;
+}
+
+/* 숫자와 그 아래 근거(0명 · 1표 · 관객 점수만)는 줄바꿈하지 않는다.
+   `.table--wrap` 이 td 를 전부 normal 로 풀어 두는데, 내용만큼 좁아진 숫자
+   칸에서는 "관객 점수만" 이 두 줄로 접혀 행 전체가 높아진다. */
+.table--wrap th.num,
+.table--wrap td.num {
+  white-space: nowrap;
+}
+
+/* 표 안의 출품 번호는 제목과 붙어 버린다 — 배지가 격자라 사이의 공백이
+   줄바꿈 기회로 먹힌다. 간격을 글자가 아니라 여백으로 준다. */
+.table .exhibit__no {
+  margin-right: var(--space-2);
+}
+
+.rowlink {
+  font-weight: var(--weight-bold);
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowlink:hover {
+  color: var(--color-act-ink);
+  text-decoration: underline;
+}
+
+.rowsub {
+  display: block;
+  margin-top: 1px;
+  font-size: 12.5px;
+  color: var(--color-ink-mute);
+  font-weight: var(--weight-regular);
+}
+
+/* 스탯 카드 밑에 붙는 한 줄. 숫자만으로는 "그래서 뭐" 가 되므로 여기서
+   맥락을 준다 — 남은 일, 비교 대상, 방금 바뀐 값. */
+.kpi__note {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.overview__score {
+  margin: 0;
+  font-size: var(--text-stat);
+  font-weight: var(--weight-stat);
+  letter-spacing: var(--tracking-display);
+  line-height: 1;
+}
+
+.overview__score small {
+  margin-left: 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink-mute);
+  letter-spacing: 0;
+}
+
+/* ── 시간대 그래프 ───────────────────────────────────────── */
+
+.tchart {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* viewBox 를 늘여 쓰므로 선이 함께 늘어나면 두께가 가로로 뭉개진다.
+   선에는 vector-effect 를, 여기서는 높이만 고정한다. */
+.tchart__svg {
+  width: 100%;
+  height: 132px;
+  display: block;
+  overflow: visible;
+}
+
+.tchart__line {
+  stroke: var(--color-act-solid);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tchart__axis {
+  stroke: var(--chart-axis);
+  stroke-width: 1;
+}
+
+/* 그래프 영역을 기준으로 끝점을 놓는다. */
+.tchart__plot {
+  position: relative;
+}
+
+.tchart__dot {
+  position: absolute;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-act-solid);
+  box-shadow: 0 0 0 2px var(--color-surface);
+  transform: translate(50%, -50%);
+  pointer-events: none;
+}
+
+.tchart__ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-ink-mute);
+  font-family: var(--font-mono);
+}
+
+.tchart__legend {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.tchart__legend b {
+  color: var(--color-ink);
+  font-weight: var(--weight-bold);
+}
+
+/* 당일 밀도에서는 그래프도 커진다 — 운영본부 스크린에서 132px 는 선이 아니라
+   실오라기로 보인다. */
+.ops .tchart__svg {
+  height: 172px;
+}
+
+/* ── 탭 ──────────────────────────────────────────────────── */
+
+/* 두 자리가 한 루프일 때만 탭을 쓴다. 서로 관계없는 화면을 탭으로 묶으면
+   "여기 어디지" 가 되고, 그건 메뉴가 할 일이다. */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 42px;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-mute);
+  cursor: pointer;
+  /* 밑줄이 표의 경계선 위에 정확히 앉게 한다. */
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+
+.tabs__tab:hover {
+  color: var(--color-ink);
+}
+
+/* 지금 어느 탭인지. **색만으로 알리지 않는다** — 굵은 밑줄이 색을 못 보는
+   경우에도 남는다. */
+.tabs__tab[aria-selected='true'] {
+  color: var(--color-act-ink);
+  border-bottom-color: var(--color-act-solid);
+}
+
+/* 점수를 탭 이름 옆에 붙여 둔다. 기획을 고치는 동안에도 지금 점수가 보여야
+   무엇을 고쳐야 오르는지 감이 잡힌다. */
+.tabs__num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  color: var(--color-ink-mute);
+  background: var(--color-surface-sunk);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+
+.tabs__tab[aria-selected='true'] .tabs__num {
+  color: var(--color-act-ink);
+  background: var(--color-act-wash);
+}
+
+/* ── 표 안의 작은 막대 ───────────────────────────────────── */
+
+/* 조각 격자는 개수가 의미 있을 때 쓴다. 부스별 완료 건수처럼 수백 단위가
+   되면 셀 수 없으므로, 그때는 비율만 읽히는 막대가 맞다. 숫자 열이 바로
+   옆에 있어 정확한 값은 거기서 읽는다. */
+.minibar {
+  display: block;
+  width: 84px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-pip-empty);
+  overflow: hidden;
+}
+
+.minibar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-act-solid);
+}
+
+/* 리포트는 인쇄해서 보고서에 붙인다. 종이에서 옅은 회색 막대는 사라진다. */
+@media print {
+  .minibar {
+    border: 1px solid var(--color-ink-mute);
+  }
+  .minibar i {
+    background: var(--color-ink);
+  }
+}
+
+/* ── 드로어 ──────────────────────────────────────────────── */
+
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 24, 31, 0.42);
+}
+
+.drawer__panel {
+  position: relative;
+  width: min(560px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-line);
+  box-shadow: var(--shadow-lg);
+  animation: drawer-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+/* 애니메이션을 끄되 **나타나는 것 자체는 남긴다.** */
+@media (prefers-reduced-motion: reduce) {
+  .drawer__panel {
+    animation: none;
+  }
+}
+
+.drawer__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.drawer__title {
+  margin: 0;
+  font-size: var(--text-h2);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* 본문만 스크롤한다. 머리말과 바닥이 함께 밀려 올라가면 저장 버튼을 찾으러
+   맨 아래까지 내려가야 한다. */
+.drawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.drawer__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface-sunk);
+}
+
+@media (max-width: 620px) {
+  .drawer__panel {
+    width: 100vw;
+    border-left: 0;
+  }
+}
+
+/* ── 표 안의 상태 ────────────────────────────────────────── */
+
+/* 중지된 부스. 지우지 않고 흐리게 둔다 — 없는 것과 멈춘 것은 다르고,
+   멈춘 부스도 어제까지의 참여 기록을 갖고 있다. */
+.table tbody tr[data-off] td:not(:last-child) {
+  opacity: 0.55;
+}
+
+/* 표 안의 링크가 버튼일 때. 드로어를 여는 것이라 주소가 없다. */
+button.rowlink {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: var(--weight-bold);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* ── 표 안의 보조 숫자 ───────────────────────────────────── */
+
+/* 숫자 칸 아래에 붙는 근거(심사위원 6명 · 12표). 열이 늘어나는 것보다
+   한 칸에 두 줄이 낫다 — 열이 열 개를 넘으면 가로 스크롤이 생긴다. */
+.table td.num .rowsub {
+  text-align: right;
+}
+
+/* 작품 포스터 미리보기. 드로어 폭에 맞추되 세로로 화면을 다 먹지 않게 한다. */
+.posterthumb {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-sunk);
+}
+
+/* 문장 안에서 탭을 바꾸는 링크. 진짜 링크가 아니라 주소가 없다. */
+.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: var(--weight-bold);
+  color: var(--color-act-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── 축제 전환 ───────────────────────────────────────────── */
+
+.fswitch {
+  position: relative;
+}
+
+.fswitch__btn {
+  display: inline-flex;
+  /* **baseline 이 아니다.** baseline 으로 두면 글자 묶음이 상자의 세로
+     중앙이 아니라 첫 베이스라인 기준으로 앉아, 36px 상자 안에서 5px 위로
+     뜬다. 옆의 검색창·브랜드와 높이가 어긋나 보이는 원인이었다. */
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 320px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunk);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fswitch__btn:hover {
+  border-color: var(--color-act-solid);
+}
+
+/* 이름과 기간끼리는 베이스라인을 맞춘다. 크기가 다른 두 글자를 가운데로
+   맞추면 작은 쪽이 떠 보인다. */
+.fswitch__text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.fswitch__caret {
+  flex: none;
+  font-size: 11px;
+  color: var(--color-ink-mute);
+  line-height: 1;
+}
+
+.fswitch__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 이름만 늘어놓으면 «SW Week» 이 작년 것인지 올해 것인지 알 수 없다. */
+.fswitch__meta {
+  font-size: 12px;
+  color: var(--color-ink-mute);
+  white-space: nowrap;
+}
+
+.fswitch__pop {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-overlay);
+  width: min(360px, calc(100vw - var(--space-8)));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.fswitch__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fswitch__item:hover {
+  background: var(--color-surface-sunk);
+}
+
+.fswitch__item[aria-selected='true'] {
+  background: var(--color-act-wash);
+  color: var(--color-act-ink);
+}
+
+.fswitch__item strong {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.fswitch__item span {
+  display: block;
+  font-size: 12px;
+  color: var(--color-ink-mute);
+}
+
+.fswitch__item[aria-selected='true'] span {
+  color: inherit;
+}
+
+.fswitch__all {
+  display: block;
+  padding: var(--space-3);
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--color-line);
+  font-size: 12.5px;
+  font-weight: var(--weight-bold);
+  color: var(--color-act-ink);
+  text-decoration: none;
+}
+
+/* ── 통합 검색 ───────────────────────────────────────────── */
+
+.fsearch {
+  position: relative;
+  /* 상단바가 붐빌 때 제일 먼저 줄어드는 자리다. 그렇다고 안내 문구가
+     한가운데서 잘리면 무엇을 찾을 수 있는지 모른 채 남는다 — 아래에서
+     넘치면 «…» 로 끝내고, 그보다 좁아지면 아예 감춘다. */
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 340px;
+}
+
+.fsearch__input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.fsearch__input::placeholder {
+  color: var(--color-ink-mute);
+  /* 잘릴 때 한가운데서 뚝 끊기지 않게 한다. */
+  text-overflow: ellipsis;
+}
+
+.fsearch__pop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-overlay);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 안내는 오류가 아니다. 타이핑 중인 상태를 빨갛게 알리면 글자를 칠 때마다
+   경고가 깜빡인다. */
+.fsearch__note {
+  margin: 0;
+  padding: var(--space-3);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-ink-mute);
+}
+
+.fsearch__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fsearch__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fsearch__item:hover {
+  background: var(--color-surface-sunk);
+}
+
+/* 무엇으로 걸렸는지. 부스와 미션이 같은 이름을 쓰는 일이 흔하다. */
+.fsearch__kind {
+  flex: none;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-mute);
+  background: var(--color-surface-sunk);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+.fsearch__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fsearch__sub {
+  font-size: 12px;
+  color: var(--color-ink-mute);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* 좁은 화면에서는 상단바에 넣을 자리가 없다. 검색은 넓은 화면의 편의이고,
+   좁은 화면에서는 메뉴가 그 일을 한다. */
+@media (max-width: 1100px) {
+  .fswitch__meta {
+    display: none;
+  }
+}
+
+/* 좁은 화면에서는 상단바에 넣을 자리가 없다. 검색은 넓은 화면의 편의이고,
+   좁은 화면에서는 레일이 그 일을 한다. */
+@media (max-width: 980px) {
+  .fsearch {
+    display: none;
+  }
+}
+
+/* ── 상단바 밀도 ─────────────────────────────────────────── */
+
+/* 축제 안에서는 브랜드 부제("축제 기획 진단")를 접는다. 바로 옆에 축제
+   이름과 기간이 서 있어 그 자리에서 더 정확한 말을 하고 있고, 남겨 두면
+   상단바가 좁아져 브랜드가 두 줄로 접힌다. */
+.app[data-nav='true'] .brand small {
+  display: none;
+}
+
+.app[data-nav='true'] .brand {
+  white-space: nowrap;
+}
+
+/* ── 다른 사람 화면 · 역할 묶음 ──────────────────────────── */
+
+.fieldmenu__group + .fieldmenu__group {
+  border-top: 1px solid var(--color-line);
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+/* 화면 이름이 아니라 **누가 보는지** 로 묶는다. 운영자가 찾는 방식이
+   "심사위원한테 뭐가 보이지" 이지 "judging 화면이 어디지" 가 아니다. */
+.fieldmenu__who {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-ink-mute);
+}
+
+/* 잠긴 화면을 감추지 않는다. 링크를 빼면 운영자는 그 화면의 존재조차 잊는다. */
+.fieldmenu__lock {
+  display: inline-block;
+  margin-left: var(--space-2);
+  font-size: 10.5px;
+  font-weight: var(--weight-bold);
+  color: var(--color-state-caution);
+  background: var(--color-state-caution-bg);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  vertical-align: 1px;
+}
+
+.fieldmenu__pop {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.fieldmenu__note a {
+  font-weight: var(--weight-bold);
+  color: var(--color-act-ink);
+}
+
+/* ── 푸터 ────────────────────────────────────────────────────
+   출처 표기가 사는 자리다. 상단바는 축제 전환·검색·현장 화면·계정이 다투는
+   자리라 출처가 끼면 넷 다 좁아지고, 정작 출처는 아무도 안 본다.
+
+   **눈에 띄면 안 되는 자리다.** 흰 면에 테두리를 두르면 본문 카드와 같은
+   무게가 되어, 아무도 읽지 않을 글이 카드 하나만큼의 존재감을 갖는다.
+   바탕색 위에 그대로 눕히고 글자도 한 단 낮춘다 — 찾으면 있고, 안 찾으면
+   보이지 않는 정도.
+   ============================================================ */
+
+.afoot {
+  /* 흰 면도 테두리도 없다. 바닥색 위에 그냥 눕는다. */
+  background: transparent;
+}
+
+/* 본문 칼럼을 세로 flex 로 만들어 푸터를 바닥으로 민다. 내용이 짧은
+   화면에서도 푸터가 화면 중간에 뜨지 않는다. */
+.app__main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* **flex 자식에게 폭을 돌려준다.** `margin: 0 auto` 를 가진 자식은 flex
+   안에서 늘어나지 않고 내용 폭으로 줄어든다 — 본문 shell 이 실제로 그렇게
+   좁아져 카드가 200px 가까이 안쪽으로 밀렸다. `width: 100%` 를 주면 늘어난
+   뒤 `max-width` 가 잡고 auto 마진이 가운데로 놓는다. */
+.app__main > * {
+  width: 100%;
+}
+
+.app__main > .afoot {
+  margin-top: auto;
+}
+
+.afoot__in {
+  /* 본문 shell 과 같은 폭·같은 좌우 여백. 출처가 본문 왼쪽 끝과 줄이 맞아야
+     떠 있는 띠가 아니라 문서의 끝으로 읽힌다. */
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-7) var(--space-8);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 12.5px;
+  color: var(--color-ink-mute);
+}
+
+.afoot__brand {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 브랜드도 굵게 두지 않는다. 상단바에 이미 있는 이름이다. */
+.afoot__brand strong {
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-soft);
+  letter-spacing: var(--tracking-tight);
+}
+
+.afoot__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.afoot__meta p {
+  margin: 0;
+}
+
+/* 출처는 조건부로 빼지 않지만, 굵게 할 이유도 없다. */
+.afoot__meta strong {
+  font-weight: var(--weight-medium);
+  color: inherit;
+}
+
+/* 인쇄물(부스 안내문·리포트)에는 나가지 않는다. 종이에서는 화면 크롬이다. */
+@media print {
+  .afoot {
+    display: none;
+  }
+}

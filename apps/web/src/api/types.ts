@@ -197,6 +197,10 @@ export interface PublicFestival {
   /** 참여 시작 화면이 학번을 물어야 하는지 여기서 정해집니다. */
   identity_mode: IdentityMode;
   source_note: string;
+  /** 하단 탭을 띄울지 정합니다. 없는데 띄우면 눌러도 "아직 없습니다" 만
+   *  나오고, 죽은 링크가 있는 메뉴는 없는 메뉴보다 나쁩니다. */
+  has_lectures: boolean;
+  has_exhibits: boolean;
 }
 
 export interface ParticipantIssued {
@@ -840,6 +844,40 @@ export interface Recommendation {
   evidence: string;
   action: string;
   target_booth_id: number | null;
+}
+
+/** 당일 화면의 시간대 그래프. **빈 칸도 0 으로 들어 있습니다** —
+ *  화면이 구멍을 메우게 두면 없던 시간이 완만한 하강으로 그려집니다. */
+/** 통합 검색. **참여자 secret 은 이 응답에 자리가 없습니다** —
+ *  코드는 부스에서 보여주는 값이지만 secret 은 남의 수집 현황을 여는 열쇠입니다. */
+export interface SearchHit {
+  kind: 'booth' | 'mission' | 'exhibit' | 'participant';
+  id: number;
+  title: string;
+  subtitle: string | null;
+}
+
+export interface SearchResult {
+  query: string;
+  /** 몇 글자부터 찾는지. 화면이 같은 숫자를 따로 들고 있지 않게 합니다. */
+  min_query: number;
+  /** 종류마다 상한이 있습니다. 잘렸으면 화면이 그 사실을 말해야 합니다. */
+  truncated: boolean;
+  hits: SearchHit[];
+}
+
+export interface TimelinePoint {
+  /** 칸의 **시작** 시각(UTC ISO). 화면이 자기 시간대로 찍습니다. */
+  at: string;
+  completions: number;
+}
+
+export interface OperationsTimeline {
+  bucket_minutes: number;
+  window_hours: number;
+  /** 가장 높은 칸. 화면이 다시 훑지 않게 서버가 함께 냅니다. */
+  peak: number;
+  points: TimelinePoint[];
 }
 
 export interface Insights {

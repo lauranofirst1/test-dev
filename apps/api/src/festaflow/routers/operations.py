@@ -33,6 +33,8 @@ from festaflow.schemas.operations import (
     InsightKpi,
     InsightsOut,
     RecommendationOut,
+    TimelineOut,
+    TimelinePointOut,
     WarningOut,
 )
 from festaflow.services import grants, operations_insights, operations_recommendations
@@ -74,6 +76,32 @@ def _etag(payload: InsightsOut) -> str:
         json.dumps(body, sort_keys=True, ensure_ascii=False).encode()
     ).hexdigest()
     return f'W/"{digest[:32]}"'
+
+
+@router.get(
+    "/operations/timeline", response_model=TimelineOut, dependencies=[*OPERATOR, CanOperate]
+)
+def get_timeline(
+    festival_id: int,
+    db: DbSession,
+    org: CurrentOrg,
+    hours: int = operations_insights.TIMELINE_DEFAULT_HOURS,
+) -> TimelineOut:
+    """최근 N시간의 완료 건수. 당일 화면의 선 그래프가 씁니다.
+
+    인사이트와 달리 ETag 를 붙이지 않습니다 — 10분마다 칸이 하나씩 늘어나므로
+    본문이 계속 바뀌고, 조건부 요청이 절약해 주는 것이 거의 없습니다.
+    """
+    _owned(db, org.id, festival_id)
+    points = operations_insights.timeline(db, festival_id, hours=hours)
+    return TimelineOut(
+        bucket_minutes=operations_insights.TIMELINE_BUCKET_MINUTES,
+        window_hours=max(
+            1, min(int(hours), operations_insights.TIMELINE_MAX_HOURS)
+        ),
+        peak=max((p.completions for p in points), default=0),
+        points=[TimelinePointOut(at=p.at, completions=p.completions) for p in points],
+    )
 
 
 @router.get(

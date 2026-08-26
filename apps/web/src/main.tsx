@@ -6,6 +6,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './styles/tokens.css';
 import './styles/app.css';
 import './styles/paper.css';
+// 콘솔 전용. app.css 를 덮으므로 반드시 뒤에 온다.
+import './styles/console.css';
 import { AudienceLayout, PlannerLayout } from './layouts';
 import { RequireAccount } from './components/RequireAccount';
 import { BoothGrantPage } from './pages/BoothGrantPage';
@@ -16,7 +18,6 @@ import { CheckInPage } from './pages/CheckInPage';
 import { CheckpointScreenPage } from './pages/CheckpointScreenPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DiagnosisPage } from './pages/DiagnosisPage';
-import { EditFestivalPage } from './pages/EditFestivalPage';
 import { ExhibitionPage } from './pages/ExhibitionPage';
 import { ExhibitsAdminPage } from './pages/ExhibitsAdminPage';
 import { JoinPage } from './pages/JoinPage';
@@ -31,6 +32,7 @@ import { JudgingPage } from './pages/JudgingPage';
 import { LecturesPage } from './pages/LecturesPage';
 import { MyLecturesPage } from './pages/MyLecturesPage';
 import { NewFestivalPage } from './pages/NewFestivalPage';
+import { OverviewPage } from './pages/OverviewPage';
 import { PrizeClaimPage } from './pages/PrizeClaimPage';
 import { ReportPage } from './pages/ReportPage';
 import { ScanPage } from './pages/ScanPage';
@@ -58,10 +60,19 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<PlannerLayout />}>
             <Route path="/" element={<RequireAccount><WorkspacePage /></RequireAccount>} />
             <Route path="/festivals/new" element={<RequireAccount><NewFestivalPage /></RequireAccount>} />
+            {/* 축제에 들어가면 처음 열리는 화면. 예전에는 진단이 먼저 열렸는데,
+                진단은 기획 단계에 몇 번 하고 마는 일이라 매일 여는 화면이
+                아니었습니다. */}
+            <Route path="/festivals/:id" element={<RequireAccount><OverviewPage /></RequireAccount>} />
             <Route path="/festivals/:id/diagnosis" element={<RequireAccount><DiagnosisPage /></RequireAccount>} />
-            {/* 진단 → 교정 → 재진단 루프의 가운데 고리. 이게 없으면
-                "다시 진단하기" 를 눌러도 같은 입력에 같은 점수가 나온다. */}
-            <Route path="/festivals/:id/edit" element={<RequireAccount><EditFestivalPage /></RequireAccount>} />
+            {/* 기획 수정은 이제 진단 화면의 탭이다. 진단 → 교정 → 재진단이
+                한 루프인데 화면이 둘로 갈라져 있으면, 고치러 가는 순간 점수가
+                사라져 무엇을 고쳐야 점수가 오르는지 보면서 고칠 수 없다.
+                예전 주소는 살려 둔다 — 북마크와 이미 나간 링크가 있다. */}
+            <Route
+              path="/festivals/:id/edit"
+              element={<Navigate to="../diagnosis?tab=plan" replace relative="path" />}
+            />
             {/* 축제 당일 띄워 두는 화면. 참여 편중 지표와 확인 요청 카드. */}
             <Route path="/festivals/:id/dashboard" element={<RequireAccount><DashboardPage /></RequireAccount>} />
             {/* 축제가 끝난 뒤 여는 화면. 목표 대비 실제와 다음 축제 개선안. */}

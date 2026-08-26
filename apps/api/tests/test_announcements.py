@@ -30,6 +30,7 @@ from festaflow.models import (
     Festival,
     FestivalStaff,
     Organization,
+    OrganizationAccount,
     Participant,
 )
 from festaflow.models.enums import (
@@ -104,6 +105,21 @@ def staff(db: Session, festival: Festival) -> tuple[FestivalStaff, str]:
         staff_id=s.id, festival_id=festival.id, role=s.role, booth_id=None
     )
     return s, token
+
+
+@pytest.fixture
+def account(db: Session, org: Organization) -> tuple[OrganizationAccount, str]:
+    """기관 세션. 운영 대시보드를 띄워 둔 사람이 이 신원으로 들어온다."""
+    a = OrganizationAccount(
+        organization_id=org.id,
+        email="sw@hallym.ac.kr",
+        password_hash=security.hash_password("고구마-감자-옥수수-달빛"),
+        display_name="운영 담당",
+    )
+    db.add(a)
+    db.flush()
+    token, _ = security.issue_org_token(account_id=a.id, organization_id=org.id)
+    return a, token
 
 
 def _post(db: Session, festival: Festival, **kw) -> object:
@@ -211,6 +227,75 @@ def test_남의_축제_스태프_토큰으로는_못_본다(
     )
 
     assert r.status_code in (403, 404)
+
+
+def test_운영자도_스태프_공지를_본다(
+    db: Session, client: TestClient, festival: Festival, account
+) -> None:
+    """축제 당일 대시보드를 띄워 둔 운영자가 "현금 정산 30분 뒤" 를 못 보면,
+    그 공지를 가장 먼저 봐야 하는 사람이 못 보는 것이다. 스태프 토큰만 받던
+    시절에는 기관 세션이 10초마다 401 을 받고 목록이 늘 비어 있었다."""
+    _post(db, festival, channel=AnnouncementChannel.STAFF, title="현금 정산 30분 뒤")
+    db.commit()
+    _, token = account
+
+    r = client.get(
+        f"/api/festivals/{festival.id}/announcements/staff-live",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert [a["title"] for a in items] == ["현금 정산 30분 뒤"]
+    # 확인 기록에 기관 계정 자리가 없다. 없는 것을 있다고 답하면 안 된다.
+    assert items[0]["acked"] is False
+
+
+def test_운영자에게도_관객_공지는_스태프_경로로_오지_않는다(
+    db: Session, client: TestClient, festival: Festival, account
+) -> None:
+    """신원이 하나 늘어도 채널 경계는 그대로여야 한다."""
+    _post(db, festival, channel=AnnouncementChannel.AUDIENCE, title="관객용 안내")
+    db.commit()
+    _, token = account
+
+    r = client.get(
+        f"/api/festivals/{festival.id}/announcements/staff-live",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert r.status_code == 200
+    assert r.json()["items"] == []
+
+
+def test_남의_기관_세션으로는_스태프_공지를_못_본다(
+    db: Session, client: TestClient, festival: Festival
+) -> None:
+    """기관 세션을 받는다고 아무 축제나 열리면, 축제 id 를 훑는 것만으로
+    남의 내부 전달이 새어 나간다."""
+    other_org = Organization(name="옆 재단")
+    db.add(other_org)
+    db.flush()
+    stranger = OrganizationAccount(
+        organization_id=other_org.id,
+        email="hello@example.com",
+        password_hash=security.hash_password("고구마-감자-옥수수-달빛"),
+        display_name="남의 기관",
+    )
+    db.add(stranger)
+    db.flush()
+    _post(db, festival, channel=AnnouncementChannel.STAFF, title="내부 전달")
+    db.commit()
+    token, _ = security.issue_org_token(
+        account_id=stranger.id, organization_id=other_org.id
+    )
+
+    r = client.get(
+        f"/api/festivals/{festival.id}/announcements/staff-live",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert r.status_code == 404
 
 
 # ── 등록하지 않아도 보인다 ──────────────────────────────────────────────────

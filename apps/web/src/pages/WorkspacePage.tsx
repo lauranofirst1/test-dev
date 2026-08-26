@@ -1,4 +1,7 @@
-/** 기획자 워크스페이스 — 축제 목록. */
+/** 내 축제 — 축제 목록.
+ *
+ * 담당자는 자기를 "기획자" 라고 부르지 않고, "워크스페이스" 도 이 사람의
+ * 말이 아닙니다. 화면 이름은 쓰는 사람의 말이어야 합니다. */
 
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -17,7 +20,7 @@ export function WorkspacePage() {
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
       <div className="row wrap" style={{ justifyContent: 'space-between' }}>
         <div className="stack" style={{ gap: 4 }}>
-          <p className="eyebrow">기획자 워크스페이스</p>
+          <p className="eyebrow">내 축제</p>
           <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>축제</h1>
         </div>
         <Link to="/festivals/new" className="btn btn--primary btn--lg">
@@ -90,7 +93,7 @@ export function WorkspacePage() {
             {/* 축제 당일에 여는 화면. 준비 단계에서는 볼 것이 없지만, 당일
                 아침에 어디로 들어가는지를 미리 알아 두어야 한다. */}
             <Link to={`/festivals/${f.id}/dashboard`} className="fcard__sub">
-              운영 대시보드 →
+              오늘 →
             </Link>
             <Link to={`/festivals/${f.id}/report`} className="fcard__sub">
               사후 리포트 →
