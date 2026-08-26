@@ -6,6 +6,42 @@
 
 ---
 
+## 0. 저장소 받기 — 포크해서 씁니다
+
+원본에 직접 밀지 않습니다. **각자 포크해서 자기 저장소에서 작업하고, 다 되면
+PR 로 보냅니다.** 실수로 남의 작업 위에 밀어 버리는 일이 구조적으로 안 생기고,
+누가 무엇을 고쳤는지도 PR 하나로 남습니다.
+
+1. <https://github.com/lauranofirst1/test-dev> 에서 오른쪽 위 **Fork** 를 누릅니다.
+2. 포크한 **자기 저장소**를 클론합니다.
+
+```bash
+git clone https://github.com/{내아이디}/test-dev.git
+cd test-dev
+
+# 원본을 upstream 으로 걸어 둔다 — 나중에 최신 코드를 당겨오는 통로다
+git remote add upstream https://github.com/lauranofirst1/test-dev.git
+
+# 지금 작업 중인 브랜치로 옮긴다 (main 은 한참 뒤에 있습니다)
+git fetch upstream
+git checkout -b feat/backend-scaffold upstream/feat/backend-scaffold
+```
+
+이후 최신 코드를 받을 때는 `git pull upstream feat/backend-scaffold` 입니다.
+(`git pull` 만 치면 자기 포크를 봅니다.)
+
+고친 것을 보낼 때:
+
+```bash
+git push origin feat/backend-scaffold        # 자기 포크로 올린다
+```
+
+GitHub 이 띄워 주는 **Compare & pull request** 를 누르고, **받는 쪽 브랜치를
+`feat/backend-scaffold` 로** 맞춰 주세요. `main` 이 기본값으로 잡히는데 그쪽은
+18커밋 뒤에 있어서 비교가 엉킵니다.
+
+---
+
 ## 1. 5분 안에 화면 보기
 
 환경 준비(PostgreSQL · 가상환경 · npm)를 아직 안 했다면 [README 의 개발 환경 준비](../README.md#개발-환경-준비)를
