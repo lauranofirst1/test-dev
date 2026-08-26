@@ -13,10 +13,17 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from festaflow.core import security
 from festaflow.core.config import settings
 from festaflow.db.session import get_db
 from festaflow.main import app
-from festaflow.models import Booth, Festival, FestivalStaff, Organization
+from festaflow.models import (
+    Booth,
+    Festival,
+    FestivalStaff,
+    Organization,
+    OrganizationAccount,
+)
 from festaflow.models.enums import BoothType, StaffRole
 
 
@@ -116,8 +123,85 @@ def test_the_issued_code_actually_logs_in(client, festival, db):
     )
     assert r.status_code == 200, r.text
     assert r.json()["staff"]["role"] == "judge"
-    # 세션이 httpOnly 쿠키로도 함께 나간다.
-    assert settings.session_cookie_name in r.cookies
+    # 세션이 httpOnly 쿠키로도 함께 나간다. **기관 계정 쿠키와 다른 이름이다** —
+    # 한 브라우저에서 콘솔과 현장 화면을 함께 여는 것이 정상 동선이라, 같은
+    # 이름을 쓰면 스태프 로그인이 운영자의 콘솔 세션을 지운다.
+    assert settings.staff_cookie_name in r.cookies
+    assert settings.session_cookie_name not in r.cookies
+
+
+def test_staff_login_does_not_evict_the_console_session(client, festival, org, db):
+    """스태프 로그인이 **운영자의 콘솔 세션을 지우지 않는다.**
+
+    콘솔은 현장 화면(심사표·부스 지급)을 새 탭으로 열라고 링크를 걸어 둡니다.
+    쿠키 이름이 하나였을 때는 그 탭에서 심사위원으로 로그인하는 순간 콘솔의
+    기관 세션이 덮어써졌습니다. 읽기는 스태프 권한으로 계속 되니 화면은 멀쩡해
+    보이는데 저장만 "이 작업은 기획자·운영자만 할 수 있습니다" 로 막혔습니다.
+    """
+    password = "chuncheon-maple-77"
+    account = OrganizationAccount(
+        organization_id=org.id,
+        email="sw@hallym.ac.kr",
+        password_hash=security.hash_password(password),
+        display_name="운영 담당",
+    )
+    db.add(account)
+    db.flush()
+    db.commit()
+
+    assert (
+        client.post(
+            "/api/auth/login", json={"email": account.email, "password": password}
+        ).status_code
+        == 200
+    )
+
+    issued = _issue(client, festival).json()
+    r = client.post(
+        "/api/auth/staff/login",
+        json={
+            "festival_id": festival.id,
+            "staff_id": issued["staff"]["id"],
+            "access_code": issued["access_code"],
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    # 콘솔 세션이 그대로 살아 있다.
+    assert client.get("/api/auth/me").status_code == 200
+
+    # 콘솔의 쓰기도 막히지 않는다 — 심사위원 쿠키가 같이 실려 나가도.
+    r = client.put(
+        f"/api/festivals/{festival.id}/exhibition-settings",
+        json={
+            "audience_votes_per_participant": 3,
+            "judge_weight_percent": 70,
+            "voting_open": True,
+        },
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_logout_clears_both_sessions(client, festival, org, db):
+    """로그아웃은 이 브라우저의 세션을 **둘 다** 지운다.
+
+    공용 태블릿에서 한쪽만 지우면 "로그아웃했는데 아직 들어가진다" 가 됩니다.
+    """
+    db.commit()
+    issued = _issue(client, festival).json()
+    client.post(
+        "/api/auth/staff/login",
+        json={
+            "festival_id": festival.id,
+            "staff_id": issued["staff"]["id"],
+            "access_code": issued["access_code"],
+        },
+    )
+    assert client.get("/api/auth/staff/me").status_code == 200
+
+    client.post("/api/auth/logout")
+    assert settings.staff_cookie_name not in client.cookies
+    assert client.get("/api/auth/staff/me").status_code == 401
 
 
 def test_two_issues_do_not_share_a_code(client, festival, db):

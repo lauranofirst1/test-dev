@@ -86,8 +86,12 @@ def get_optional_staff(
     토큰을 손에 쥘 일이 없고, XSS 가 나도 스크립트가 읽어갈 수 없습니다.
     `Authorization` 헤더는 브라우저가 아닌 클라이언트(테스트·스크립트)용으로
     남겨 둡니다.
+
+    스태프 쿠키는 기관 계정 쿠키와 **이름이 다릅니다**(`staff_cookie_name`).
+    한 브라우저에서 콘솔과 현장 화면을 함께 여는 것이 정상 동선이라, 둘이
+    같은 자리를 쓰면 나중에 로그인한 쪽이 앞의 세션을 지웁니다.
     """
-    token = request.cookies.get(settings.session_cookie_name) or _bearer(authorization)
+    token = request.cookies.get(settings.staff_cookie_name) or _bearer(authorization)
     if not token:
         return None
 
@@ -231,26 +235,55 @@ def get_current_org(
 CurrentOrg = Annotated[Organization, Depends(get_current_org)]
 
 
-def require_festival_access(festival_id: int, staff: OptionalStaff) -> None:
+def require_festival_access(
+    festival_id: int, staff: OptionalStaff, account: OptionalAccount
+) -> None:
     """스태프 토큰은 **자기 축제만** 만질 수 있다.
 
     기관 스코프만으로는 막히지 않는다 — 같은 기관에 축제가 여럿이면
     A 축제 운영자 토큰으로 B 축제를 읽을 수 있다.
+
+    **기관 계정 세션이 있으면 스태프 쿠키는 보지 않는다.** 한 브라우저에 둘 다
+    있는 것이 정상이라(콘솔 + 현장 화면), 그때 A 축제 스태프 쿠키가 남아 있다고
+    B 축제 콘솔이 막히면 안 된다. 계정 쪽 권한은 `get_current_org` 의 기관
+    스코프와 각 엔드포인트의 소유 검사가 이미 판정한다.
     """
+    if account is not None:
+        return
     if staff is not None and staff.festival_id != festival_id:
         raise ApiError(403, "FORBIDDEN", "이 축제에 대한 권한이 없습니다.")
+
+
+#: 오류 문장에 쓰는 역할 이름. 화면은 서버 문장을 그대로 띄우므로 여기서
+#: 영어 값이 나가면 "이 작업은 operator, planner 역할만 할 수 있습니다" 가
+#: 그대로 보인다 — 읽는 사람은 자기가 그중 무엇인지 알 수 없다.
+#: `details.required_roles` 는 값 그대로 둔다. 그쪽은 기계가 읽는 자리다.
+ROLE_LABELS: dict[str, str] = {
+    StaffRole.PLANNER.value: "기획자",
+    StaffRole.OPERATOR.value: "운영자",
+    StaffRole.BOOTH_MANAGER.value: "부스 관리자",
+    StaffRole.JUDGE.value: "심사위원",
+}
 
 
 def require_role(*roles: StaffRole):
     """역할 제한. 토큰이 없는 폴백 환경에서는 검사할 역할이 없어 통과시킨다."""
     allowed = {r.value for r in roles}
+    # 사람이 읽는 순서는 ROLE_LABELS 의 차례를 따른다(기획자 → 심사위원).
+    labels = [label for value, label in ROLE_LABELS.items() if value in allowed]
 
-    def _check(staff: OptionalStaff) -> None:
+    def _check(staff: OptionalStaff, account: OptionalAccount) -> None:
+        # 기관 계정으로 들어온 요청은 스태프 역할로 막지 않는다 — 계정은 이
+        # 기관의 주인이고, 만질 수 있는 축제는 기관 스코프가 이미 가른다.
+        # (쿠키가 하나이던 때는 계정 세션이면 staff 가 늘 None 이라 결과가
+        #  같았다. 쿠키를 가른 지금은 명시해야 한다.)
+        if account is not None:
+            return
         if staff is not None and staff.role.value not in allowed:
             raise ApiError(
                 403,
                 "FORBIDDEN",
-                f"이 작업은 {', '.join(sorted(allowed))} 역할만 할 수 있습니다.",
+                f"이 작업은 {'·'.join(labels)}만 할 수 있습니다.",
                 {"required_roles": sorted(allowed)},
             )
 
@@ -356,11 +389,21 @@ def get_optional_participant(
 OptionalParticipant = Annotated[Participant | None, Depends(get_optional_participant)]
 
 
-def require_booth_scope(staff: FestivalStaff | None, booth_id: int) -> None:
+def require_booth_scope(
+    staff: FestivalStaff | None,
+    booth_id: int,
+    account: OrganizationAccount | None = None,
+) -> None:
     """`booth_manager` 는 **자기 부스의 미션만** 지급할 수 있다 — 계약 §1.
 
     역할 검사만으로는 부족하다. booth_manager 토큰이면 부스까지 봐야 한다.
+
+    `account` 가 있으면 검사하지 않는다. 운영자가 콘솔에서 부스 화면을 열어
+    보다가 담당자 코드로 로그인해 두면 그 쿠키가 남는데, 그 뒤 콘솔에서 다른
+    부스를 여는 것까지 막히면 안 된다.
     """
+    if account is not None:
+        return
     if staff is None:
         return
     if staff.role != StaffRole.BOOTH_MANAGER:
