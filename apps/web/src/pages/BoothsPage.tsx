@@ -62,6 +62,9 @@ const QR_MODES: { value: BoothQrMode; label: string; hint: string }[] = [
   },
 ];
 
+/** 조각 보드를 만들 수 있는 최소 지급 단위 수. 서버의 격자 하한(2×2)과 같다. */
+const GRID_MIN_UNITS = 4;
+
 const BOARD_STYLES: { value: BoardStyle; label: string; hint: string }[] = [
   { value: 'grid', label: '그림 퍼즐', hint: '그림 한 장을 격자로 쪼갭니다. 다 모으면 그림이 완성됩니다.' },
   { value: 'trail', label: '스탬프 지도', hint: '점선으로 이어진 길을 따라 도장을 찍습니다. 그림은 쓰지 않습니다.' },
@@ -326,7 +329,11 @@ export function BoothsPage() {
           onClick={() => setTab('board')}
         >
           조각 보드
-          {board.data && <b className="tabs__num tabular">{board.data.total_tiles}</b>}
+          {/* 부스가 갖춰지기 전의 조각 수는 기본값일 뿐 아직 정해진 것이 아니다.
+              탭에 숫자가 떠 있으면 이미 정해진 것처럼 읽힌다. */}
+          {board.data && Math.max(active.length, activeMissions) >= GRID_MIN_UNITS && (
+            <b className="tabs__num tabular">{board.data.total_tiles}</b>
+          )}
         </button>
         <button
           type="button"
@@ -433,6 +440,7 @@ export function BoothsPage() {
           boothCount={active.length}
           missionCount={activeMissions}
           onChanged={refresh}
+          onGoToBooths={() => setTab('booths')}
         />
       )}
 
@@ -779,12 +787,14 @@ function BoardSettings({
   boothCount,
   missionCount,
   onChanged,
+  onGoToBooths,
 }: {
   festivalId: string;
   board: StampBoardAdmin;
   boothCount: number;
   missionCount: number;
   onChanged: () => void;
+  onGoToBooths: () => void;
 }) {
   const [grid, setGrid] = useState<Grid>({ rows: board.rows, cols: board.cols });
   const [grantUnit, setGrantUnit] = useState<GrantUnit>(board.grant_unit);
@@ -852,12 +862,51 @@ function BoardSettings({
     onSuccess: onChanged,
   });
 
+  // ── 부스가 갖춰지기 전에는 조각 보드를 꺼내지 않는다 ──
+  //
+  // 조각 수는 부스 수에서 나온다. 부스가 없거나 아직 만드는 중인데 후보를 먼저
+  // 보여주면, 운영자는 **근거가 없는 상태에서 고르게** 되고 부스를 더 만드는
+  // 순간 그 선택이 틀린 것이 된다. 그리고 그때 격자를 바꾸는 것은 되돌리는
+  // 일이 아니다 — 이미 모은 조각이 초기화된다.
+  //
+  // 그래서 고르라고 하기 전에 고를 근거부터 갖추게 한다.
+  const basisCount = Math.max(boothCount, missionCount);
+  if (basisCount < GRID_MIN_UNITS) {
+    return (
+      <div className="card state">
+        <p className="eyebrow">부스를 먼저 만드세요</p>
+        <p className="lede" style={{ textAlign: 'center' }}>
+          {boothCount === 0 ? (
+            <>
+              조각 보드는 <strong>부스 하나에 조각 하나</strong>로 만들어집니다. 부스가
+              몇 개인지 정해져야 몇 조각으로 나눌지 정할 수 있습니다.
+            </>
+          ) : (
+            <>
+              지금 부스가 <strong>{boothCount}개</strong>입니다. 조각 보드는{' '}
+              {GRID_MIN_UNITS}개부터 만들 수 있습니다.
+            </>
+          )}
+        </p>
+        <button className="btn btn--primary btn--lg" onClick={onGoToBooths}>
+          부스 만들러 가기
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="card stack" style={{ gap: 'var(--space-5)' }}>
       <div className="stack" style={{ gap: 4 }}>
         <p className="eyebrow">조각 보드</p>
         <h3 style={{ fontSize: 'var(--text-h3)' }}>관객이 모을 그림</h3>
         <p className="muted">{gridBasisHint(unitLabel, unitCount)}</p>
+        {/* 지금 고른 것이 나중에 틀려질 수 있다는 사실은, 고른 뒤가 아니라
+            고르기 전에 알아야 한다. 바꾸는 것이 공짜가 아니기 때문이다. */}
+        <p className="muted">
+          {unitLabel}를 더 만들 예정이면 <strong>그 뒤에 정하세요.</strong> 나중에 격자를
+          바꾸면 관객이 이미 모은 조각이 초기화됩니다.
+        </p>
       </div>
 
       {/* 보여주는 방식 — 구조가 아니라 표현이라 바꿔도 진행이 초기화되지 않는다.
