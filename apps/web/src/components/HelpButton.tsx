@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 
 import { Tour } from './Tour';
+import type { TourStep } from './Tour';
 import { TOURS, type TourId } from '../lib/tours';
 
 /** 주소에서 이 화면의 안내를 고른다. 끝 조각만 본다. */
@@ -55,14 +56,22 @@ export function HelpButton() {
   const { pathname } = useLocation();
   const id = tourFor(pathname);
   const [panel, setPanel] = useState(false);
-  const [tour, setTour] = useState(false);
+  //: 돌고 있는 안내. **화면이 바뀌어도 살아 있어야 한다** — 안내가 스스로 다음
+  //: 화면으로 데려가는데 그때 죽으면 한 걸음도 못 넘어간다. 그래서 «지금 화면의
+  //: 안내» 가 아니라 «시작할 때 집은 안내» 를 그대로 들고 간다.
+  const [tour, setTour] = useState<{ id: TourId; steps: TourStep[] } | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
 
-  // 화면이 바뀌면 닫는다. 처음 오는 화면에서는 패널만 스스로 열린다 —
-  // 구석에 뜨는 작은 것이라 하던 일을 막지 않는다.
+  // 화면이 바뀌면 패널을 닫는다. 처음 오는 화면에서는 스스로 열린다 — 구석에
+  // 뜨는 작은 것이라 하던 일을 막지 않는다.
+  //
+  // 안내가 도는 중에는 아무것도 하지 않는다. 안내가 데려간 화면에서 패널이
+  // 튀어나오면 안내를 가린다.
   useEffect(() => {
-    setTour(false);
+    if (tour) return;
     setPanel(id !== null && !wasSeen(id));
+    // 안내가 도는 동안에는 이 효과를 건너뛰므로 tour 를 의존성에 넣지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // 바깥을 누르거나 Esc 로 닫는다. 열어 둔 채로 다른 일을 하려는 사람을
@@ -83,22 +92,34 @@ export function HelpButton() {
     };
   }, [panel]);
 
-  if (!id) return null;
-  const help = TOURS[id];
+  // 안내가 도는 중에는 그 안내를 그린다. 화면이 바뀌어 이 화면에 안내가 없어도
+  // 마찬가지다 — 데려간 화면이 마침 안내가 없는 곳일 수 있다.
+  if (!id && !tour) return null;
+
+  /** 경로의 `{id}` 를 지금 보고 있는 축제 번호로 채운다. */
+  const withFestival = (steps: TourStep[]): TourStep[] => {
+    const fid = pathname.match(/\/festivals\/(\d+)/)?.[1];
+    return steps.map((s) =>
+      s.to && fid ? { ...s, to: s.to.replace('{id}', fid) } : { ...s, to: s.to },
+    );
+  };
+
+  const help = id ? TOURS[id] : null;
 
   const startTour = () => {
+    if (!id || !help) return;
     setPanel(false);
-    setTour(true);
+    setTour({ id, steps: withFestival(help.steps) });
   };
 
   const closeTour = () => {
-    setTour(false);
-    markSeen(id);
+    if (tour) markSeen(tour.id);
+    setTour(null);
   };
 
   return createPortal(
     <>
-      {!tour && (
+      {!tour && help && id && (
         <div className="helpdock" ref={wrap}>
           {panel && (
             <div className="helppanel" role="dialog" aria-label={`${help.label} 도움말`}>
@@ -136,7 +157,7 @@ export function HelpButton() {
         </div>
       )}
 
-      {tour && <Tour steps={help.steps} onClose={closeTour} />}
+      {tour && <Tour steps={tour.steps} onClose={closeTour} />}
     </>,
     document.body,
   );

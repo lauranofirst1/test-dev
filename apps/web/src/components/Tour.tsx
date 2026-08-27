@@ -17,10 +17,17 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export interface TourStep {
   /** 짚을 요소의 `data-tour` 값. 없으면 화면 가운데에 카드만 띄운다. */
   target?: string;
+  /** 이 단계가 사는 화면. 지금 화면과 다르면 **데려간다.**
+   *
+   * 옆 화면 이야기를 하면서 그 화면을 보여주지 않으면 설명이 반쪽이다. 말로만
+   * "리포트에 가면 이런 게 있습니다" 를 들은 사람은, 나중에 그 화면을 열었을 때
+   * 방금 들은 것과 눈앞의 것을 잇지 못한다. */
+  to?: string;
   title: string;
   body: React.ReactNode;
 }
@@ -82,7 +89,11 @@ export function Tour({
   //: **열 때 한 번만 정한다.** 매 렌더마다 다시 걸러내면 도중에 목록 길이가
   //: 바뀔 수 있고, 그러면 «3 / 5» 였던 표시가 갑자기 «3 / 4» 가 되거나 보던
   //: 단계가 통째로 건너뛰어진다.
-  const [live] = useState(() => steps.filter((s) => !s.target || rectOf(s.target)));
+  //: **다른 화면으로 데려가는 단계는 거르지 않는다.** 그 대상은 아직 이 화면에
+  //: 없는 것이 당연하다 — 여기서 걸러내면 화면을 넘나드는 안내가 통째로 사라진다.
+  const [live] = useState(() => steps.filter((s) => s.to || !s.target || rectOf(s.target)));
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [i, setI] = useState(0);
   const step = live[i];
   const [hole, setHole] = useState<Hole | null>(null);
@@ -99,23 +110,35 @@ export function Tour({
   // 재기만 하고 다시 그리지는 않는다.
   useLayoutEffect(() => {
     if (!step) return;
-    // 이미 보이는 것은 굳이 스크롤하지 않는다.
-    //
-    // 화면이 움직이는 **동시에** 구멍도 움직이면 두 움직임이 겹쳐서, 구멍이
-    // 대상을 뒤쫓는 것처럼 보인다. 대부분의 단계는 대상이 이미 화면 안에 있어
-    // 스크롤이 필요 없다 — 그때는 구멍만 미끄러지므로 눈이 따라가기 쉽다.
-    const el = step.target
-      ? document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`)
-      : null;
-    if (el) {
-      const r = el.getBoundingClientRect();
-      const margin = 80; // 상단 바에 가리는 만큼은 보이는 것으로 치지 않는다
-      const visible = r.top >= margin && r.bottom <= window.innerHeight - margin;
-      if (!visible) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // 다른 화면에 사는 단계면 데려간다. 화면이 뜨면 이 효과가 다시 돌면서
+    // 아래 측정이 시작된다.
+    if (step.to && step.to !== pathname) {
+      setHole(null);
+      navigate(step.to);
+      return;
     }
 
+    // 대상이 **나타날 때** 한 번만 스크롤한다. 화면을 막 옮겨 왔으면 데이터가
+    // 아직 안 와서 대상이 없을 수 있는데, 한 번 재고 마는 방식이면 구멍이 영영
+    // 안 생긴다. 매 프레임 찾다가 처음 보이는 순간에 맞춘다.
+    let scrolled = false;
     let current: Hole | null = null;
+
     const tick = () => {
+      const el = step.target
+        ? document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`)
+        : null;
+
+      // 이미 보이는 것은 굳이 스크롤하지 않는다. 화면이 움직이는 **동시에**
+      // 구멍도 움직이면 두 움직임이 겹쳐 구멍이 대상을 뒤쫓는 것처럼 보인다.
+      if (el && !scrolled) {
+        scrolled = true;
+        const r = el.getBoundingClientRect();
+        const margin = 80; // 상단 바에 가리는 만큼은 보이는 것으로 치지 않는다
+        const visible = r.top >= margin && r.bottom <= window.innerHeight - margin;
+        if (!visible) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+
       const next = rectOf(step.target);
       if (!same(current, next)) {
         current = next;
@@ -125,7 +148,7 @@ export function Tour({
     };
     raf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.current);
-  }, [step]);
+  }, [step, pathname, navigate]);
 
   const next = useCallback(() => {
     setI((n) => (n + 1 < live.length ? n + 1 : n));
