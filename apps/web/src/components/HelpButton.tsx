@@ -105,11 +105,13 @@ export function HelpButton() {
   };
 
   const help = id ? TOURS[id] : null;
+  //: «전체 둘러보기» 는 화면을 옮겨 다니므로 축제 번호가 있어야 한다.
+  const festivalId = pathname.match(/\/festivals\/(\d+)/)?.[1] ?? null;
 
-  const startTour = () => {
-    if (!id || !help) return;
+  /** 고른 안내를 시작한다. 전체 둘러보기와 이 화면 안내가 같은 길로 온다. */
+  const start = (which: TourId) => {
     setPanel(false);
-    setTour({ id, steps: withFestival(help.steps) });
+    setTour({ id: which, steps: withFestival(TOURS[which].steps) });
   };
 
   const closeTour = () => {
@@ -122,22 +124,42 @@ export function HelpButton() {
       {!tour && help && id && (
         <div className="helpdock" ref={wrap}>
           {panel && (
-            <div className="helppanel" role="dialog" aria-label={`${help.label} 도움말`}>
+            <div className="helppanel" role="dialog" aria-label="도움말">
               <p className="helppanel__eyebrow">도움말</p>
               <h2 className="helppanel__title">{help.label}</h2>
               <p className="helppanel__summary">{help.summary}</p>
 
-              {/* 무엇을 짚어 주는지 미리 보여준다. 시작하기 전에 "내가 궁금한
-                  것이 여기 있나" 를 알 수 있어야 시작할지 정할 수 있다. */}
-              <ul className="helppanel__list">
-                {help.steps.map((s, n) => (
-                  <li key={n}>{s.title}</li>
-                ))}
-              </ul>
+              {/* ── 두 갈래로 나눈다 ──
+                  «처음이라 전체가 궁금한 사람» 과 «이 화면에서 막힌 사람» 은
+                  다른 것을 찾는다. 하나로 묶으면 앞사람은 이 화면 얘기만 듣고
+                  전체를 못 보고, 뒷사람은 관심 없는 다른 화면까지 끌려간다. */}
+              <div className="helppanel__opts">
+                {/* 축제 밖(워크스페이스)에서는 데려갈 축제가 없다. */}
+                {festivalId && (
+                  <button type="button" className="helpopt" onClick={() => start('overview')}>
+                    <span className="helpopt__name">
+                      전체 둘러보기
+                      <b className="tabular">{TOURS.overview.steps.length}단계</b>
+                    </span>
+                    <span className="helpopt__note">
+                      준비 순서를 화면을 옮겨 가며 한 바퀴 돕니다. 처음이라면 여기부터.
+                    </span>
+                  </button>
+                )}
 
-              <button type="button" className="btn btn--primary" onClick={startTour}>
-                튜토리얼 보기
-              </button>
+                {/* 지금 화면이 곧 전체 안내인 자리에서는 같은 것을 두 번 내밀지 않는다. */}
+                {id !== 'overview' && (
+                  <button type="button" className="helpopt" onClick={() => start(id)}>
+                    <span className="helpopt__name">
+                      이 화면 안내
+                      <b className="tabular">{help.steps.length}단계</b>
+                    </span>
+                    <span className="helpopt__note">
+                      «{help.label}» 화면의 구성 요소를 하나씩 짚습니다.
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

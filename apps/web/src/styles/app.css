@@ -3626,34 +3626,62 @@ fieldset.field legend {
   line-height: 1.6;
 }
 
-/* 무엇을 짚어 주는지 미리 보여준다. 시작하기 전에 "내가 궁금한 것이 여기
-   있나" 를 알 수 있어야 시작할지 정할 수 있다. */
-.helppanel__list {
+/* 두 갈래. 처음이라 전체가 궁금한 사람과 이 화면에서 막힌 사람은 다른 것을
+   찾는다. 하나로 묶으면 앞사람은 이 화면 얘기만 듣고 전체를 못 본다. */
+.helppanel__opts {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: var(--space-2) 0;
-  padding: 0;
-  list-style: none;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.helpopt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.helpopt:hover {
+  background: var(--color-surface-sunk);
+  border-color: var(--color-ink);
+}
+
+/* 첫 갈래가 기본이다. 처음 오는 사람이 대부분이고, 고민 없이 누를 것 하나는
+   있어야 한다. */
+.helpopt:first-child {
+  border-color: var(--color-act-ink);
+}
+
+.helpopt__name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
   font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink);
+}
+
+/* 몇 걸음짜리인지 미리 알면 지금 시작할지 정할 수 있다. */
+.helpopt__name b {
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-mute);
+}
+
+.helpopt__note {
+  font-size: var(--text-label);
   color: var(--color-ink-mute);
   line-height: 1.5;
-}
-
-.helppanel__list li {
-  position: relative;
-  padding-left: 14px;
-}
-
-.helppanel__list li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-line-strong);
 }
 
 @media (max-width: 720px) {
