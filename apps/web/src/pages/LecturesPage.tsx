@@ -96,7 +96,11 @@ export function LecturesPage() {
               강의 중 예고 없이 체크인을 열면 그때 자리에 있는 사람만 찍을 수 있습니다.
             </p>
           </div>
-          <button className="btn btn--primary btn--lg" onClick={() => setAdding((v) => !v)}>
+          <button
+            className="btn btn--primary btn--lg"
+            data-tour="lecture-new"
+            onClick={() => setAdding((v) => !v)}
+          >
             {adding ? '닫기' : '＋ 특강 추가'}
           </button>
         </div>

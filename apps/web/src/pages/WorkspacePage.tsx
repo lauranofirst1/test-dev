@@ -23,7 +23,7 @@ export function WorkspacePage() {
           <p className="eyebrow">내 축제</p>
           <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>축제</h1>
         </div>
-        <Link to="/festivals/new" className="btn btn--primary btn--lg">
+        <Link to="/festivals/new" className="btn btn--primary btn--lg" data-tour="ws-new">
           ＋ 새 축제
         </Link>
       </div>

@@ -163,7 +163,7 @@ export function ReportPage() {
 
           {/* ── 목표 대비 ── */}
           <section className="card stack" style={{ gap: 'var(--space-4)' }}>
-            <h2 className="section">목표 대비 실제</h2>
+            <h2 className="section" data-tour="report-kpi">목표 대비 실제</h2>
 
             {d.kpi.length === 0 ? (
               <p className="muted">아직 성과 목표를 세우지 않았습니다.</p>

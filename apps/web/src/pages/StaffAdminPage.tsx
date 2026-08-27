@@ -105,7 +105,7 @@ export function StaffAdminPage() {
           if (ready && !issue.isPending) issue.mutate();
         }}
       >
-        <p className="eyebrow">스태프 발급</p>
+        <p className="eyebrow" data-tour="staff-issue">스태프 발급</p>
 
         <div className="field">
           <label htmlFor="staff-name">

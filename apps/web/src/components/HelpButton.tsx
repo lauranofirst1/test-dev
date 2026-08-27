@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 
 import { Tour } from './Tour';
@@ -15,9 +16,14 @@ import { TOURS, type TourId } from '../lib/tours';
 
 /** 주소에서 이 화면의 안내를 고른다. 끝 조각만 본다. */
 function tourFor(pathname: string): TourId | null {
+  if (pathname === '/') return 'workspace';
   if (/\/festivals\/\d+\/booths$/.test(pathname)) return 'booths';
   if (/\/festivals\/\d+\/diagnosis$/.test(pathname)) return 'diagnosis';
   if (/\/festivals\/\d+\/dashboard$/.test(pathname)) return 'dashboard';
+  if (/\/festivals\/\d+\/report$/.test(pathname)) return 'report';
+  if (/\/festivals\/\d+\/lectures$/.test(pathname)) return 'lectures';
+  if (/\/festivals\/\d+\/exhibits$/.test(pathname)) return 'exhibits';
+  if (/\/festivals\/\d+\/staff$/.test(pathname)) return 'staff';
   if (/\/festivals\/\d+$/.test(pathname)) return 'overview';
   return null;
 }
@@ -62,24 +68,36 @@ export function HelpButton() {
     markSeen(id);
   };
 
-  return (
+  // ── 떠 있는 단추 ──
+  //
+  // 상단 바에 두었더니 다른 아이콘들 사이에 섞여 눈에 띄지 않았고, 화면을
+  // 내리면 같이 사라졌습니다. 안내는 **막혔을 때** 찾는 것이라, 막힌 그 자리에서
+  // 손이 닿아야 합니다. 오른쪽 아래는 엄지가 가장 쉽게 닿는 자리이기도 합니다.
+  //
+  // body 로 내보냅니다 — 상단 바 안에서 그리면 그 쌓임 맥락에 갇혀 본문 위로
+  // 올라오지 못하는 일이 생깁니다.
+  return createPortal(
     <>
-      <button
-        type="button"
-        className="iconbtn"
-        onClick={() => {
-          setOffer(false);
-          setOpen(true);
-        }}
-        aria-label={`${TOURS[id].label} 안내 보기`}
-        title={`${TOURS[id].label} 안내`}
-      >
-        ?
-      </button>
+      {!open && (
+        <button
+          type="button"
+          className="helpfab"
+          onClick={() => {
+            setOffer(false);
+            setOpen(true);
+          }}
+          aria-label={`${TOURS[id].label} 안내 보기`}
+          title={`${TOURS[id].label} 안내`}
+        >
+          ?
+        </button>
+      )}
 
       {offer && !open && (
         <div className="helpoffer" role="status">
-          <span>처음이신가요? {TOURS[id].label}을 짚어 드립니다.</span>
+          <span>
+            처음이신가요? <strong>{TOURS[id].label}</strong>을 짚어 드립니다.
+          </span>
           <button
             type="button"
             className="btn btn--primary"
@@ -102,6 +120,7 @@ export function HelpButton() {
       )}
 
       {open && <Tour steps={TOURS[id].steps} onClose={close} />}
-    </>
+    </>,
+    document.body,
   );
 }

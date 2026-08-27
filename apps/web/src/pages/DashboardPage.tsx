@@ -190,7 +190,9 @@ export function DashboardPage() {
           </div>
 
           {/* 공지는 캠페인보다 위에 둔다 — 무언가 잘못됐을 때 먼저 찾는 것이다. */}
-          <AnnouncementAdmin festivalId={id} />
+          <div data-tour="dash-announce">
+            <AnnouncementAdmin festivalId={id} />
+          </div>
 
           <div data-tour="dash-campaign">
           <CampaignPanel

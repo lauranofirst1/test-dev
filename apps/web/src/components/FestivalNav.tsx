@@ -134,6 +134,7 @@ function groupsFor(id: string): Group[] {
         {
           to: `/festivals/${id}/staff`,
           label: '스태프',
+          tour: 'nav-staff',
           icon: '⚿',
           hint: '부스 담당자와 심사위원을 발급합니다',
         },

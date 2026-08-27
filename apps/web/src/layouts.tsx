@@ -150,12 +150,13 @@ export function PlannerLayout() {
           {/* 레일에서 뺀 현장 화면들이 여기로 온다. 축제가 정해지지 않았으면
               열 현장 화면도 없다. */}
           {id && <FieldScreensMenu festivalId={id} />}
-          {/* 이 화면에 안내가 있을 때만 나온다. 눌러서 "준비 중" 을 보는 것은
-              없느니만 못하다. */}
-          <HelpButton />
           <AccountMenu />
         </div>
       </header>
+
+      {/* 이 화면에 안내가 있을 때만 나온다. 눌러서 "준비 중" 을 보는 것은
+          없느니만 못하다. 스스로 body 로 포털해 오른쪽 아래에 떠 있는다. */}
+      <HelpButton />
 
       <div className="app__body">
         {id && (

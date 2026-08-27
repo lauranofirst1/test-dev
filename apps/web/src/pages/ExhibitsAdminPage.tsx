@@ -356,7 +356,7 @@ function Criteria({
   return (
     <div className="card stack" style={{ gap: 'var(--space-4)' }}>
       <div className="stack" style={{ gap: 4 }}>
-        <p className="eyebrow">심사 항목</p>
+        <p className="eyebrow" data-tour="exhibit-criteria">심사 항목</p>
         <p className="muted">
           심사위원이 이 항목마다 점수를 매깁니다. 가중치는 상대값이라 합이 100 일 필요가
           없습니다 — 항목 하나를 빼도 계산이 성립합니다.
@@ -494,7 +494,7 @@ function Results({
   return (
     <div className="card stack" style={{ gap: 'var(--space-5)' }}>
       <div className="stack" style={{ gap: 4 }}>
-        <p className="eyebrow">시상 집계</p>
+        <p className="eyebrow" data-tour="exhibit-award">시상 집계</p>
         <p className="muted">
           최종 = 심사위원 {results.judge_weight_percent}% + 관객{' '}
           {results.audience_weight_percent}%. 관객 점수는 최다 득표를 100 으로 두고 환산합니다.
