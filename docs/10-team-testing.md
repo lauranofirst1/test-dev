@@ -131,6 +131,12 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 > 단, **로그아웃은 두 세션을 함께 지웁니다.** 공용 태블릿에서 한쪽만 남으면
 > "로그아웃했는데 들어가진다" 가 되기 때문입니다.
 
+> **부스 지급 화면의 카메라 스캔은 아이폰에서도 됩니다.** 사파리에는 브라우저
+> 내장 QR 인식(`BarcodeDetector`)이 없어서, 없는 브라우저에서만 디코더를 그때
+> 내려받습니다(gzip 47KB · 관객 화면은 받지 않습니다). 첫 스캔이 한 박자 늦게
+> 잡히면 그건 파일을 받는 중입니다. **어느 경우에도 코드 직접 입력이 함께 있습니다** —
+> 스캔이 안 되는 것은 버그지만, 스캔이 안 돼서 부스가 멈추는 것은 설계 실패입니다.
+
 부스에 띄우는 회전 QR: `/festivals/:id/booths/:boothId/qr`
 강의실 스크린(체크인 QR): `/festivals/:id/lectures/:sessionId/checkin/:checkpointId`
 
