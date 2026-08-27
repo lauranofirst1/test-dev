@@ -265,6 +265,54 @@ def grant_unit_count(db: Session, festival_id: int, board: StampBoard) -> int:
     return db.execute(stmt).scalar_one()
 
 
+def autofit_board(db: Session, festival_id: int) -> StampBoard | None:
+    """지급 단위 수가 바뀌었으니 격자를 다시 맞춘다. 바꿨으면 보드를 돌려준다.
+
+    조각 수는 부스 수에서 나옵니다. 기획 단계에 한 번 골라 굳혀 두면 부스를 더
+    만들었을 때 조각을 못 받는 부스가 생기고, 뒤늦게 고치면 이미 모은 조각이
+    초기화됩니다. 그래서 부스를 만들고 지울 때마다 서버가 따라 맞춥니다.
+
+    **두 가지 경우에는 손대지 않습니다.**
+
+    1. 운영자가 후보를 직접 골랐을 때(`grid_auto = False`). 부스 8개에 6조각처럼
+       일부러 고른 구성이 있고, 그것을 서버가 되돌리면 고른 의미가 없습니다.
+    2. **누군가 이미 조각을 모았을 때.** 격자를 바꾸는 것은 타일 집합을 바꾸는
+       일이라 그 순간 진행이 초기화됩니다. 그건 확인을 받고 할 일이지 부스를
+       하나 추가했다고 조용히 벌어질 일이 아닙니다.
+
+    맞출 격자가 없으면(단위가 4개 미만) 그대로 둡니다 — 지울 격자가 아니라
+    아직 정할 수 없는 상태입니다.
+    """
+    board = get_board(db, festival_id)
+    if not board.grid_auto:
+        return None
+
+    options = grid_options(grant_unit_count(db, festival_id, board))
+    if not options:
+        return None
+
+    best = options[0]
+    if (best.rows, best.cols) == (board.rows, board.cols):
+        return None
+
+    revealed = db.execute(
+        select(func.count(StampReveal.id)).where(
+            StampReveal.board_id == board.id,
+            StampReveal.board_version == board.version,
+        )
+    ).scalar_one()
+    if revealed:
+        return None
+
+    board.rows = best.rows
+    board.cols = best.cols
+    board.version += 1
+    for idx in range(board.total_tiles):
+        db.add(StampTile(board_id=board.id, board_version=board.version, tile_index=idx))
+    db.flush()
+    return board
+
+
 def uncompletable_warning(db: Session, festival_id: int, board: StampBoard) -> dict | None:
     """`rows*cols > 지급 단위 수` 면 완성이 불가능하다 — 데이터모델 C2.
 

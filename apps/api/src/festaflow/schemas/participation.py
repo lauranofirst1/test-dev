@@ -145,6 +145,8 @@ class StampBoardOut(BaseModel):
     grant_unit: GrantUnit
     #: 표현만 정한다 — 바꿔도 진행이 초기화되지 않는다.
     board_style: BoardStyle = BoardStyle.GRID
+    #: 격자가 부스(또는 미션) 수를 계속 따라가는가. 직접 고르면 거짓이 된다.
+    grid_auto: bool = True
     image_url: str
     complete_message: str
     tiles: list[BoardTile]
@@ -158,6 +160,9 @@ class StampBoardUpdate(BaseModel):
     grant_unit: GrantUnit
     #: 구조가 아니라 표현이므로 STRUCTURAL 에 넣지 않는다 — 버전을 올리지 않는다.
     board_style: BoardStyle = BoardStyle.GRID
+    #: 비우면 "직접 골랐다" 로 본다 — 구조를 바꾸는 요청이면 자동이 꺼진다.
+    #: 참을 보내면 자동으로 되돌리고 그 자리에서 부스 수에 맞춘다.
+    grid_auto: bool | None = None
     image_url: str = Field(min_length=1)
     complete_message: str = Field(min_length=1)
 

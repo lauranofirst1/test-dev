@@ -175,6 +175,17 @@ def update_stamp_board(
         board.reveal_mode = payload.reveal_mode
         board.grant_unit = payload.grant_unit
         board.version += 1
+        # 직접 골랐으니 이제부터 서버가 되돌리지 않는다. 부스 8개에 6조각처럼
+        # 일부러 고른 구성이 있고, 그것을 자동 맞춤이 덮으면 고른 의미가 없다.
+        # `grid_auto` 를 본문으로 받으면 자동으로 돌아갈 수 있다.
+        if payload.grid_auto is None:
+            board.grid_auto = False
+
+    if payload.grid_auto is not None:
+        board.grid_auto = payload.grid_auto
+        if payload.grid_auto:
+            # 자동으로 되돌리는 순간 지금 부스 수에 맞춘다.
+            svc.autofit_board(db, festival_id)
         for idx in range(board.total_tiles):
             db.add(StampTile(board_id=board.id, board_version=board.version, tile_index=idx))
         # 기존 stamp_reveals 는 지우지 않는다. 이전 버전 기록으로 남는다.

@@ -797,6 +797,11 @@ function BoardSettings({
   onGoToBooths: () => void;
 }) {
   const [grid, setGrid] = useState<Grid>({ rows: board.rows, cols: board.cols });
+  //: 부스 수를 계속 따라갈 것인가. 후보를 직접 고르는 순간 꺼진다.
+  const [gridAuto, setGridAuto] = useState(board.grid_auto);
+  //: 자동인데도 후보를 펼쳐 볼 것인가. 평소에는 접어 둔다 — 이미 맞춰져 있는
+  //: 것을 다시 고르라고 내밀면 정해야 할 일이 있는 것처럼 보인다.
+  const [picking, setPicking] = useState(false);
   const [grantUnit, setGrantUnit] = useState<GrantUnit>(board.grant_unit);
   const [style, setStyle] = useState<BoardStyle>(board.board_style);
   const [confirming, setConfirming] = useState<{ participants: number; revealed: number } | null>(
@@ -823,7 +828,14 @@ function BoardSettings({
     grid.rows !== board.rows ||
     grid.cols !== board.cols ||
     grantUnit !== board.grant_unit ||
-    style !== board.board_style;
+    style !== board.board_style ||
+    gridAuto !== board.grid_auto;
+
+  /** 후보를 직접 고르면 그 순간부터 서버가 되돌리지 않는다. */
+  const pickGrid = (g: Grid) => {
+    setGrid(g);
+    setGridAuto(false);
+  };
 
   const save = useMutation({
     mutationFn: (confirm: boolean) =>
@@ -835,6 +847,7 @@ function BoardSettings({
           reveal_mode: board.reveal_mode,
           grant_unit: grantUnit,
           board_style: style,
+          grid_auto: gridAuto,
           image_url: board.image_url,
           complete_message: board.complete_message,
         },
@@ -901,12 +914,14 @@ function BoardSettings({
         <p className="eyebrow">조각 보드</p>
         <h3 style={{ fontSize: 'var(--text-h3)' }}>관객이 모을 그림</h3>
         <p className="muted">{gridBasisHint(unitLabel, unitCount)}</p>
-        {/* 지금 고른 것이 나중에 틀려질 수 있다는 사실은, 고른 뒤가 아니라
-            고르기 전에 알아야 한다. 바꾸는 것이 공짜가 아니기 때문이다. */}
-        <p className="muted">
-          {unitLabel}를 더 만들 예정이면 <strong>그 뒤에 정하세요.</strong> 나중에 격자를
-          바꾸면 관객이 이미 모은 조각이 초기화됩니다.
-        </p>
+        {/* 직접 고른 경우에만 남는 경고다. 자동이면 서버가 따라 맞추므로
+            "나중에 정하라" 고 할 일 자체가 없다. */}
+        {!gridAuto && (
+          <p className="muted">
+            직접 고른 격자는 {unitLabel}를 더 만들어도 <strong>따라 바뀌지 않습니다.</strong>{' '}
+            나중에 바꾸면 관객이 이미 모은 조각이 초기화됩니다.
+          </p>
+        )}
       </div>
 
       {/* 보여주는 방식 — 구조가 아니라 표현이라 바꿔도 진행이 초기화되지 않는다.
@@ -984,8 +999,38 @@ function BoardSettings({
       {/* 격자 후보 */}
       <div className="stack" style={{ gap: 'var(--space-3)' }}>
         <p className="eyebrow">
-          {style === 'trail' ? '몇 곳을 돌지 고르세요' : '몇 조각으로 나눌지 고르세요'}
+          {gridAuto
+            ? '몇 조각인가'
+            : style === 'trail'
+              ? '몇 곳을 돌지 고르세요'
+              : '몇 조각으로 나눌지 고르세요'}
         </p>
+
+        {/* ── 자동일 때는 고르라고 하지 않는다 ──
+            조각 수는 부스 수에서 나온다. 이미 맞춰져 있는 것을 다시 고르라고
+            내밀면, 정해야 할 일이 남은 것처럼 보이고 기획 단계에서 굳혀 버린다.
+            결과를 말하고, 바꾸고 싶은 사람에게만 후보를 편다. */}
+        {gridAuto && (
+          <div className="autofit">
+            <p className="autofit__now">
+              {unitLabel} <b className="tabular">{unitCount}개</b>에 맞춰{' '}
+              <b className="tabular">
+                {board.total_tiles}
+                {style === 'trail' ? '곳' : '조각'}
+              </b>
+              {style === 'trail' ? '' : ` · ${board.rows}×${board.cols}`}
+            </p>
+            <p className="autofit__how">
+              {unitLabel}를 만들고 지울 때마다 <strong>서버가 다시 맞춥니다.</strong> 지금
+              정해 둘 필요가 없습니다 — 다 만든 뒤의 수가 그대로 조각 수가 됩니다.
+            </p>
+            {!picking && (
+              <button type="button" className="btn btn--ghost" onClick={() => setPicking(true)}>
+                직접 고르기
+              </button>
+            )}
+          </div>
+        )}
 
         {/* 이 사실은 후보 카드마다 회색 잔글씨로만 적혀 있었다. 정작 고르기
             전에 알아야 하는 것이고, 알면 부스 수를 조정하는 선택지가 생긴다. */}
@@ -1000,10 +1045,11 @@ function BoardSettings({
             </span>
           </div>
         )}
+        {(!gridAuto || picking) && (
         <GridPlanPicker
           options={options}
           value={grid}
-          onChange={setGrid}
+          onChange={pickGrid}
           // 지도 모드에서는 그림을 넘기지 않는다. 미리보기가 화면에 나오지도 않을
           // 그림을 잘라 보여주면, 방금 "그림은 쓰지 않는다"고 한 말과 어긋난다.
           imageUrl={style === 'trail' ? undefined : board.image_url}
@@ -1011,6 +1057,23 @@ function BoardSettings({
           unitLabel={unitLabel}
           unitCount={unitCount}
         />
+        )}
+
+        {/* 직접 고른 뒤에도 되돌아갈 길을 남긴다. 한 번 고르면 영영 손으로
+            관리해야 하는 것은 아니다. */}
+        {!gridAuto && (
+          <button
+            type="button"
+            className="btn btn--ghost"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => {
+              setGridAuto(true);
+              setPicking(false);
+            }}
+          >
+            {unitLabel} 수에 맞춰 자동으로 되돌리기
+          </button>
+        )}
       </div>
 
       <div className="field">

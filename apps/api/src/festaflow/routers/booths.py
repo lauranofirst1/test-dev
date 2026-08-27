@@ -174,6 +174,9 @@ def create_booth(
         db.add(mission)
         db.flush()
 
+    # 부스가 하나 늘었다. 조각 보드가 부스 수를 따라간다 — 서비스 §조각 보드.
+    svc.autofit_board(db, festival_id)
+
     db.commit()
     db.refresh(booth)
     if mission is not None:
@@ -233,6 +236,11 @@ def archive_booth(festival_id: int, booth_id: int, db: DbSession, org: CurrentOr
         select(StampTile).where(StampTile.assigned_booth_id == booth.id)
     ).scalars():
         tile.assigned_booth_id = None
+
+    # 부스가 하나 줄었다. 줄어든 쪽이 더 급하다 — 조각 수가 부스 수보다 많으면
+    # 아무도 완성할 수 없다.
+    svc.autofit_board(db, festival_id)
+
     db.commit()
 
 
@@ -276,6 +284,9 @@ def create_mission(
 
     mission = Mission(festival_id=festival.id, **_validated_mission_fields(payload))
     db.add(mission)
+    db.flush()
+    # 지급 기준이 미션이면 이쪽 수가 조각 수의 근거다.
+    svc.autofit_board(db, festival_id)
     db.commit()
     db.refresh(mission)
     return MissionOut.model_validate(mission)
@@ -318,6 +329,8 @@ def archive_mission(festival_id: int, mission_id: int, db: DbSession, org: Curre
         raise not_found("미션")
     mission.archived_at = datetime.now(UTC)
     mission.is_active = False
+    # 지급 기준이 미션이면 이쪽 수가 조각 수의 근거다.
+    svc.autofit_board(db, festival_id)
     db.commit()
 
 

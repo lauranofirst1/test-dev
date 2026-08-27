@@ -11,6 +11,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     Enum,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -58,6 +60,16 @@ class StampBoard(Base):
     grant_unit: Mapped[GrantUnit] = mapped_column(
         _pg_enum(GrantUnit, "grant_unit"), nullable=False, server_default=GrantUnit.BOOTH.value
     )
+
+    #: 격자를 부스(또는 미션) 수에 맞춰 서버가 계속 다시 맞출 것인가.
+    #:
+    #: 조각 수는 부스 수에서 나온다. 기획 단계에서 한 번 골라 굳혀 두면 부스를
+    #: 더 만들었을 때 조각을 못 받는 부스가 생기고, 뒤늦게 고치면 이미 모은
+    #: 조각이 초기화된다. 그래서 **기본은 따라가는 쪽**이다.
+    #:
+    #: 운영자가 후보를 직접 고르면 거짓이 되고, 그 뒤로는 그 선택을 지킨다 —
+    #: 부스 8개에 6조각처럼 일부러 고른 구성이 있기 때문이다.
+    grid_auto: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
 
     #: 표현만 정한다. 바꿔도 타일과 공개 기록은 그대로라 진행이 초기화되지 않는다.
     board_style: Mapped[BoardStyle] = mapped_column(

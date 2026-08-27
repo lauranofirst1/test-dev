@@ -416,6 +416,8 @@ export interface StampBoardAdmin {
   reveal_mode: RevealMode;
   grant_unit: GrantUnit;
   board_style: BoardStyle;
+  /** 격자가 부스(또는 미션) 수를 계속 따라가는가. 직접 고르면 거짓이 됩니다. */
+  grid_auto: boolean;
   image_url: string;
   complete_message: string;
   tiles: BoardTile[];

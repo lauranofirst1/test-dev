@@ -1047,6 +1047,31 @@ p {
    격자 비율대로 두면 2×3 은 납작하고 2×2 는 정사각이라, 넓은 쪽 카드만
    아래가 한 뼘 비고 두 카드의 설명이 서로 다른 높이에 놓인다. 자리를 고정하고
    그 안에서 각자 제 비율을 지킨다 — 여기서 고르는 것은 모양이 아니라 조각 수다. */
+/* 부스 수를 따라간다는 사실을 결과로 말하는 자리.
+   고르라고 내미는 것이 아니라 이미 맞춰진 것을 보여준다. */
+.autofit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunk);
+  border: 1px solid var(--color-line);
+}
+
+.autofit__now {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-bold);
+}
+
+.autofit__how {
+  font-size: var(--text-sm);
+  color: var(--color-ink-mute);
+  line-height: 1.55;
+  max-inline-size: 64ch;
+}
+
 /* 후보 중 하나를 권할 때. 고르는 것을 막지 않는다 — 권하는 것뿐이다. */
 .exptype__rec {
   margin-left: 6px;
