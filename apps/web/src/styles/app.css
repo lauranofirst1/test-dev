@@ -3386,6 +3386,7 @@ fieldset.field legend {
    조각들이 따로 놀아서, 눈이 따라가야 할 대상이 흩어진다. */
 .tour__hole {
   position: fixed;
+  /* 실제 값은 대상의 모서리에서 가져와 인라인으로 온다. 여기 값은 첫 프레임용. */
   border-radius: var(--radius-lg);
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 62%);
   /* 짚는 자리가 **움직여서** 다음 자리로 간다. 카드만 툭툭 바뀌면 방금 무엇을
@@ -3395,7 +3396,8 @@ fieldset.field legend {
     top var(--duration-slow) var(--ease-out),
     left var(--duration-slow) var(--ease-out),
     width var(--duration-slow) var(--ease-out),
-    height var(--duration-slow) var(--ease-out);
+    height var(--duration-slow) var(--ease-out),
+    border-radius var(--duration-slow) var(--ease-out);
   /* 구멍 안은 그대로 보이고 눌리지도 않는다 — 안내 중에 실수로 눌러
      화면이 바뀌면 설명하던 자리가 사라진다. */
   pointer-events: none;

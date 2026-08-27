@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface TourStep {
   /** 짚을 요소의 `data-tour` 값. 없으면 화면 가운데에 카드만 띄운다. */
@@ -29,6 +30,19 @@ interface Hole {
   left: number;
   width: number;
   height: number;
+  /** 대상의 모서리 반경. 네모난 구멍으로 둥근 버튼을 덮으면 모서리가 삐져나온다. */
+  radius: number;
+}
+
+function same(a: Hole | null, b: Hole | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    Math.abs(a.top - b.top) < 0.5 &&
+    Math.abs(a.left - b.left) < 0.5 &&
+    Math.abs(a.width - b.width) < 0.5 &&
+    Math.abs(a.height - b.height) < 0.5 &&
+    a.radius === b.radius
+  );
 }
 
 /** 구멍 둘레에 두는 여백. 요소에 딱 맞추면 잘린 것처럼 보인다. */
@@ -43,11 +57,13 @@ function rectOf(target: string | undefined): Hole | null {
   if (!el) return null;
   const r = el.getBoundingClientRect();
   if (r.width === 0 && r.height === 0) return null;
+  const corner = Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
   return {
     top: r.top - PAD,
     left: r.left - PAD,
     width: r.width + PAD * 2,
     height: r.height + PAD * 2,
+    radius: corner + PAD,
   };
 }
 
@@ -70,36 +86,44 @@ export function Tour({
   const [hole, setHole] = useState<Hole | null>(null);
   const raf = useRef(0);
 
-  const measure = useCallback(() => {
-    setHole(rectOf(step?.target));
-  }, [step?.target]);
-
-  // 대상으로 스크롤한 뒤, 스크롤이 멎을 때까지 계속 다시 잰다. 한 번만 재면
-  // 부드러운 스크롤이 끝나기 전의 좌표에 구멍이 남는다.
+  // 대상으로 스크롤하고, **안내가 열려 있는 내내** 다시 잰다.
+  //
+  // 처음에는 스크롤이 끝날 무렵까지만 쟀는데, 부드러운 스크롤이 그보다 오래
+  // 걸리는 긴 화면에서는 구멍이 중간 좌표에 멈춰 대상과 어긋났다. 스크롤·리사이즈
+  // 이벤트만 듣는 것도 부족하다 — 늦게 온 이미지나 폰트 때문에 레이아웃이
+  // 밀리는 것은 어느 이벤트로도 오지 않는다.
+  //
+  // 값이 실제로 달라졌을 때만 상태를 바꾸므로, 가만히 있을 때는 매 프레임
+  // 재기만 하고 다시 그리지는 않는다.
   useLayoutEffect(() => {
     if (!step) return;
+    // 이미 보이는 것은 굳이 스크롤하지 않는다.
+    //
+    // 화면이 움직이는 **동시에** 구멍도 움직이면 두 움직임이 겹쳐서, 구멍이
+    // 대상을 뒤쫓는 것처럼 보인다. 대부분의 단계는 대상이 이미 화면 안에 있어
+    // 스크롤이 필요 없다 — 그때는 구멍만 미끄러지므로 눈이 따라가기 쉽다.
     const el = step.target
       ? document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`)
       : null;
-    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const margin = 80; // 상단 바에 가리는 만큼은 보이는 것으로 치지 않는다
+      const visible = r.top >= margin && r.bottom <= window.innerHeight - margin;
+      if (!visible) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
 
-    const until = Date.now() + 800;
+    let current: Hole | null = null;
     const tick = () => {
-      measure();
-      if (Date.now() < until) raf.current = requestAnimationFrame(tick);
+      const next = rectOf(step.target);
+      if (!same(current, next)) {
+        current = next;
+        setHole(next);
+      }
+      raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.current);
-  }, [step, measure]);
-
-  useEffect(() => {
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, true);
-    return () => {
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, true);
-    };
-  }, [measure]);
+  }, [step]);
 
   const next = useCallback(() => {
     setI((n) => (n + 1 < live.length ? n + 1 : n));
@@ -136,7 +160,16 @@ export function Tour({
       }
     : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
 
-  return (
+  // ── body 로 내보낸다 ──
+  //
+  // 이 컴포넌트는 상단 바 안에서 렌더된다. 상단 바는 `position: sticky` 에
+  // `z-index` 를 갖고 있어 **쌓임 맥락**을 만들고, 그 안의 `z-index` 는 바깥과
+  // 겨루지 못한다. 조상 어딘가에 `transform` 이 생기면 `position: fixed` 의
+  // 기준이 화면이 아니라 그 조상이 되어 구멍이 통째로 밀리기도 한다.
+  //
+  // 어느 쪽도 이 파일을 고쳐서 막을 수 없다 — 남의 화면 CSS 가 바뀌면 그만이다.
+  // body 로 내보내면 조상이 무엇이든 상관없어진다.
+  return createPortal(
     <div className="tour" role="dialog" aria-modal="true" aria-label="화면 안내">
       {/* 구멍. 바깥을 어둡게 하는 것은 그림자 하나가 다 한다 — 네 조각으로
           나눠 덮으면 이동할 때 조각들이 따로 논다. */}
@@ -148,6 +181,7 @@ export function Tour({
             left: hole.left,
             width: hole.width,
             height: hole.height,
+            borderRadius: hole.radius,
           }}
         />
       )}
@@ -178,6 +212,7 @@ export function Tour({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
