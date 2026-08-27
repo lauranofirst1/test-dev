@@ -148,9 +148,19 @@ nano .env
 | 값 | 무엇을 넣나 |
 |---|---|
 | `SITE_ADDRESS` | `festaflow.duckdns.org` — **`http://` 를 붙이지 마세요.** 도메인만 |
+| `PUBLIC_WEB_ORIGIN` | `https://festaflow.duckdns.org` — 이쪽은 `https://` 를 **붙입니다** |
 | `POSTGRES_PASSWORD` | `openssl rand -base64 24` 결과 |
 | `JWT_SECRET` | `openssl rand -hex 32` 결과. **개발 기본값이면 서버가 뜨지 않습니다** |
 | `KTO_API_KEY` | 공공데이터포털 **Decoding 키** |
+
+> 🔒 **`PUBLIC_WEB_ORIGIN` 을 왜 따로 받나** — 서버가 스스로 만들어 내보내는
+> 절대 주소, 특히 **비밀번호 재설정 링크**의 근거입니다. 비워 두면 요청의
+> `Host` 헤더에서 가져오는데, 그러면 Host 를 바꿔 보낼 수 있는 구성에서 남의
+> 재설정 링크를 공격자 도메인으로 보낼 수 있습니다. 빠뜨리면 아예 뜨지 않게
+> 해 두었습니다.
+>
+> `SITE_ADDRESS` 에 도메인 대신 `:80` 을 넣으면 Caddy 가 **아무 Host 나 받습니다.**
+> 시험 삼아 띄울 때만 쓰고, 실제로 열어 둘 서버에는 도메인을 넣으세요.
 
 `CORS_ORIGINS` 는 손대지 않아도 됩니다 — 화면과 API 가 같은 주소를 쓰므로
 브라우저가 CORS 를 따지지 않습니다.
@@ -201,6 +211,12 @@ docker compose exec api python scripts/seed_test_account.py
 > ([docs/08-contest-submission.md](08-contest-submission.md) §2.2). 지금 시드
 > 스크립트는 `test@test.com` 을 고정으로 만듭니다. 제출 전에 심사용 계정을
 > 만드는 방법이 필요합니다.
+
+> 🔒 **이 계정의 비밀번호는 저장소에 적혀 있습니다.** 즉 주소를 아는 누구나
+> 로그인할 수 있는 공개 계정입니다. 심사용으로는 그게 목적이라 괜찮지만,
+> **11월 실제 운영을 이 계정·이 기관으로 하지 마세요.** 실제 축제는 기관을
+> 따로 만들고, 데모 축제는 데모 기관에만 두세요. 기관이 다르면 서로의 데이터에
+> 닿지 않습니다.
 
 ---
 
