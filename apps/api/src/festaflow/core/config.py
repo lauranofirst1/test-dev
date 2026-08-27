@@ -23,8 +23,15 @@ def _find_env_file() -> Path:
         candidate = parent / ".env"
         if candidate.is_file():
             return candidate
-    # 없으면 저장소 루트로 추정되는 위치를 반환한다 (pydantic 이 무시한다)
-    return here.parents[5] / ".env"
+    # 못 찾았으면 없는 것이다. **위치를 지어내지 않는다.**
+    #
+    # 여기서 parents[5] 를 세던 코드가 컨테이너에서 IndexError 로 터졌다 —
+    # 저장소에서는 6단계 위에 루트가 있지만 이미지 안에서는 /app/src/festaflow/core
+    # 라 그만큼 깊지 않다. 바로 위 docstring 이 경고하는 그 실수다.
+    #
+    # .env 파일이 없는 것은 오류가 아니다. 배포에서는 환경변수로만 넣는 게
+    # 정상이고, pydantic 은 없는 파일을 조용히 무시한다.
+    return Path(".env")
 
 
 ENV_FILE = _find_env_file()
