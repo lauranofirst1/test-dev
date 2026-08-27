@@ -159,7 +159,7 @@ export function DashboardPage() {
               식는 중인지에 따라 할 일이 정반대다. */}
           <section className="card stack" style={{ gap: 'var(--space-4)' }}>
             <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-              <h2 className="section">시간대별 참여</h2>
+              <h2 className="section" data-tour="dash-trend">시간대별 참여</h2>
               <span className="muted">참여가 없던 구간도 그대로 그립니다</span>
             </div>
             {timeline.error instanceof ApiError ? (
@@ -205,7 +205,7 @@ export function DashboardPage() {
 
           <section className="card stack" style={{ gap: 'var(--space-4)' }}>
             <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-              <h2 className="section">부스 참여 현황</h2>
+              <h2 className="section" data-tour="dash-booths">부스 참여 현황</h2>
               <span className="muted">막대는 최근 30분 완료 건수</span>
             </div>
 

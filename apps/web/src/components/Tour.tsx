@@ -49,7 +49,9 @@ function same(a: Hole | null, b: Hole | null): boolean {
 const PAD = 8;
 /** 카드와 구멍 사이. */
 const GAP = 12;
-const CARD_W = 320;
+const CARD_W = 340;
+/** 카드에서 구멍 쪽으로 내미는 꼬리의 크기. */
+const ARROW = 10;
 
 function rectOf(target: string | undefined): Hole | null {
   if (!target) return null;
@@ -187,25 +189,57 @@ export function Tour({
       )}
       {!hole && <div className="tour__veil" />}
 
-      <div className="tour__card" style={cardStyle}>
-        <p className="tour__count tabular">
-          {i + 1} / {live.length}
-        </p>
+      <div
+        className={`tour__card${putAbove ? ' tour__card--above' : ''}`}
+        style={cardStyle}
+      >
+        {/* 카드가 어느 요소를 두고 하는 말인지 꼬리가 이어 준다. 떨어져 떠 있으면
+            구멍과 카드가 별개로 읽힌다. */}
+        {hole && (
+          <span
+            className="tour__arrow"
+            style={{
+              left: Math.min(
+                Math.max(ARROW * 2, hole.left + hole.width / 2 - (cardStyle.left as number)),
+                CARD_W - ARROW * 2,
+              ),
+            }}
+            aria-hidden="true"
+          />
+        )}
+
+        <div className="tour__head">
+          {/* 몇 걸음 남았는지 숫자보다 점이 빨리 읽힌다. 숫자는 읽어 주는 쪽에만
+              남긴다. */}
+          <span className="tour__dots" role="img" aria-label={`${i + 1} / ${live.length} 단계`}>
+            {live.map((_, n) => (
+              <i key={n} className={n === i ? 'on' : undefined} />
+            ))}
+          </span>
+          <button
+            type="button"
+            className="tour__quit"
+            onClick={onClose}
+            aria-label="안내 그만 보기"
+          >
+            ✕
+          </button>
+        </div>
+
         <h2 className="tour__title">{step.title}</h2>
         <div className="tour__body">{step.body}</div>
+
         <div className="tour__acts">
-          <button type="button" className="btn btn--ghost" onClick={onClose}>
-            그만 보기
-          </button>
-          <span className="tour__spacer" />
-          {i > 0 && (
-            <button type="button" className="btn btn--ghost" onClick={prev}>
+          {i > 0 ? (
+            <button type="button" className="tour__btn" onClick={prev}>
               이전
             </button>
+          ) : (
+            <span />
           )}
           <button
             type="button"
-            className="btn btn--primary"
+            className="tour__btn tour__btn--go"
             onClick={last ? onClose : next}
           >
             {last ? '알겠습니다' : '다음'}

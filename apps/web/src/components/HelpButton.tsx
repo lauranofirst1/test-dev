@@ -1,13 +1,17 @@
-/** 지금 보고 있는 화면의 안내를 켜는 단추.
+/** 오른쪽 아래에 떠 있는 도움말.
  *
- * 화면마다 다른 안내를 띄웁니다. 한 곳에 모아 둔 도움말 페이지로 보내면, 거기서
- * 자기 화면을 다시 찾아야 하고 대부분 그 지점에서 그만둡니다.
+ * 누르면 **작은 패널이 스르륵 올라옵니다.** 곧장 안내를 시작하지 않는 이유는,
+ * 뭘 하려고 들어온 사람 앞을 전체 화면 안내가 가로막으면 그건 안내가 아니라
+ * 방해이기 때문입니다. 패널은 구석에 뜨고, 시작할지는 본인이 정합니다.
  *
- * 안내가 없는 화면에서는 **단추 자체가 나오지 않습니다.** 눌러서 "준비 중입니다"
- * 를 보는 것은 없느니만 못합니다.
+ * 패널에는 **이 화면이 무엇인지**와 **안내가 무엇을 짚는지**가 먼저 있습니다.
+ * 그것만 읽고 닫는 경우가 실제로 많고, 그때도 답을 얻은 것입니다.
+ *
+ * 안내가 없는 화면에서는 단추 자체가 나오지 않습니다. 눌러서 "준비 중입니다" 를
+ * 보는 것은 없느니만 못합니다.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 
@@ -34,7 +38,7 @@ function markSeen(id: TourId): void {
   try {
     localStorage.setItem(seenKey(id), '1');
   } catch {
-    /* 사파리 프라이빗 모드처럼 저장이 막힌 환경에서도 안내 자체는 돌아야 한다 */
+    /* 사파리 프라이빗 모드처럼 저장이 막힌 환경에서도 도움말 자체는 돌아야 한다 */
   }
 }
 
@@ -42,7 +46,7 @@ function wasSeen(id: TourId): boolean {
   try {
     return localStorage.getItem(seenKey(id)) === '1';
   } catch {
-    // 저장을 못 읽으면 **본 것으로 친다.** 매번 다시 권하면 그게 더 방해다.
+    // 저장을 못 읽으면 **본 것으로 친다.** 갈 때마다 다시 펼치면 그게 더 방해다.
     return true;
   }
 }
@@ -50,76 +54,89 @@ function wasSeen(id: TourId): boolean {
 export function HelpButton() {
   const { pathname } = useLocation();
   const id = tourFor(pathname);
-  const [open, setOpen] = useState(false);
-  //: 처음 온 화면인가. 자동으로 켜지 않고 **권하기만** 한다 — 뭘 하려고 들어온
-  //: 사람 앞을 안내가 가로막으면 안내가 아니라 방해다.
-  const [offer, setOffer] = useState(false);
+  const [panel, setPanel] = useState(false);
+  const [tour, setTour] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
 
+  // 화면이 바뀌면 닫는다. 처음 오는 화면에서는 패널만 스스로 열린다 —
+  // 구석에 뜨는 작은 것이라 하던 일을 막지 않는다.
   useEffect(() => {
-    setOpen(false);
-    setOffer(id !== null && !wasSeen(id));
+    setTour(false);
+    setPanel(id !== null && !wasSeen(id));
   }, [id]);
 
-  if (!id) return null;
+  // 바깥을 누르거나 Esc 로 닫는다. 열어 둔 채로 다른 일을 하려는 사람을
+  // 붙잡지 않는다.
+  useEffect(() => {
+    if (!panel) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setPanel(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPanel(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [panel]);
 
-  const close = () => {
-    setOpen(false);
-    setOffer(false);
+  if (!id) return null;
+  const help = TOURS[id];
+
+  const startTour = () => {
+    setPanel(false);
+    setTour(true);
+  };
+
+  const closeTour = () => {
+    setTour(false);
     markSeen(id);
   };
 
-  // ── 떠 있는 단추 ──
-  //
-  // 상단 바에 두었더니 다른 아이콘들 사이에 섞여 눈에 띄지 않았고, 화면을
-  // 내리면 같이 사라졌습니다. 안내는 **막혔을 때** 찾는 것이라, 막힌 그 자리에서
-  // 손이 닿아야 합니다. 오른쪽 아래는 엄지가 가장 쉽게 닿는 자리이기도 합니다.
-  //
-  // body 로 내보냅니다 — 상단 바 안에서 그리면 그 쌓임 맥락에 갇혀 본문 위로
-  // 올라오지 못하는 일이 생깁니다.
   return createPortal(
     <>
-      {!open && (
-        <button
-          type="button"
-          className="helpfab"
-          onClick={() => {
-            setOffer(false);
-            setOpen(true);
-          }}
-          aria-label={`${TOURS[id].label} 안내 보기`}
-          title={`${TOURS[id].label} 안내`}
-        >
-          ?
-        </button>
-      )}
+      {!tour && (
+        <div className="helpdock" ref={wrap}>
+          {panel && (
+            <div className="helppanel" role="dialog" aria-label={`${help.label} 도움말`}>
+              <p className="helppanel__eyebrow">도움말</p>
+              <h2 className="helppanel__title">{help.label}</h2>
+              <p className="helppanel__summary">{help.summary}</p>
 
-      {offer && !open && (
-        <div className="helpoffer" role="status">
-          <span>
-            처음이신가요? <strong>{TOURS[id].label}</strong>을 짚어 드립니다.
-          </span>
+              {/* 무엇을 짚어 주는지 미리 보여준다. 시작하기 전에 "내가 궁금한
+                  것이 여기 있나" 를 알 수 있어야 시작할지 정할 수 있다. */}
+              <ul className="helppanel__list">
+                {help.steps.map((s, n) => (
+                  <li key={n}>{s.title}</li>
+                ))}
+              </ul>
+
+              <button type="button" className="btn btn--primary" onClick={startTour}>
+                튜토리얼 보기
+              </button>
+            </div>
+          )}
+
           <button
             type="button"
-            className="btn btn--primary"
+            className="helpfab"
             onClick={() => {
-              setOffer(false);
-              setOpen(true);
+              setPanel((v) => !v);
+              if (!panel) markSeen(id);
             }}
+            aria-expanded={panel}
+            aria-label={`${help.label} 도움말`}
+            title={`${help.label} 도움말`}
           >
-            안내 보기
-          </button>
-          <button
-            type="button"
-            className="helpoffer__no"
-            onClick={close}
-            aria-label="안내 권유 닫기"
-          >
-            ✕
+            {panel ? '✕' : '?'}
           </button>
         </div>
       )}
 
-      {open && <Tour steps={TOURS[id].steps} onClose={close} />}
+      {tour && <Tour steps={help.steps} onClose={closeTour} />}
     </>,
     document.body,
   );

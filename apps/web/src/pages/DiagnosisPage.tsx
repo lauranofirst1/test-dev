@@ -196,7 +196,7 @@ function DiagnosisResult({
     <>
       {/* 종합 — 숫자 하나에 차트를 붙이지 않는다(§3.1). 스탯 타일 + 상태 배지. */}
       <div className="card card--accent">
-        <p className="eyebrow">종합 준비도</p>
+        <p className="eyebrow" data-tour="diagnosis-total">종합 준비도</p>
         {disclosed && d.total_score !== null ? (
           <ScoreTile
             score={d.total_score}
@@ -295,7 +295,7 @@ function DiagnosisResult({
       {boothCount === 0 && (
         <div className="card card--accent stack" style={{ gap: 'var(--space-4)' }}>
           <div className="stack" style={{ gap: 4 }}>
-            <p className="eyebrow">다음 단계</p>
+            <p className="eyebrow" data-tour="diagnosis-next">다음 단계</p>
             <h3 style={{ fontSize: 'var(--text-h3)' }}>부스를 등록하면 점수가 달라집니다</h3>
           </div>
           <p className="soft">
@@ -355,7 +355,7 @@ function ComparisonCard({ c, disclosed }: { c: DiagnosisComparison; disclosed: b
   return (
     <div className="card">
       <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-        <p className="eyebrow">직전 진단 대비</p>
+        <p className="eyebrow" data-tour="diagnosis-delta">직전 진단 대비</p>
         {disclosed && c.delta !== null && (
           <span className={`delta ${c.delta > 0 ? 'delta--up' : c.delta < 0 ? 'delta--down' : ''}`}>
             {c.delta > 0 ? '▲' : c.delta < 0 ? '▼' : '—'} {Math.abs(c.delta).toFixed(1)}점

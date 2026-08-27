@@ -493,7 +493,7 @@ export function BoothsPage() {
 
       {tab === 'booths' && items.length > 0 && (
         <div className="card card--sunk stack" style={{ gap: 'var(--space-3)' }}>
-          <p className="eyebrow">관객 참여 링크</p>
+          <p className="eyebrow" data-tour="booth-joinlink">관객 참여 링크</p>
           <p className="muted">
             이 주소를 포스터·안내판의 QR로 만들면 관객이 참여 코드를 받고 조각을 모읍니다.
           </p>
@@ -699,7 +699,7 @@ function BoothQrSettings({
 
   return (
     <div className="card card--sunk stack" style={{ gap: 'var(--space-4)' }}>
-      <p className="eyebrow">부스 QR</p>
+      <p className="eyebrow" data-tour="booth-qr">부스 QR</p>
 
       <div className="exptypes">
         {QR_MODES.map((m) => (

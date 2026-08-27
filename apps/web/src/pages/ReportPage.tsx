@@ -100,7 +100,7 @@ export function ReportPage() {
 
           {/* ── 방문객 대비 ── */}
           <section className="card stack" style={{ gap: 'var(--space-4)' }}>
-            <h2 className="section">방문객 대비 참여</h2>
+            <h2 className="section" data-tour="report-reach">방문객 대비 참여</h2>
 
             {d.visitor_basis ? (
               <>
@@ -225,7 +225,7 @@ export function ReportPage() {
           {/* ── 부스 ── */}
           {d.booths.length > 0 && (
             <section className="card stack" style={{ gap: 'var(--space-4)' }}>
-              <h2 className="section">부스별 성과</h2>
+              <h2 className="section" data-tour="report-booths">부스별 성과</h2>
               {/* 카드를 세로로 쌓던 자리다. 부스가 스무 개면 스무 번 스크롤해야
                   1위와 20위를 비교할 수 있었다. 표는 열을 맞춰 주므로 눈이
                   한 열만 따라 내려가면 된다. */}
@@ -316,7 +316,7 @@ export function ReportPage() {
           {/* ── 운영 개입 ── */}
           {(d.campaigns.length > 0 || d.recommendation_accuracy) && (
             <section className="card stack" style={{ gap: 'var(--space-4)' }}>
-              <h2 className="section">운영 개입 결과</h2>
+              <h2 className="section" data-tour="report-intervention">운영 개입 결과</h2>
 
               {/* 제품이 자기 추천의 정확도를 스스로 보고하는 항목. */}
               {d.recommendation_accuracy && (
@@ -353,7 +353,7 @@ export function ReportPage() {
 
           {/* ── 개선안 ── */}
           <section className="card stack" style={{ gap: 'var(--space-3)' }}>
-            <h2 className="section">다음 축제 개선안</h2>
+            <h2 className="section" data-tour="report-next">다음 축제 개선안</h2>
             <p className="muted">
               AI 가 아니라 정해진 규칙으로 만듭니다. 왜 이 문장이 나왔는지 언제나 되짚을 수
               있습니다.

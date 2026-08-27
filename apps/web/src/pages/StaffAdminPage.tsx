@@ -207,7 +207,7 @@ function IssuedCard({ issued, onClose }: { issued: StaffIssued; onClose: () => v
       </div>
 
       <div className="stack" style={{ gap: 'var(--space-2)' }}>
-        <span className="eyebrow">접근 코드</span>
+        <span className="eyebrow" data-tour="staff-code">접근 코드</span>
         <div className="claimcode tabular">{issued.access_code}</div>
       </div>
 

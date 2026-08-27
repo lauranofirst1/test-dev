@@ -152,7 +152,7 @@ export function ExhibitsAdminPage() {
           if (form.title.trim()) create.mutate();
         }}
       >
-        <p className="eyebrow">작품 등록</p>
+        <p className="eyebrow" data-tour="exhibit-works">작품 등록</p>
         <div className="grid2">
           <div className="field">
             <label htmlFor="ex-title">
@@ -254,7 +254,7 @@ function Settings({
   return (
     <div className="card stack" style={{ gap: 'var(--space-4)' }}>
       <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-        <p className="eyebrow">투표 설정</p>
+        <p className="eyebrow" data-tour="exhibit-vote">투표 설정</p>
         <span className={`badge badge--${results.voting_open ? 'stable' : 'none'}`}>
           <i />
           {results.voting_open ? '투표 진행 중' : '투표 닫힘'}

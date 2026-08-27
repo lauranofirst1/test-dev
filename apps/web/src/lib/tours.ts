@@ -25,9 +25,13 @@ export type TourId =
   | 'exhibits'
   | 'staff';
 
-export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
+export const TOURS: Record<
+  TourId,
+  { label: string; summary: string; steps: TourStep[] }
+> = {
   workspace: {
     label: '시작하기',
+    summary: '축제를 만들고 고르는 자리입니다.',
     steps: [
       {
         title: '축제 하나가 작업 단위입니다',
@@ -43,10 +47,16 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
 
   overview: {
     label: '축제 준비 순서',
+    summary: '이 축제가 어디까지 준비됐는지, 다음에 무엇을 할지 보여줍니다.',
     steps: [
       {
         title: '순서가 있습니다',
         body: '축제 하나를 준비하는 데 정해진 차례가 있습니다. 건너뛰면 뒤에서 다시 해야 하고, 그때는 이미 손댈 수 없는 것이 생깁니다. 이 화면이 어디까지 왔는지 보여줍니다.',
+      },
+      {
+        target: 'ov-progress',
+        title: '막힌 것부터 위에 옵니다',
+        body: '준비 현황 표는 이름순이 아니라 «막힌 것 → 진행 중 → 끝난 것» 순으로 놓입니다. 위에서부터 손대면 됩니다.',
       },
       {
         target: 'nav-booths',
@@ -83,6 +93,7 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
 
   booths: {
     label: '부스와 조각 보드',
+    summary: '부스와 미션을 만들고, 조각 보드와 경품을 정합니다.',
     steps: [
       {
         target: 'tab-booths',
@@ -119,16 +130,47 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
         title: '확률은 관객에게 보이지 않습니다',
         body: '상품 이름만 보이고 재고와 가중치는 내려가지 않습니다. 남은 재고가 보이면 언제 뽑을지 재는 사람이 생기고, 그 순간 추첨이 아니게 됩니다.',
       },
+      {
+        target: 'booth-joinlink',
+        title: '관객은 이 주소 하나로 들어옵니다',
+        body: '포스터나 안내판의 QR 로 만드세요. 앱을 깔지 않고, 로그인도 하지 않고, 이 주소만 열면 참여 코드를 받습니다.',
+      },
+      {
+        target: 'booth-qr',
+        title: '인쇄 QR 과 회전 QR',
+        body: '인쇄는 종이에 붙여 두는 고정 QR 이라 네트워크가 끊겨도 살아 있지만, 사진을 찍어 퍼뜨리면 안 가고도 조각을 받습니다. 회전은 화면에 띄워 계속 바뀌므로 사진이 소용없는 대신 그 화면이 살아 있어야 합니다.',
+      },
+      {
+        target: 'booth-qr',
+        title: '경품이 걸린 부스는 회전으로',
+        body: '단순 방문 확인은 인쇄로 두고, 공결이나 경품처럼 걸린 것이 있는 부스만 회전으로 바꾸는 것이 무난합니다. 부스마다 따로 정합니다.',
+      },
     ],
   },
 
   diagnosis: {
     label: '사전 진단 읽는 법',
+    summary: '관광 데이터로 기획의 준비도를 재고, 어디부터 고칠지 알려줍니다.',
     steps: [
       {
         target: 'diagnosis-run',
         title: '누를 때마다 실제로 불러옵니다',
         body: '저장된 값을 다시 보여주는 것이 아니라 한국관광공사 API 를 그 자리에서 호출합니다. 그래서 인증키가 없으면 이 화면만 동작하지 않습니다.',
+      },
+      {
+        target: 'diagnosis-total',
+        title: '종합 점수는 상대 지표입니다',
+        body: '몇 점이면 흥행한다는 뜻이 아닙니다. 관광 데이터로 본 준비도이고, 무엇이 비어 있는지 찾는 데 쓰는 값입니다.',
+      },
+      {
+        target: 'diagnosis-next',
+        title: '다음에 무엇을 할지 알려줍니다',
+        body: '점수만 보고 무엇을 고칠지 알아내는 것은 어렵습니다. 항목별 결과에서 바로 이어지는 할 일을 뽑아 줍니다.',
+      },
+      {
+        target: 'diagnosis-delta',
+        title: '고친 것이 반영됐는지 봅니다',
+        body: '직전 진단과 나란히 놓습니다. 무엇을 고쳐서 어느 항목이 올랐는지가 남으므로, 기획서에 그대로 쓸 수 있습니다.',
       },
       {
         target: 'diagnosis-score',
@@ -150,6 +192,7 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
 
   dashboard: {
     label: '당일 운영',
+    summary: '축제 당일 화면입니다. 어느 부스에 몰리는지 보고 바로 손씁니다.',
     steps: [
       {
         target: 'dash-insight',
@@ -167,6 +210,16 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
         body: '한산한 부스에 한시적으로 추가 포인트를 겁니다. 캠페인 전후로 실제 분포가 어떻게 달라졌는지 함께 기록되므로, 효과가 있었는지 나중에 확인할 수 있습니다.',
       },
       {
+        target: 'dash-trend',
+        title: '시간대별로 언제 몰렸나',
+        body: '지금 이 순간만 보면 방금 지나간 봉우리를 놓칩니다. 하루의 흐름을 함께 봐야 다음 시간대를 준비할 수 있습니다.',
+      },
+      {
+        target: 'dash-booths',
+        title: '부스별 실제 숫자',
+        body: '판정 뒤에 있는 원래 숫자입니다. "몰렸다" 는 말이 몇 건을 두고 하는 말인지 여기서 확인하세요.',
+      },
+      {
         target: 'dash-announce',
         title: '급한 것은 공지로 덮습니다',
         body: '「긴급」으로 올리면 관객 화면 전체를 덮고 확인을 받습니다. 우천 중단이나 대피처럼 못 보고 지나가면 안 되는 것에만 쓰세요 — 자주 쓰면 다음에 진짜 긴급이 왔을 때 아무도 안 봅니다.',
@@ -176,6 +229,7 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
 
   report: {
     label: '사후 리포트',
+    summary: '예측과 실측을 나란히 놓고 다음 기획을 고칩니다.',
     steps: [
       {
         title: '예측과 실측을 맞춰 보는 자리',
@@ -186,15 +240,36 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
         title: '목표를 미리 넣어 두세요',
         body: '목표 없이 결과만 보면 잘된 것인지 알 수 없습니다. 참여 인원이나 부스별 완료 수 같은 목표를 축제 전에 넣어 두면, 여기서 목표 대비로 보여줍니다.',
       },
+      {
+        target: 'report-reach',
+        title: '온 사람 중 몇 명이 참여했나',
+        body: '방문객 수와 참여자 수는 다른 숫자입니다. 이 비율이 낮으면 부스가 아니라 안내가 부족했던 것일 수 있습니다.',
+      },
+      {
+        target: 'report-booths',
+        title: '어느 부스가 일했나',
+        body: '부스별로 실제 완료가 몇 건인지 나옵니다. 다음에 무엇을 늘리고 무엇을 줄일지가 여기서 나옵니다.',
+      },
+      {
+        target: 'report-intervention',
+        title: '개입이 통했는지 봅니다',
+        body: '한시 보상을 걸었던 구간의 전후를 비교합니다. 통했으면 다음에도 쓰고, 아니면 다른 방법을 찾아야 합니다.',
+      },
+      {
+        target: 'report-next',
+        title: '다음 축제로 넘길 것',
+        body: '이 축제에서 나온 사실을 다음 기획의 입력으로 정리합니다. 예측 → 실측 → 교정이 한 바퀴 도는 자리입니다.',
+      },
     ],
   },
 
   lectures: {
     label: '특강 출결',
+    summary: '특강 출결과 공결을 관리합니다.',
     steps: [
       {
-        title: '출튀를 막는 것이 목적입니다',
-        body: '특강이 공결을 주기 때문에 앞에서 찍고 나가는 일이 생깁니다. 체크인을 두 번 여는 것이 그 대응책입니다.',
+        title: '끝까지 있었는지 확인합니다',
+        body: '특강이 공결을 주기 때문에, 앞에서 한 번 찍고 곧 자리를 뜨는 일이 생깁니다. 체크인을 두 번 여는 것이 그 대응책입니다.',
       },
       {
         target: 'lecture-new',
@@ -206,11 +281,16 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
         title: '공결 여부는 특강마다 정합니다',
         body: '공결을 주지 않는 특강은 미달이어도 성적에 영향이 없습니다. 집계도 그 기준으로 나뉩니다.',
       },
+      {
+        title: '두 숫자가 다른 것이 정상입니다',
+        body: '«찍은 사람» 과 «출석 인정» 은 다릅니다. 앞은 한 번이라도 찍은 사람, 뒤는 기준을 채운 사람입니다. 둘이 같으면 오히려 확인해 보세요.',
+      },
     ],
   },
 
   exhibits: {
     label: '전시 심사',
+    summary: '작품과 심사 항목을 만들고 시상을 집계합니다.',
     steps: [
       {
         title: '이의가 들어와도 답할 수 있어야 합니다',
@@ -226,11 +306,22 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
         title: '심사위원 수가 다르면 알려줍니다',
         body: '어떤 작품은 3명이 보고 어떤 작품은 1명만 봤다면 평균을 그대로 비교할 수 없습니다. 그럴 때 경고가 붙습니다 — 숨기면 그 순위를 방어할 수 없습니다.',
       },
+      {
+        target: 'exhibit-works',
+        title: '작품을 먼저 등록합니다',
+        body: '작품이 있어야 심사위원의 심사표가 채워집니다. 포스터 그림도 여기서 올립니다.',
+      },
+      {
+        target: 'exhibit-vote',
+        title: '관객 투표는 학번으로 한 번',
+        body: '스티커를 여러 장 붙이던 것이 «참여 코드 여러 개 받기» 로 그대로 옮겨올 수 있습니다. 같은 학번이면 새 코드를 받아도 다시 투표되지 않습니다.',
+      },
     ],
   },
 
   staff: {
     label: '스태프 발급',
+    summary: '현장 사람에게 접근 코드를 발급합니다.',
     steps: [
       {
         title: '현장 사람은 계정을 만들지 않습니다',
@@ -245,6 +336,11 @@ export const TOURS: Record<TourId, { label: string; steps: TourStep[] }> = {
         target: 'staff-issue',
         title: '코드는 다시 볼 수 없습니다',
         body: '발급 직후 한 번만 보여줍니다. 잃어버리면 재발급인데, 재발급하는 순간 이전 코드는 막힙니다 — 이미 나눠 준 코드가 있으면 그것부터 확인하세요.',
+      },
+      {
+        target: 'staff-code',
+        title: '코드는 화면에 띄워 두지 마세요',
+        body: '옆 사람이 보면 그대로 쓸 수 있습니다. 접근 코드는 개인에게 따로 전하고, 초대 링크는 비밀이 들어 있지 않으니 단체방에 올려도 됩니다.',
       },
     ],
   },

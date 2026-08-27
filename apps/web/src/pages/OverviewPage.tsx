@@ -294,7 +294,7 @@ export function OverviewPage() {
       {/* ── 준비 현황 ── */}
       <section className="card stack" style={{ gap: 'var(--space-4)' }}>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-          <h2 className="section">준비 현황</h2>
+          <h2 className="section" data-tour="ov-progress">준비 현황</h2>
           <span className="muted">막힌 것부터 위에 옵니다</span>
         </div>
 
