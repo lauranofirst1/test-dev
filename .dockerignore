@@ -1,0 +1,15 @@
+# 이미지에 절대 들어가면 안 되는 것 — 인증키가 들어 있습니다.
+.env
+.env.local
+.env.*.local
+
+.git/
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+apps/api/media/
+apps/web/node_modules/

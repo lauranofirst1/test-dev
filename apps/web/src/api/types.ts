@@ -456,6 +456,17 @@ export interface PrizeDrawStatus {
   prizes: PrizePreview[];
 }
 
+/** 관객 화면이 주기적으로 물어보는 전부 — `GET /participants/me/overview`.
+ *
+ * 낱개 세 엔드포인트와 **같은 값**입니다. 셋을 따로 물으면 참여자 1명이
+ * 초당 0.3 요청이 되고, 1000명 규모에서는 그것만으로 초당 300 요청입니다.
+ */
+export interface ParticipantOverview {
+  board: ParticipantBoard;
+  me: ParticipantMe;
+  prize_draw: PrizeDrawStatus;
+}
+
 // ── 경품 (운영자) ────────────────────────────────────────────────────────────
 
 export interface Prize {

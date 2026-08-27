@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
@@ -25,6 +25,7 @@ from festaflow.models import (
     Prize,
 )
 from festaflow.models.enums import BoothQrMode, BoothVerifyMode
+from festaflow.routers import stamp_board as board_svc
 from festaflow.schemas.participation import (
     ActiveCampaign,
     GrantResult,
@@ -32,6 +33,7 @@ from festaflow.schemas.participation import (
     ParticipantIssue,
     ParticipantIssued,
     ParticipantMe,
+    ParticipantOverview,
     PublicBooth,
     PublicFestival,
     PublicMission,
@@ -176,13 +178,30 @@ def issue_participant(
     )
 
 
-@router.get("/participants/me", response_model=ParticipantMe)
-def participant_me(
-    festival_id: int, db: DbSession, participant: CurrentParticipant
-) -> ParticipantMe:
-    """미션별 지급 상태와 포인트 합계. 활성 캠페인 안내를 함께 싣는다."""
-    _live_festival(db, festival_id)
+#: `last_seen_at` 을 다시 쓰기까지 두는 최소 간격.
+#:
+#: 이 값은 "마지막으로 화면을 보고 있었나" 를 대략 알기 위한 것이지 초 단위
+#: 정확도가 필요한 값이 아니다. 그런데 관객 화면이 주기적으로 이 조회를 하므로,
+#: 매번 쓰면 **참여자 수 × 폴링 주기만큼 쓰기가 발생한다** — 1000명이 붙으면
+#: 10초마다 1000번이다. 조회가 쓰기를 만드는 구조는 그 자체로 확장되지 않는다.
+LAST_SEEN_MIN_INTERVAL = timedelta(minutes=1)
 
+
+def _touch_last_seen(db: Session, participant) -> None:
+    """마지막 접속 시각을 **가끔만** 갱신한다."""
+    now = datetime.now(UTC)
+    seen = participant.last_seen_at
+    if seen is not None and seen.tzinfo is None:
+        # 드라이버 설정에 따라 naive 로 올라올 수 있다. UTC 로 읽는다.
+        seen = seen.replace(tzinfo=UTC)
+    if seen is not None and now - seen < LAST_SEEN_MIN_INTERVAL:
+        return
+    participant.last_seen_at = now
+    db.commit()
+
+
+def _me_payload(db: Session, festival_id: int, participant) -> ParticipantMe:
+    """미션별 지급 상태와 포인트 합계. 활성 캠페인 안내를 함께 싣는다."""
     granted = {
         p.mission_id: p
         for p in db.execute(
@@ -218,8 +237,7 @@ def participant_me(
         )
     ).scalar_one()
 
-    participant.last_seen_at = datetime.now(UTC)
-    db.commit()
+    _touch_last_seen(db, participant)
 
     return ParticipantMe(
         code=participant.code,
@@ -240,6 +258,15 @@ def participant_me(
             for c in svc.active_campaigns(db, festival_id)
         ],
     )
+
+
+@router.get("/participants/me", response_model=ParticipantMe)
+def participant_me(
+    festival_id: int, db: DbSession, participant: CurrentParticipant
+) -> ParticipantMe:
+    """미션별 지급 상태와 포인트 합계. 활성 캠페인 안내를 함께 싣는다."""
+    _live_festival(db, festival_id)
+    return _me_payload(db, festival_id, participant)
 
 
 # ── 부스 QR 스캔 (§8.3) ─────────────────────────────────────────────────────
@@ -425,20 +452,19 @@ def _draw_out(draw, prize: Prize | None) -> PrizeDrawOut:
     )
 
 
-@router.get("/prize-draw/me", response_model=PrizeDrawStatus)
-def prize_draw_status(
-    festival_id: int, db: DbSession, participant: CurrentParticipant
-) -> PrizeDrawStatus:
+def _draw_payload(db: Session, festival_id: int, participant, *, board=None, progress=None):
     """뽑기 카드를 그리는 데 필요한 전부.
 
     상품 미리보기에 **재고와 가중치는 담지 않는다.** 남은 재고가 보이면 언제
     뽑을지를 재는 사람이 생기고, 그 순간 추첨이 아니게 된다.
-    """
-    _live_festival(db, festival_id)
 
+    보드와 진행률은 묶음 조회가 이미 계산해 두므로 인자로 받는다.
+    """
     prizes = prize_svc.active_prizes(db, festival_id)
-    board = svc.get_board(db, festival_id)
-    progress = svc.progress_of(db, board, participant.id)
+    if board is None:
+        board = svc.get_board(db, festival_id)
+    if progress is None:
+        progress = svc.progress_of(db, board, participant.id)
     existing = prize_svc.existing_draw(db, festival_id, participant.id)
 
     return PrizeDrawStatus(
@@ -456,6 +482,40 @@ def prize_draw_status(
             PrizePreview(name=p.name, description=p.description, is_blank=p.is_blank)
             for p in prizes
         ],
+    )
+
+
+@router.get("/prize-draw/me", response_model=PrizeDrawStatus)
+def prize_draw_status(
+    festival_id: int, db: DbSession, participant: CurrentParticipant
+) -> PrizeDrawStatus:
+    """뽑기 카드를 그리는 데 필요한 전부."""
+    _live_festival(db, festival_id)
+    return _draw_payload(db, festival_id, participant)
+
+
+@router.get("/participants/me/overview", response_model=ParticipantOverview)
+def participant_overview(
+    festival_id: int, db: DbSession, participant: CurrentParticipant
+) -> ParticipantOverview:
+    """관객 화면이 주기적으로 물어보는 세 가지를 한 번에.
+
+    `/stamp-board/me` + `/participants/me` + `/prize-draw/me` 와 **같은 값**을
+    돌려준다. 화면이 세 번 물어보던 것을 한 번으로 줄이려고 만든 자리이고,
+    그래서 셋 중 하나라도 값이 달라지면 그것은 버그다.
+
+    보드와 진행률을 한 번만 계산해 보드 응답과 뽑기 응답이 나눠 쓴다 — 따로
+    부를 때는 같은 것을 세 번 세고 있었다.
+    """
+    _live_festival(db, festival_id)
+
+    board = svc.get_board(db, festival_id)
+    progress = svc.progress_of(db, board, participant.id)
+
+    return ParticipantOverview(
+        board=board_svc.participant_board(db, board, participant.id, progress=progress),
+        me=_me_payload(db, festival_id, participant),
+        prize_draw=_draw_payload(db, festival_id, participant, board=board, progress=progress),
     )
 
 

@@ -212,15 +212,23 @@ def upload_board_image(
 # ── 참여자 ──────────────────────────────────────────────────────────────────
 
 
-@router.get("/stamp-board/me", response_model=ParticipantBoard)
-def my_stamp_board(
-    festival_id: int, db: DbSession, participant: CurrentParticipant
+def participant_board(
+    db: Session,
+    board: StampBoard,
+    participant_id: int,
+    *,
+    progress=None,
 ) -> ParticipantBoard:
-    """내 수집 현황. 공개된 조각만 `is_revealed` 가 참이다."""
-    board = svc.get_board(db, festival_id)
+    """내 수집 현황 응답을 조립한다.
+
+    엔드포인트 밖으로 꺼내 둔 이유는 관객 화면의 묶음 조회(`/participants/me/overview`)가
+    같은 응답을 필요로 하기 때문이다. 거기서는 보드와 진행률을 이미 계산해 두었으므로
+    `progress` 를 넘겨 다시 세지 않는다.
+    """
     tiles = svc.current_tiles(db, board)
-    reveals = {r.tile_id: r for r in svc.reveals_of(db, board, participant.id)}
-    progress = svc.progress_of(db, board, participant.id)
+    reveals = {r.tile_id: r for r in svc.reveals_of(db, board, participant_id)}
+    if progress is None:
+        progress = svc.progress_of(db, board, participant_id)
 
     base = _out(db, board, tiles=tiles)
     return ParticipantBoard(
@@ -242,3 +250,11 @@ def my_stamp_board(
         # 완성 전에 미리 보여주면 완성의 의미가 없다.
         complete_message_shown=board.complete_message if progress.is_complete else None,
     )
+
+
+@router.get("/stamp-board/me", response_model=ParticipantBoard)
+def my_stamp_board(
+    festival_id: int, db: DbSession, participant: CurrentParticipant
+) -> ParticipantBoard:
+    """내 수집 현황. 공개된 조각만 `is_revealed` 가 참이다."""
+    return participant_board(db, svc.get_board(db, festival_id), participant.id)
