@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { api } from '../api/client';
 import type { GridOption } from '../api/types';
+import { TrailPreview } from './TrailBoard';
 import { subject, topic } from '../lib/particles';
 
 export interface Grid {
@@ -36,6 +37,7 @@ export function GridPlanPicker({
   value,
   onChange,
   imageUrl,
+  boardStyle = 'grid',
   unitLabel,
   unitCount,
 }: {
@@ -44,6 +46,8 @@ export function GridPlanPicker({
   onChange: (g: Grid) => void;
   /** 미리보기에 쓸 그림. 없으면 색 블록으로 보여준다. */
   imageUrl?: string;
+  /** 관객이 실제로 보게 될 표현. 미리보기가 그것과 같아야 한다. */
+  boardStyle?: 'grid' | 'trail';
   unitLabel: string;
   unitCount: number;
 }) {
@@ -76,7 +80,16 @@ export function GridPlanPicker({
               {o.exact && <span className="plan__badge">딱 맞음</span>}
             </span>
 
-            <GridPreview rows={o.rows} cols={o.cols} imageUrl={imageUrl} />
+            {/* 후보마다 격자 비율이 달라도 자리는 같은 크기다. 비율대로 두면
+                넓은 격자를 고른 카드만 아래가 텅 비고, 나란히 놓고 비교할 수
+                없게 된다. 여기서 정하는 것은 모양이 아니라 조각 수다. */}
+            <span className="plan__prev">
+              {boardStyle === 'trail' ? (
+                <TrailPreview total={o.total} />
+              ) : (
+                <GridPreview rows={o.rows} cols={o.cols} imageUrl={imageUrl} />
+              )}
+            </span>
 
             <span className="plan__total tabular">
               {o.total}조각 · {o.rows}×{o.cols}

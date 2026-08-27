@@ -43,9 +43,6 @@ export function AnnouncementSurface() {
               // 폴링으로 새 공지가 들어오면 스크린리더가 읽어야 한다.
               role="status"
             >
-              <span className="notice-item__icon" aria-hidden>
-                {a.level === 'urgent' ? '⚠' : 'ℹ'}
-              </span>
               <div className="notice-item__text">
                 <strong>
                   {/* 색이 아니라 글자로도 등급을 알린다. */}

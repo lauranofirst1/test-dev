@@ -198,9 +198,6 @@ export function AnnouncementAdmin({ festivalId }: { festivalId: string }) {
             <div className="stack" style={{ gap: 6 }}>
               <p className="eyebrow">관객에게 이렇게 보입니다</p>
               <div className="notice-item" data-level={form.level}>
-                <span className="notice-item__icon" aria-hidden>
-                  {form.level === 'urgent' ? '⚠' : 'ℹ'}
-                </span>
                 <div className="notice-item__text">
                   <strong>
                     {form.level === 'urgent' && <span className="notice-item__tag">긴급</span>}

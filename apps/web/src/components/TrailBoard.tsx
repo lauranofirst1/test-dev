@@ -44,6 +44,38 @@ function positionOf(index: number, total: number): Point {
   return { x: xGap * (dir + 1) + wobble, y: yGap * (row + 1) };
 }
 
+/** 후보를 고르는 화면에 쓰는 작은 지도.
+ *
+ * **격자를 보여주고 지도를 내주면 고른 것과 나온 것이 다릅니다.** 지도 표현을
+ * 골랐는데 미리보기가 그림 격자면, 운영자는 화면에 나오지도 않을 배치를 보고
+ * 조각 수를 정하게 됩니다. 그래서 좌표 계산을 실제 보드와 **같은 함수**로
+ * 합니다 — 여기서 따로 그리면 언젠가 어긋납니다.
+ */
+export function TrailPreview({ total }: { total: number }) {
+  const points = Array.from({ length: total }, (_, i) => positionOf(i, total));
+  const rows = Math.ceil(total / PER_ROW);
+
+  return (
+    <span className="trailprev" style={{ aspectRatio: `${PER_ROW} / ${rows}` }} aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        {points.slice(0, -1).map((from, i) => (
+          <line
+            key={i}
+            x1={from.x}
+            y1={from.y}
+            x2={points[i + 1].x}
+            y2={points[i + 1].y}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
+      {points.map((pt, i) => (
+        <i key={i} style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
+      ))}
+    </span>
+  );
+}
+
 export function TrailBoard({
   tiles,
   revealedCount,

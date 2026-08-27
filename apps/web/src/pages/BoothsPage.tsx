@@ -801,6 +801,14 @@ function BoardSettings({
   const fetched = useGridOptions(unitCount);
   const options = fetched.data ?? board.grid_options;
 
+  //: 어떤 격자로도 딱 나눠지지 않는가. 부스가 5·7·11·14개일 때 그렇다.
+  //:
+  //: **홀수 여부가 아니라 이것이 기준이다.** 9개는 홀수지만 3×3 으로 딱 맞고,
+  //: 14개는 짝수지만 2×7 의 7 이 격자 상한(5)을 넘어 안 맞는다. 홀수로 판단하면
+  //: 9개 축제에 멀쩡한 격자를 두고 지도를 권하게 된다.
+  const noExactGrid = options.length > 0 && !options.some((o) => o.exact);
+  const leftover = noExactGrid ? Math.min(...options.map((o) => o.leftover)) : 0;
+
   const changed =
     grid.rows !== board.rows ||
     grid.cols !== board.cols ||
@@ -866,7 +874,15 @@ function BoardSettings({
               aria-pressed={style === o.value}
               onClick={() => setStyle(o.value)}
             >
-              <b>{o.label}</b>
+              <b>
+                {o.label}
+                {/* 격자로 딱 안 나눠지는 수에서는 지도가 낫다. 그림 퍼즐은 빈
+                    격자가 생기면 "완성했는데 그림이 덜 찼다" 로 보이지만,
+                    길은 몇 곳이든 그만큼 이어지면 끝난 것으로 읽힌다. */}
+                {noExactGrid && o.value === 'trail' && (
+                  <span className="exptype__rec">추천</span>
+                )}
+              </b>
               <small>{o.hint}</small>
             </button>
           ))}
@@ -921,6 +937,20 @@ function BoardSettings({
         <p className="eyebrow">
           {style === 'trail' ? '몇 곳을 돌지 고르세요' : '몇 조각으로 나눌지 고르세요'}
         </p>
+
+        {/* 이 사실은 후보 카드마다 회색 잔글씨로만 적혀 있었다. 정작 고르기
+            전에 알아야 하는 것이고, 알면 부스 수를 조정하는 선택지가 생긴다. */}
+        {noExactGrid && (
+          <div className="notice notice--warn">
+            <span>⚠</span>
+            <span>
+              {unitLabel} {unitCount}개는 <strong>어떤 격자로도 딱 나눠지지 않습니다.</strong>{' '}
+              어느 후보를 고르든 {leftover}개는 조각을 주지 않습니다 — 그 {unitLabel}만
+              들렀다 간 사람은 아무것도 못 받습니다. {unitLabel} 수를 맞추거나, 그
+              {unitLabel}에 다른 역할을 주세요.
+            </span>
+          </div>
+        )}
         <GridPlanPicker
           options={options}
           value={grid}
@@ -928,6 +958,7 @@ function BoardSettings({
           // 지도 모드에서는 그림을 넘기지 않는다. 미리보기가 화면에 나오지도 않을
           // 그림을 잘라 보여주면, 방금 "그림은 쓰지 않는다"고 한 말과 어긋난다.
           imageUrl={style === 'trail' ? undefined : board.image_url}
+          boardStyle={style === 'trail' ? 'trail' : 'grid'}
           unitLabel={unitLabel}
           unitCount={unitCount}
         />
