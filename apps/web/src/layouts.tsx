@@ -20,6 +20,7 @@ import { AnnouncementProvider } from './components/announcements/AnnouncementPro
 import { AppFooter } from './components/AppFooter';
 import { AudienceTabs } from './components/AudienceTabs';
 import { AnnouncementSurface } from './components/announcements/AnnouncementSurface';
+import { HelpButton } from './components/HelpButton';
 import { FestivalNav } from './components/FestivalNav';
 import { FieldScreensMenu } from './components/FieldScreensMenu';
 import { FestivalSearch } from './components/FestivalSearch';
@@ -149,6 +150,9 @@ export function PlannerLayout() {
           {/* 레일에서 뺀 현장 화면들이 여기로 온다. 축제가 정해지지 않았으면
               열 현장 화면도 없다. */}
           {id && <FieldScreensMenu festivalId={id} />}
+          {/* 이 화면에 안내가 있을 때만 나온다. 눌러서 "준비 중" 을 보는 것은
+              없느니만 못하다. */}
+          <HelpButton />
           <AccountMenu />
         </div>
       </header>

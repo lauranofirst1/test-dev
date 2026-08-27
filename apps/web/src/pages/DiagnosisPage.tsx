@@ -87,6 +87,7 @@ export function DiagnosisPage() {
                 되는 것이 이 루프의 전부다. */}
             <button
               className="btn btn--primary btn--lg"
+              data-tour="diagnosis-run"
               onClick={() => {
                 goTab('score');
                 run.mutate();
@@ -223,7 +224,7 @@ function DiagnosisResult({
       {/* 항목별 — 두 차트가 서로 다른 질문에 답한다.
           불릿: 배점 대비 얼마나 찼나. 손실: 어디부터 손대야 총점이 오르나. */}
       {disclosed && (
-        <div className="chartgrid">
+        <div className="chartgrid" data-tour="diagnosis-score">
           <div className="card">
             <LazyScoreBullet items={d.items} disclosed={disclosed} />
           </div>

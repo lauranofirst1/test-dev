@@ -180,22 +180,26 @@ export function DashboardPage() {
           {/* 제한은 각주가 아니라 지표 바로 옆에 둔다. */}
           <p className="disclaimer">{d.disclaimer}</p>
 
-          <RecommendationCards
-            festivalId={id}
+          <div data-tour="dash-insight">
+            <RecommendationCards
+              festivalId={id}
             items={d.recommendations}
-            insights={d}
-            onSetReward={setPresetBoothId}
-          />
+              insights={d}
+              onSetReward={setPresetBoothId}
+            />
+          </div>
 
           {/* 공지는 캠페인보다 위에 둔다 — 무언가 잘못됐을 때 먼저 찾는 것이다. */}
           <AnnouncementAdmin festivalId={id} />
 
+          <div data-tour="dash-campaign">
           <CampaignPanel
             festivalId={id}
             booths={d.booths}
             presetBoothId={presetBoothId}
             onConsumePreset={() => setPresetBoothId(null)}
           />
+          </div>
 
           <section className="card stack" style={{ gap: 'var(--space-4)' }}>
             <div className="row wrap" style={{ justifyContent: 'space-between' }}>

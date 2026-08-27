@@ -3372,3 +3372,129 @@ fieldset.field legend {
 .boothapp .shell {
   max-width: 720px;
 }
+
+
+/* ── 화면 안내 (components/Tour) ─────────────────────────── */
+
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+}
+
+/* 구멍 하나가 바깥 전체를 어둡게 한다. 네 조각으로 나눠 덮으면 이동할 때
+   조각들이 따로 놀아서, 눈이 따라가야 할 대상이 흩어진다. */
+.tour__hole {
+  position: fixed;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 62%);
+  /* 짚는 자리가 **움직여서** 다음 자리로 간다. 카드만 툭툭 바뀌면 방금 무엇을
+     봤는지 잊지만, 구멍이 이동하면 "여기 다음은 저기" 가 위치로 남는다.
+     움직임 줄이기를 켜면 tokens.css 가 이 시간을 0 으로 접는다. */
+  transition:
+    top var(--duration-slow) var(--ease-out),
+    left var(--duration-slow) var(--ease-out),
+    width var(--duration-slow) var(--ease-out),
+    height var(--duration-slow) var(--ease-out);
+  /* 구멍 안은 그대로 보이고 눌리지도 않는다 — 안내 중에 실수로 눌러
+     화면이 바뀌면 설명하던 자리가 사라진다. */
+  pointer-events: none;
+}
+
+/* 짚을 요소가 없는 단계(첫 인사 등). 화면 전체를 덮는다. */
+.tour__veil {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 62%);
+}
+
+.tour__card {
+  position: fixed;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 32%);
+  animation: tour-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes tour-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.tour__count {
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-ink-mute);
+}
+
+.tour__title {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-black);
+  line-height: 1.35;
+}
+
+.tour__body {
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  line-height: 1.65;
+}
+
+.tour__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.tour__spacer {
+  flex: 1;
+}
+
+/* 처음 온 화면에서 권하기만 한다. 자동으로 켜서 앞을 가로막으면 안내가
+   아니라 방해다. */
+.helpoffer {
+  position: fixed;
+  top: 64px;
+  right: var(--space-5);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100vw - 32px);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  font-size: var(--text-sm);
+  animation: tour-in var(--duration-base) var(--ease-out);
+}
+
+.helpoffer__no {
+  border: none;
+  background: none;
+  color: var(--color-ink-mute);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.helpoffer__no:hover {
+  color: var(--color-ink);
+}
+
+@media (max-width: 720px) {
+  .helpoffer {
+    left: var(--space-4);
+    right: var(--space-4);
+  }
+}

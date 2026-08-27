@@ -189,7 +189,11 @@ export function BoothsPage() {
               활성 부스 {active.length}개 · 미션 {missionCount}개
             </p>
           </div>
-          <button className="btn btn--primary btn--lg" onClick={() => setOpenForm((v) => !v)}>
+          <button
+            className="btn btn--primary btn--lg"
+            data-tour="booth-new"
+            onClick={() => setOpenForm((v) => !v)}
+          >
             {openForm ? '접기' : '＋ 부스 추가'}
           </button>
         </div>
@@ -316,6 +320,7 @@ export function BoothsPage() {
           type="button"
           role="tab"
           className="tabs__tab"
+          data-tour="tab-booths"
           aria-selected={tab === 'booths'}
           onClick={() => setTab('booths')}
         >
@@ -325,6 +330,7 @@ export function BoothsPage() {
           type="button"
           role="tab"
           className="tabs__tab"
+          data-tour="tab-board"
           aria-selected={tab === 'board'}
           onClick={() => setTab('board')}
         >
@@ -339,6 +345,7 @@ export function BoothsPage() {
           type="button"
           role="tab"
           className="tabs__tab"
+          data-tour="tab-prizes"
           aria-selected={tab === 'prizes'}
           onClick={() => setTab('prizes')}
         >

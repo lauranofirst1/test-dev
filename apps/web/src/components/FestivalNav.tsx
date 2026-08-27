@@ -37,6 +37,8 @@ interface Item {
   /** 접었을 때 남는 것. 글자가 사라지므로 이것만으로 구분돼야 한다. */
   icon: string;
   hint: string;
+  /** 화면 안내(`components/Tour`)가 짚을 수 있게 하는 표시. */
+  tour?: string;
   /** 정확히 이 경로일 때만 활성. `/festivals/:id` 는 모든 하위 화면의
       접두사라, 이걸 안 주면 어느 화면에 있든 «현황» 이 켜져 있다. */
   end?: boolean;
@@ -57,6 +59,7 @@ function groupsFor(id: string): Group[] {
           to: `/festivals/${id}`,
           label: '현황',
           icon: '▦',
+          tour: 'nav-overview',
           hint: '지금 무엇이 준비됐고 뭐가 남았는지',
           end: true,
         },
@@ -69,12 +72,14 @@ function groupsFor(id: string): Group[] {
           to: `/festivals/${id}/diagnosis`,
           label: '사전 진단',
           icon: '◎',
+          tour: 'nav-diagnosis',
           hint: '관광 데이터로 기획을 점검하고 고칩니다',
         },
         {
           to: `/festivals/${id}/booths`,
           label: '부스 · 미션',
           icon: '▤',
+          tour: 'nav-booths',
           hint: '부스와 미션, 조각 보드를 만듭니다',
         },
         {
@@ -97,6 +102,7 @@ function groupsFor(id: string): Group[] {
         {
           to: `/festivals/${id}/dashboard`,
           label: '오늘',
+          tour: 'nav-dashboard',
           icon: '⚡',
           hint: '지금 참여가 어디로 몰리는지, 공지와 한시 포인트',
         },
@@ -108,6 +114,7 @@ function groupsFor(id: string): Group[] {
         {
           to: `/festivals/${id}/report`,
           label: '리포트',
+          tour: 'nav-report',
           icon: '▧',
           hint: '목표 대비 실제와 다음 축제 개선안',
         },
@@ -162,6 +169,7 @@ export function FestivalNav({
               to={item.to}
               end={item.end}
               className="snav__item"
+              data-tour={item.tour}
               onClick={onNavigate}
               // 접었을 때는 글자가 없으므로 이름을 여기서 준다.
               title={collapsed ? `${item.label} — ${item.hint}` : item.hint}
