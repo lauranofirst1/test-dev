@@ -1,629 +1,342 @@
-/** 관객 화면 — 참여 시작과 내 조각 보드. 계약 §7, §9.
- *
- * 이 화면은 로그인이 없습니다. 축제 링크로 들어와 버튼 한 번으로 참여 코드를 받고,
- * 그 뒤로는 부스에서 코드를 보여주거나 부스 QR을 스캔해 조각을 모읍니다.
- *
- * 완성 문구는 서버가 완성 판정을 했을 때만 내려옵니다. 클라이언트가 미리 알고
- * 보여주면 완성의 의미가 없어서, 판정도 문구도 서버에만 둡니다.
- */
+/** Lifecycle-aware participant entry: ARRIVE → NOW → REMEMBER. */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { ApiError, api } from '../api/client';
-import { TrailBoard } from '../components/TrailBoard';
-import {
-  clearParticipant,
-  loadParticipant,
-  participantApi,
-  saveParticipant,
-} from '../api/participant';
-import type {
-  MyAttendance,
-  ParticipantOverview,
-  PrizeDrawResult,
-  PrizeDrawStatus,
-  PublicFestival,
-} from '../api/types';
-
-/** 두구두구 지속 시간. 길면 지루하고 짧으면 연출로 안 읽힌다. */
-const ROLL_MS = 1600;
-
-/** 화면이 방금 바뀌었을 때 다시 묻는 간격. */
-const POLL_FAST_MS = 10_000;
-/** 한동안 아무것도 안 바뀌었을 때의 간격. */
-const POLL_SLOW_MS = 45_000;
-/** 몇 번 연속으로 그대로여야 느린 쪽으로 넘어가는가. */
-const IDLE_BEFORE_BACKOFF = 3;
-
-/** 움직임 줄이기를 켠 사람인가. 연출을 통째로 건너뛴다. */
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-}
+import { ApiError } from '../api/client';
+import { participantApi, saveParticipant } from '../api/participant';
+import type { FavoriteMemory, FavoriteMemoryReason, PublicFestival } from '../api/types';
+import { ExperienceCard } from '../components/consumer/ExperienceCard';
+import { FlowTimeline } from '../components/consumer/FlowTimeline';
+import { ShareAction } from '../components/consumer/ShareAction';
+import { featuredExperiences } from '../consumer/adapters';
+import { useConsumerJourney } from '../consumer/hooks';
+import { resolveEventPhase, resolveParticipantLifecycle } from '../consumer/lifecycle';
+import { deriveTimeContext } from '../consumer/metadata';
+import type { ConsumerExperience } from '../consumer/model';
+import type { ConsumerMoment } from '../consumer/moments';
+import { resolveJoinReturnTo } from '../lib/navigation';
+import { buildFlowShareUrl } from '../lib/share';
 
 export function JoinPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
-  const [stored, setStored] = useState(() => loadParticipant(id));
-  const [wasReset, setWasReset] = useState(false);
-  //: 같은 학번으로 다시 들어와 기존 참여를 이어받았는가. 새로 시작한 것과
-  //: 다른 사실이라 그대로 말해 준다 — 모은 조각이 사라진 줄 알면 안 된다.
-  const [resumed, setResumed] = useState(false);
-
-  const festival = useQuery({
-    queryKey: ['public', id],
-    queryFn: () => api.get<PublicFestival>(`/api/festivals/${id}/public`),
-    retry: false,
-  });
-
-  //: 연속으로 값이 그대로였던 횟수. 폴링 간격을 여기서 정한다.
-  const idleRounds = useRef(0);
-  const lastSig = useRef<string | null>(null);
-
-  // 부스에서 스태프가 지급하면 이 화면은 그 사실을 모른다. 그래서 다시 물어본다.
-  //
-  // **한 번에 묻는다.** 보드·진행·뽑기를 따로 물으면 참여자 1명이 10초마다 세
-  // 요청을 만들고, 1000명이 붙는 축제에서는 그것만으로 초당 300 요청이 된다.
-  // 셋은 어차피 같은 순간의 같은 참여자를 말한다.
-  const overview = useQuery({
-    queryKey: ['my-overview', id, stored?.code],
-    queryFn: () =>
-      participantApi.get<ParticipantOverview>(id, '/participants/me/overview', stored!.secret),
-    enabled: !!stored,
-    refetchInterval: () => (idleRounds.current >= IDLE_BEFORE_BACKOFF ? POLL_SLOW_MS : POLL_FAST_MS),
-    retry: false,
-  });
-
-  // ── 안 바뀌면 뜸하게 묻는다 ──
-  //
-  // 관객은 부스 사이를 걸어다니는 동안에도 화면을 켜 둔다. 그 몇 분 동안 서버가
-  // 할 말은 없는데 10초마다 묻는 것은 양쪽 모두의 낭비다. 값이 그대로면 간격을
-  // 늘리고, 뭔가 바뀌면 곧바로 되돌린다.
-  //
-  // 지급을 받는 순간은 관객이 화면을 **보고 있을 때**이고, react-query 는 창이
-  // 다시 앞으로 나오면 스스로 한 번 물어본다. 그래서 느린 간격에 있어도 부스
-  // 앞에서 기다리는 체감은 달라지지 않는다.
-  useEffect(() => {
-    const d = overview.data;
-    if (!d) return;
-    const sig = [
-      d.board.progress.revealed_count,
-      d.me.total_points,
-      d.me.completed_count,
-      d.me.active_campaigns.length,
-      d.prize_draw.can_draw,
-      d.prize_draw.draw?.id ?? 0,
-    ].join('|');
-    if (sig === lastSig.current) idleRounds.current += 1;
-    else {
-      lastSig.current = sig;
-      idleRounds.current = 0;
-    }
-  }, [overview.dataUpdatedAt, overview.data]);
-
-  const board = { data: overview.data?.board, error: overview.error };
-  const me = { data: overview.data?.me };
-  const drawStatus = { data: overview.data?.prize_draw };
-
-  // 저장된 비밀이 더 이상 통하지 않으면 스스로 비우고 처음 화면으로 돌아간다.
-  //
-  // 이걸 하지 않으면 화면에 죽은 코드와 오류 문구만 남고 빠져나갈 버튼이 없어서,
-  // 관객은 localStorage 를 직접 지우는 방법밖에 없다. 운영자가 참여 데이터를
-  // 초기화했거나(리허설), 90일 뒤 익명화됐거나, 축제를 다시 만든 경우에 실제로 걸린다.
-  const authFailed = overview.error instanceof ApiError && overview.error.status === 401;
-
-  useEffect(() => {
-    if (!authFailed) return;
-    clearParticipant(id);
-    setStored(null);
-    setWasReset(true);
-  }, [authFailed, id]);
-
+  const journey = useConsumerJourney(id);
   const [studentNo, setStudentNo] = useState('');
+  const [transition, setTransition] = useState<string | null>(null);
 
   const join = useMutation({
     mutationFn: () => participantApi.issue(id, studentNo.trim() || undefined),
     onSuccess: (issued) => {
-      // secret 은 이 응답에서만 나온다. 여기서 저장하지 않으면 되돌릴 방법이 없다.
       saveParticipant(id, { code: issued.code, secret: issued.secret });
-      setStored({ code: issued.code, secret: issued.secret });
-      setResumed(issued.resumed);
-      setWasReset(false);
-      qc.invalidateQueries({ queryKey: ['my-overview', id] });
+      void qc.invalidateQueries({ queryKey: ['my-progress', id] });
+      setTransition(
+        issued.resumed ? '이전에 남긴 Flow를 이어서 불러왔어요.' : '오늘의 Flow가 시작됐어요.',
+      );
+      const requested = params.get('returnTo');
+      const destination = resolveJoinReturnTo(requested, id, window.location.origin);
+      if (destination) {
+        navigate(destination, { replace: true });
+      }
     },
   });
 
-  const f = festival.data;
-
-  // ── 참여 전 ──
-  if (!stored) {
+  if (journey.festival.isLoading) {
+    return <div className="shell"><div className="skeleton" style={{ height: 260 }} /></div>;
+  }
+  if (journey.festival.error instanceof ApiError || !journey.festival.data) {
     return (
-      <div className="shell stack" style={{ gap: 'var(--space-5)' }}>
-        {festival.isLoading && <div className="skeleton" style={{ height: 200 }} />}
-        {festival.error instanceof ApiError && (
-          <div className="card state">
-            <p className="eyebrow">축제를 찾을 수 없습니다</p>
-            <p className="lede" style={{ textAlign: 'center' }}>{festival.error.message}</p>
-          </div>
-        )}
-        {f && (
-          <>
-            <div className="stack" style={{ gap: 'var(--space-3)' }}>
-              <p className="eyebrow">축제 참여</p>
-              <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>{f.name}</h1>
-              {/* 지역·장소·기간은 읽고 넘기는 정보라 인쇄된 띠로 눕힌다. */}
-              <p className="punch">
-                <span>
-                  {f.region} · {f.venue} · {f.starts_on} ~ {f.ends_on}
-                </span>
-              </p>
-            </div>
-
-            {wasReset && (
-              <div className="notice notice--warn">
-                <span>⚠</span>
-                <span>
-                  이전 참여 정보가 더 이상 유효하지 않아 초기화했습니다. 다시 시작하면 새 참여
-                  코드를 받습니다.
-                </span>
-              </div>
-            )}
-
-            {/* 학번을 묻는지는 축제가 정한다. 관광 축제는 지나가는 관광객에게
-                신원을 요구할 수 없어 익명이 옳고, 교내 행사는 1인 1표와 공결
-                처리 때문에 학번이 필요하다. */}
-            <form
-              className="card stack"
-              style={{ gap: 'var(--space-4)' }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!join.isPending) join.mutate();
-              }}
-            >
-              {f.identity_mode === 'student_id' ? (
-                <>
-                  <p className="lede">
-                    부스를 돌면 그림이 한 조각씩 열리고, 특강 출결도 함께 기록됩니다.
-                  </p>
-                  <div className="field">
-                    <label htmlFor="student-no">
-                      학번 <span className="req">*</span>
-                    </label>
-                    <input
-                      id="student-no"
-                      className="tabular"
-                      value={studentNo}
-                      onChange={(e) => setStudentNo(e.target.value)}
-                      placeholder="20251234"
-                      inputMode="numeric"
-                      autoComplete="off"
-                    />
-                    {/* 왜 받는지 말한다. 이유 없이 학번을 요구하면 가짜를 넣는다. */}
-                    <span className="hint">
-                      한 학번에 한 번만 참여할 수 있습니다. 투표를 여러 번 하는 것을 막고,
-                      공결 명단을 만들기 위해 받습니다. 이름과 연락처는 받지 않습니다.
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <p className="lede">
-                  부스를 돌면 축제 그림이 한 조각씩 열립니다. 이름이나 연락처는 받지 않습니다.
-                </p>
-              )}
-
-              <button
-                className="btn btn--primary btn--lg"
-                type="submit"
-                disabled={
-                  join.isPending || (f.identity_mode === 'student_id' && !studentNo.trim())
-                }
-              >
-                {join.isPending ? '확인 중…' : '참여 시작하기'}
-              </button>
-              {join.error instanceof ApiError && (
-                <div className="notice notice--warn">
-                  <span>⚠</span>
-                  <span>{join.error.message}</span>
-                </div>
-              )}
-            </form>
-
-            <BoothGuide festival={f} />
-          </>
-        )}
+      <div className="shell">
+        <div className="card state">
+          <p className="eyebrow">행사를 찾을 수 없습니다</p>
+          <p className="lede" style={{ textAlign: 'center' }}>
+            {journey.festival.error instanceof ApiError
+              ? journey.festival.error.message
+              : '행사 정보를 불러오지 못했습니다.'}
+          </p>
+        </div>
       </div>
     );
   }
 
-  // ── 참여 후 ──
-  const b = board.data;
-  const progress = b?.progress;
+  const festival = journey.festival.data;
+  if (!journey.participant) {
+    return (
+      <ArriveSurface
+        festival={festival}
+        experiences={journey.experiences}
+        studentNo={studentNo}
+        onStudentNo={setStudentNo}
+        pending={join.isPending}
+        error={join.error instanceof ApiError ? join.error : null}
+        onJoin={() => join.mutate()}
+      />
+    );
+  }
+
+  const phase = resolveEventPhase({
+    status: festival.status,
+    startsOn: festival.starts_on,
+    endsOn: festival.ends_on,
+  });
+  const lifecycle = resolveParticipantLifecycle({
+    hasParticipant: true,
+    momentCount: journey.moments.length,
+    eventPhase: phase,
+  });
+
+  if (lifecycle === 'post_event') {
+    return (
+      <RememberSurface
+        festivalId={id}
+        festival={festival}
+        secret={journey.participant.secret}
+        moments={journey.moments}
+      />
+    );
+  }
 
   return (
-    <div className="shell stack" style={{ gap: 'var(--space-5)' }}>
-      {/* 헤더가 축제 이름을 계속 보여주므로 여기서 반복하지 않는다.
-          참여 전에는 "이 축제가 맞나" 확인이 중요해 이름을 크게 두지만,
-          참여 후에는 확인이 끝났고 필요한 건 지금 어디까지 모았는지다. */}
-      <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>내 축제 조각</h1>
-
-      {resumed && (
-        <div className="notice notice--ok">
-          <span>✓</span>
-          <span>
-            이미 참여한 학번입니다. 기존 참여를 이어받았고 모은 조각도 그대로입니다.
-            이전에 쓰던 기기에서는 로그아웃됩니다.
-          </span>
-        </div>
-      )}
-
-      {/* ── 학생에게는 공결이 먼저다 ──
-          조각 보드는 재미고 공결은 이해관계입니다. 성적에 직결되는 것을 퍼즐
-          아래에 두면, 정작 미달인 학생이 그 사실을 축제가 끝난 뒤에 압니다.
-          익명 축제에서는 이 블록이 통째로 나타나지 않습니다 — 지나가는
-          관광객에게 출결과 투표는 아무 의미가 없습니다. */}
-      {f?.identity_mode === 'student_id' && <StudentDuties festivalId={id} secret={stored.secret} />}
-
-      <div className="ticket">
-        <div className="ticket__stub">
-          <p className="eyebrow">부스에서 이 코드를 보여주세요</p>
-          <div className="accesscode tabular">{stored.code}</div>
-        </div>
-        <div className="ticket__perf" aria-hidden="true">
-          <i />
-        </div>
-        <div className="ticket__foot">
-          <span>지급 {me.data ? me.data.completed_count : '—'}건</span>
-          <span className="tabular">
-            {me.data ? me.data.total_points.toLocaleString() : '—'}점
-          </span>
-        </div>
-      </div>
-
-      {board.error instanceof ApiError && (
-        <div className="notice notice--warn">
-          <span>⚠</span>
-          <span>{board.error.message}</span>
-        </div>
-      )}
-
-      {b && progress && (
-        <div className="card stack boardcard" style={{ gap: 'var(--space-4)' }}>
-          <div
-            className="row"
-            style={{ justifyContent: 'space-between', alignItems: 'center' }}
-          >
-            <p className="figure tabular">
-              {progress.revealed_count} / {progress.total_tiles}
-              <small>모은 조각</small>
-            </p>
-            {progress.is_complete && (
-              <span className="stamp">
-                완성
-                <small>COMPLETE</small>
-              </span>
-            )}
-          </div>
-
-          {/* 같은 타일·같은 공개 기록을 운영자가 고른 표현으로 그린다.
-              구조가 아니라 표현이라 이 값을 바꿔도 진행은 그대로다. */}
-          {b.board_style === 'trail' ? (
-            <TrailBoard
-              tiles={b.tiles}
-              revealedCount={progress.revealed_count}
-              totalTiles={progress.total_tiles}
-            />
-          ) : (
-          <div
-            className="stampgrid"
-            style={{
-              gridTemplateColumns: `repeat(${b.cols}, 1fr)`,
-              // 원본 그림의 비율을 지켜야 조각이 맞춰졌을 때 그림이 된다.
-              ['--grid-ratio' as string]: `${b.cols} / ${b.rows}`,
-            }}
-            role="img"
-            aria-label={`축제 조각 보드, ${progress.total_tiles}조각 중 ${progress.revealed_count}조각 공개`}
-          >
-            {b.tiles.map((t) => (
-              <div
-                key={t.tile_index}
-                className={`stamptile${t.is_revealed ? ' stamptile--on' : ''}`}
-                style={
-                  t.is_revealed
-                    ? {
-                        backgroundImage: `url(${b.image_url})`,
-                        backgroundSize: `${b.cols * 100}% ${b.rows * 100}%`,
-                        backgroundPosition: `${(t.tile_index % b.cols) * (100 / (b.cols - 1 || 1))}% ${
-                          Math.floor(t.tile_index / b.cols) * (100 / (b.rows - 1 || 1))
-                        }%`,
-                      }
-                    : undefined
-                }
-              >
-                {!t.is_revealed && <span aria-hidden="true">?</span>}
-              </div>
-            ))}
-          </div>
-          )}
-
-          {b.complete_message_shown && (
-            <div className="notice notice--ok">
-              <span>✓</span>
-              <span>{b.complete_message_shown}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {drawStatus.data?.enabled && <DrawCard festivalId={id} status={drawStatus.data} />}
-
-      {me.data && me.data.active_campaigns.length > 0 && (
-        <div className="card card--sunk stack" style={{ gap: 'var(--space-3)' }}>
-          <p className="eyebrow">지금 추가 보상</p>
-          {me.data.active_campaigns.map((c) => (
-            <div key={c.id} className="stack" style={{ gap: 2 }}>
-              <strong>
-                {c.title} <span className="tabular">+{c.bonus_points}점</span>
-              </strong>
-              <span className="muted">{c.message}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {me.data && (
-        <div className="card stack" style={{ gap: 'var(--space-2)' }}>
-          <p className="eyebrow">미션</p>
-          {me.data.missions.length === 0 && (
-            <p className="muted">아직 열린 미션이 없습니다. 부스가 준비되면 여기에 표시됩니다.</p>
-          )}
-          <div className="rcpt">
-            {me.data.missions.map((m) => (
-              <div key={m.mission_id} className="rcpt__row">
-                <span className="rcpt__name">
-                  <strong>{m.title}</strong>
-                  <span>{m.booth_name ?? '미배정'}</span>
-                </span>
-                <span className="rcpt__lead" aria-hidden="true" />
-                {m.status === 'granted' ? (
-                  <span className="rcpt__value rcpt__value--done tabular">
-                    ✓ +{(m.granted_points ?? m.points).toLocaleString()}
-                  </span>
-                ) : (
-                  <span className="rcpt__value rcpt__value--muted tabular">
-                    {m.points.toLocaleString()}점
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-    </div>
+    <NowSurface
+      festivalId={id}
+      moments={journey.moments}
+      experiences={journey.experiences}
+      transition={transition}
+    />
   );
 }
 
-/** 경품 뽑기 — 조각을 다 모은 사람만, 축제당 한 번.
- *
- * 결과는 **서버가 뽑습니다.** 화면이 뽑아서 보여주면 새로고침으로 다시 뽑을 수
- * 있고, 재고도 지킬 수 없습니다. 여기는 봉투를 뜯는 동작만 담당합니다.
- *
- * 완성 전에도 카드를 보여줍니다 — 무엇이 걸려 있는지 알아야 부스를 더 돌 이유가
- * 생깁니다. 다만 재고와 확률은 오지 않습니다(서버가 안 내려줍니다).
- */
-function DrawCard({ festivalId, status }: { festivalId: string; status: PrizeDrawStatus }) {
-  const qc = useQueryClient();
-  const stored = loadParticipant(festivalId);
-
-  // 두구두구 — 결과는 **서버가 이미 정했고** 이 연출은 그 위에 덮는 장막이다.
-  // 화면이 뽑는 것처럼 보이면 안 된다. 그래서 응답을 받은 **뒤에** 돌리고,
-  // 도는 동안 보여주는 이름은 실제 결과와 아무 관계가 없다.
-  const [rolling, setRolling] = useState(false);
-  const [face, setFace] = useState(0);
-
-  useEffect(() => {
-    if (!rolling) return;
-    const timer = setInterval(() => setFace((f) => f + 1), 90);
-    const stop = setTimeout(() => setRolling(false), ROLL_MS);
-    return () => {
-      clearInterval(timer);
-      clearTimeout(stop);
-    };
-  }, [rolling]);
-
-  const draw = useMutation({
-    mutationFn: () =>
-      participantApi.post<PrizeDrawResult>(festivalId, '/prize-draw', stored!.secret),
-    onSuccess: () => {
-      // 움직임을 끈 사람에게는 연출을 생략한다. 기다리게 할 이유가 없다.
-      if (!prefersReducedMotion()) setRolling(true);
-      qc.invalidateQueries({ queryKey: ['my-overview', festivalId] });
-    },
-  });
-
-  const result = draw.data ?? status.draw;
-
-  if (rolling && status.prizes.length > 0) {
-    const shown = status.prizes[face % status.prizes.length];
-    return (
-      <div className="card draw">
-        <div className="draw__flap" aria-hidden="true" />
-        <div className="draw__body">
-          <p className="eyebrow">두구두구…</p>
-          {/* aria-live 를 쓰지 않는다 — 90ms 마다 바뀌는 값을 읽어주면 소음이다.
-              스크린리더에는 결과가 나온 뒤 한 번만 전해진다. */}
-          <p className="draw__name draw__rolling" aria-hidden="true">
-            {shown.name}
-          </p>
-          <p className="muted">경품을 뽑고 있습니다</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (result) {
-    return (
-      <div className="card draw">
-        <div className="draw__flap" aria-hidden="true" />
-        <div className="draw__body" role="status">
-          <p className="eyebrow">뽑기 결과</p>
-          {result.prize_name === null ? (
-            // 상품이 하나도 남지 않은 상태. 꽝이라고 말하면 거짓말이다.
-            <>
-              <p className="draw__name">준비된 경품이 모두 소진되었습니다</p>
-              <p className="muted">부스 스태프에게 문의해 주세요.</p>
-            </>
-          ) : (
-            <>
-              <span className={`stamp stamp--lg draw__result`}>
-                {result.is_blank ? '꽝' : '당첨'}
-                <small>{result.is_blank ? 'BLANK' : 'WINNER'}</small>
-              </span>
-              <p className="draw__name">{result.prize_name}</p>
-              {result.prize_description && <p className="muted">{result.prize_description}</p>}
-              {!result.is_blank &&
-                (result.claimed_at ? (
-                  <div className="notice notice--ok">
-                    <span>✓</span>
-                    <span>
-                      수령 완료되었습니다 (
-                      {new Date(result.claimed_at).toLocaleString('ko-KR')}).
-                    </span>
-                  </div>
-                ) : (
-                  // 수령은 스태프가 이 코드로 찾아 확인한다. 위 티켓에도 코드가
-                  // 있지만 여기서 다시 크게 보여준다 — 당첨 화면을 열어 둔 채로
-                  // 창구에 서는데, 그때 위로 스크롤하게 만들면 줄이 멈춘다.
-                  <div className="stack" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
-                    <p className="eyebrow">이 코드를 보여주세요</p>
-                    <div className="accesscode tabular">{stored?.code ?? ''}</div>
-                    <p className="muted">경품 수령대에서 스태프가 확인해 드립니다.</p>
-                  </div>
-                ))}
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
+function ArriveSurface({
+  festival,
+  experiences,
+  studentNo,
+  onStudentNo,
+  pending,
+  error,
+  onJoin,
+}: {
+  festival: PublicFestival;
+  experiences: ConsumerExperience[];
+  studentNo: string;
+  onStudentNo: (value: string) => void;
+  pending: boolean;
+  error: ApiError | null;
+  onJoin: () => void;
+}) {
+  const preview = featuredExperiences(experiences, 3);
   return (
-    <div className="card draw">
-      <div className="draw__flap" aria-hidden="true" />
-      <div className="draw__body">
-        <p className="eyebrow">조각을 다 모으면 뽑기 1회</p>
+    <main className="shell consumer-page consumer-arrive stack">
+      <section className="consumer-event-hero">
+        <p className="eyebrow">오늘 만날 행사</p>
+        <h1>{festival.name}</h1>
+        <p className="consumer-event-meta tabular">
+          <span>{festival.starts_on === festival.ends_on ? festival.starts_on : `${festival.starts_on} — ${festival.ends_on}`}</span>
+          <span>{[festival.region, festival.venue].filter(Boolean).join(' · ')}</span>
+        </p>
+        {festival.summary && <p className="lede">{festival.summary}</p>}
+      </section>
 
-        {status.prizes.length > 0 && (
-          <div className="draw__prizes">
-            {status.prizes.map((p) => (
-              <span
-                key={p.name}
-                className={`draw__chip${p.is_blank ? ' draw__chip--blank' : ''}`}
-              >
-                {p.name}
-              </span>
+      {preview.length > 0 && (
+        <section className="consumer-preview stack">
+          <div className="consumer-section-head">
+            <div><p className="eyebrow">이런 경험이 있어요</p><h2>행사에서 만날 순간</h2></div>
+          </div>
+          <div className="consumer-experience-list">
+            {preview.map((experience, index) => (
+              <ExperienceCard
+                key={experience.key}
+                festivalId={String(festival.id)}
+                experience={experience}
+                context="featured"
+                featured={index === 0}
+              />
             ))}
           </div>
-        )}
+        </section>
+      )}
 
-        {draw.error instanceof ApiError && (
-          <div className="notice notice--warn">
-            <span>⚠</span>
-            <span>{draw.error.message}</span>
+      <form
+        className="consumer-start stack"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!pending) onJoin();
+        }}
+      >
+        {festival.identity_mode === 'student_id' && (
+          <div className="field">
+            <label htmlFor="student-no">학번</label>
+            <input id="student-no" inputMode="numeric" autoComplete="off" value={studentNo} onChange={(event) => onStudentNo(event.target.value)} placeholder="20251234" />
+            <span className="hint">
+              중복 투표를 막고 특강 출결 명단을 만들기 위해 사용합니다. 학교 로그인이나
+              본인 인증은 아니며 이름과 연락처는 받지 않습니다.
+            </span>
           </div>
         )}
+        {festival.identity_mode === 'anonymous' && (
+          <p className="muted">이름이나 연락처 없이 이 행사에서만 쓰는 참여 코드를 만듭니다.</p>
+        )}
+        <details className="consumer-privacy">
+          <summary>기록은 어떻게 쓰이나요?</summary>
+          <p className="muted">
+            상세 열람과 현장에서 확인된 참여는 행사 개선을 위해 집계됩니다. 직접 My
+            Flow에 담은 Personal Moment는 이 기기에만 남고, Favorite Memory는 제출할
+            때만 행사에 전달됩니다.
+          </p>
+        </details>
+        {error && <div className="notice notice--warn"><span>⚠</span><span>{error.message}</span></div>}
+        <button className="btn btn--primary btn--lg" type="submit" disabled={pending || (festival.identity_mode === 'student_id' && !studentNo.trim())}>
+          {pending ? '시작하는 중…' : '행사 시작하기'}
+        </button>
+      </form>
+    </main>
+  );
+}
 
-        {status.can_draw ? (
-          <button
-            className="btn btn--primary btn--lg"
-            onClick={() => draw.mutate()}
-            disabled={draw.isPending}
-          >
-            {draw.isPending ? '뽑는 중…' : '봉투 열기'}
-          </button>
+function NowSurface({ festivalId, moments, experiences, transition }: { festivalId: string; moments: ConsumerMoment[]; experiences: ConsumerExperience[]; transition: string | null }) {
+  const timed = useMemo(
+    () =>
+      experiences
+        .map((experience) => ({ experience, context: deriveTimeContext(experience) }))
+        .filter((item) => item.context && item.context.phase !== 'ended')
+        .sort((a, b) => Date.parse(a.context!.startAt) - Date.parse(b.context!.startAt))
+        .slice(0, 3),
+    [experiences],
+  );
+  const discovery = experiences.find(
+    (experience) => !experience.completed && !timed.some((item) => item.experience.key === experience.key),
+  );
+
+  return (
+    <main className="shell consumer-page consumer-now stack">
+      {transition && <div className="notice notice--ok"><span>✓</span><span>{transition}</span></div>}
+      <section className="consumer-now-flow">
+        <div className="consumer-section-head">
+          <div><p className="eyebrow">My Flow</p><h1>{moments.length > 0 ? `${moments.length}개의 순간이 남았어요.` : '첫 순간을 기다리고 있어요.'}</h1></div>
+          <Link to={`/join/${festivalId}/flow`} className="consumer-text-link">전체 보기 →</Link>
+        </div>
+        <FlowTimeline moments={moments} compact />
+      </section>
+
+      <section className="stack" style={{ gap: 'var(--space-3)' }}>
+        <div className="consumer-section-head"><div><p className="eyebrow">지금</p><h2>잠깐 확인할 것</h2></div></div>
+        {timed.length > 0 ? (
+          <div className="consumer-experience-list">
+            {timed.map(({ experience }) => <ExperienceCard key={experience.key} festivalId={festivalId} experience={experience} context="now" />)}
+          </div>
         ) : (
-          <p className="muted tabular">
-            {status.total_tiles - status.revealed_count}조각 남았습니다
-          </p>
+          <p className="consumer-quiet-state">지금 꼭 확인할 일정은 없어요. 행사장을 천천히 둘러봐도 좋아요.</p>
         )}
+      </section>
+
+      {discovery && (
+        <section className="stack" style={{ gap: 'var(--space-3)' }}>
+          <div className="consumer-section-head"><div><p className="eyebrow">이런 것도 있어요</p></div></div>
+          <ExperienceCard festivalId={festivalId} experience={discovery} context="now" />
+        </section>
+      )}
+
+      <div className="consumer-tool-row">
+        <Link to={`/join/${festivalId}/scan`} className="btn btn--soft">◎ 현장 QR 읽기</Link>
+        <Link to={`/join/${festivalId}/explore`} className="btn btn--ghost">둘러보기</Link>
       </div>
-    </div>
+    </main>
   );
 }
 
-function BoothGuide({ festival }: { festival: PublicFestival }) {
-  if (festival.booths.length === 0) return null;
-  return (
-    <div className="card stack" style={{ gap: 'var(--space-2)' }}>
-      <p className="eyebrow">부스 {festival.booths.length}곳</p>
-      <div className="rcpt">
-        {festival.booths.map((b) => (
-          <div key={b.id} className="rcpt__row">
-            <span className="rcpt__name">
-              <strong>{b.name}</strong>
-              <span>{[b.type_label, b.location].filter(Boolean).join(' · ') || '위치 미정'}</span>
-            </span>
-            <span className="rcpt__lead" aria-hidden="true" />
-            <span className="rcpt__value rcpt__value--muted">
-              {b.verify_mode === 'participant_scan' ? 'QR 스캔' : '스태프 확인'}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+const REASONS: { value: FavoriteMemoryReason; label: string }[] = [
+  { value: 'fun', label: '재밌어서' },
+  { value: 'new', label: '새로워서' },
+  { value: 'together', label: '함께해서' },
+  { value: 'discovered', label: '우연히 발견해서' },
+  { value: 'again', label: '다시 하고 싶어서' },
+];
 
-/** 학생이 먼저 봐야 하는 것 — 공결과 투표.
- *
- * **링크만 두지 않고 숫자를 함께 보여줍니다.** "내 출결 확인하기" 는 눌러야만
- * 알 수 있고, 안 누르면 미달인 줄 모릅니다. 몇 번 중 몇 번인지가 여기 보이면
- * 눌러야 할 사람이 스스로 눌러 봅니다.
- */
-function StudentDuties({ festivalId, secret }: { festivalId: string; secret: string }) {
-  const mine = useQuery({
-    queryKey: ['my-lectures', festivalId],
-    queryFn: () => participantApi.get<MyAttendance[]>(festivalId, '/lectures/me', secret),
+function RememberSurface({ festivalId, festival, secret, moments }: { festivalId: string; festival: PublicFestival; secret: string; moments: ConsumerMoment[] }) {
+  const favorite = useQuery({
+    queryKey: ['favorite-memory', festivalId],
+    queryFn: () => participantApi.get<FavoriteMemory | null>(festivalId, '/favorite-memory', secret),
     retry: false,
   });
+  const [selected, setSelected] = useState<string | null>(null);
+  const [reason, setReason] = useState<FavoriteMemoryReason | null>(null);
+  const [comment, setComment] = useState('');
+  const effectiveKey = selected ?? (favorite.data ? `${favorite.data.source_type}:${favorite.data.source_id}` : null);
 
-  const items = mine.data ?? [];
-  // 공결이 걸린 특강만 센다. 공결이 아닌 특강은 미달이어도 성적에 영향이 없다.
-  const graded = items.filter((a) => a.grants_excused_absence);
-  const short = graded.filter((a) => !a.is_met);
+  useEffect(() => {
+    if (!favorite.data) return;
+    setReason(favorite.data.reason);
+    setComment(favorite.data.comment ?? '');
+  }, [favorite.data]);
+
+  const save = useMutation({
+    mutationFn: () => {
+      const moment = moments.find((item) => item.key === effectiveKey);
+      if (!moment) throw new Error('favorite missing');
+      return participantApi.put<FavoriteMemory>(festivalId, '/favorite-memory', secret, {
+        source_type: moment.sourceType,
+        source_id: moment.sourceId,
+        reason,
+        comment: comment.trim() || null,
+      });
+    },
+    onSuccess: (data) => {
+      void favorite.refetch();
+      setReason(data.reason);
+      setComment(data.comment ?? '');
+    },
+  });
+
+  const shareText = `${festival.name}에서 ${moments.length}개의 순간이 남았어요.`;
+  const shareUrl = buildFlowShareUrl(window.location.origin, festivalId);
 
   return (
-    <div className="duties stack" style={{ gap: 'var(--space-3)' }}>
-      <Link to={`/join/${festivalId}/lectures`} className="card lecturelink">
-        <span className="stack" style={{ gap: 2 }}>
-          <span className="eyebrow">특강 출결</span>
-          {graded.length === 0 ? (
-            <strong>내 출결 확인하기</strong>
-          ) : short.length > 0 ? (
-            // 미달을 숨기지 않는다. 지금 알아야 오늘 채울 수 있다.
-            <strong className="duties__short">
-              {short.length}개 특강이 아직 인정 기준에 못 미칩니다
-            </strong>
-          ) : (
-            <strong>공결 대상 {graded.length}개 모두 인정 기준을 채웠습니다</strong>
-          )}
-          {graded.length > 0 && (
-            <span className="muted tabular">
-              {graded.map((a) => `${a.title} ${a.checked}/${a.required}`).join(' · ')}
-            </span>
-          )}
-        </span>
-        <span aria-hidden="true">→</span>
-      </Link>
+    <main className="shell consumer-page consumer-remember stack">
+      <section className="consumer-event-hero">
+        <p className="eyebrow">Remember</p><h1>{festival.name}에서 남은 순간들</h1>
+        <p className="lede">놓친 것은 세지 않아요. 오늘 내 Flow에 남은 경험만 천천히 돌아보세요.</p>
+      </section>
+      <FlowTimeline moments={moments} />
 
-      <Link to={`/join/${festivalId}/exhibition`} className="card lecturelink">
-        <span className="stack" style={{ gap: 2 }}>
-          <span className="eyebrow">전시 투표</span>
-          <strong>작품 보고 투표하기</strong>
-        </span>
-        <span aria-hidden="true">→</span>
-      </Link>
-    </div>
+      {moments.length > 0 && (
+        <section className="consumer-memory stack">
+          <div><p className="eyebrow">가장 기억에 남은 순간은?</p><h2>하나를 골라 남겨주세요</h2></div>
+          <div className="consumer-memory-options">
+            {moments.map((moment) => (
+              <button type="button" key={moment.key} aria-pressed={effectiveKey === moment.key} className={effectiveKey === moment.key ? 'is-selected' : ''} onClick={() => {
+                if (effectiveKey !== moment.key) {
+                  setReason(null);
+                  setComment('');
+                }
+                setSelected(moment.key);
+              }}>
+                <span>{moment.title}</span><small>{moment.typeLabel}</small>
+              </button>
+            ))}
+          </div>
+          {effectiveKey && (
+            <>
+              <div className="tagbar">
+                {REASONS.map((item) => (
+                  <button key={item.value} type="button" className={`tagchip${reason === item.value ? ' tagchip--on' : ''}`} onClick={() => setReason(reason === item.value ? null : item.value)}>{item.label}</button>
+                ))}
+              </div>
+              <div className="field"><label htmlFor="memory-comment">한 줄 더 남기기 (선택)</label><input id="memory-comment" maxLength={500} value={comment} onChange={(event) => setComment(event.target.value)} /></div>
+              {save.error instanceof ApiError && <div className="notice notice--warn"><span>⚠</span><span>{save.error.message}</span></div>}
+              {save.isSuccess && <div className="notice notice--ok"><span>✓</span><span>이 순간을 행사에 전했어요.</span></div>}
+              <button className="btn btn--primary btn--lg" type="button" onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? '남기는 중…' : '가장 기억에 남은 순간으로 남기기'}</button>
+            </>
+          )}
+        </section>
+      )}
+      <ShareAction
+        data={{ title: `${festival.name} · My Flow`, text: shareText, url: shareUrl }}
+        fallbackText={`${shareText}\n${shareUrl}`}
+        label="My Flow 공유하기"
+      />
+      <Link to={`/join/${festivalId}/flow`} className="consumer-text-link">내 Flow 자세히 보기 →</Link>
+    </main>
   );
 }

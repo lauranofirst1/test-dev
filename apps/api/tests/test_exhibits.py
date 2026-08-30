@@ -269,6 +269,8 @@ def test_audience_never_sees_vote_counts(client, campus, db):
     # 내가 준 표는 보인다 — 그건 남의 정보가 아니다.
     mine = client.get(f"/api/festivals/{campus.id}/exhibition", headers=voter).json()
     assert [x["voted"] for x in mine["exhibits"] if x["id"] == a["id"]] == [True]
+    assert [x["voted_at"] is not None for x in mine["exhibits"] if x["id"] == a["id"]] == [True]
+    assert [x["voted_at"] for x in mine["exhibits"] if x["id"] == b["id"]] == [None]
     assert b["id"] not in [x["id"] for x in mine["exhibits"] if x["voted"]]
 
 
@@ -284,7 +286,12 @@ def test_judge_scores_are_recorded_and_overwritten_not_duplicated(client, campus
 
     first = client.put(
         f"/api/festivals/{campus.id}/exhibits/{e['id']}/scores",
-        json={"scores": [{"criterion_id": c1["id"], "score": 4}, {"criterion_id": c2["id"], "score": 5}]},
+        json={
+            "scores": [
+                {"criterion_id": c1["id"], "score": 4},
+                {"criterion_id": c2["id"], "score": 5},
+            ]
+        },
         headers=_as(judge),
     )
     assert first.status_code == 200, first.text
@@ -505,7 +512,7 @@ def test_weighting_is_configurable(client, campus, db):
 
 def test_archived_exhibit_leaves_the_ranking(client, campus, db):
     """지우지 않고 아카이브한다 — 이미 받은 표와 점수를 지우면 집계가 흔들린다."""
-    keep = _exhibit(client, campus, "남는 작품")
+    _exhibit(client, campus, "남는 작품")
     drop = _exhibit(client, campus, "내리는 작품")
     db.commit()
 

@@ -13,13 +13,13 @@ import asyncio
 import json
 import logging
 import re
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 from urllib.parse import quote, unquote
 
 import httpx
+from defusedxml import ElementTree as ET
 
 from festaflow.core.config import DEMAND_SERVICES, settings
 
@@ -188,7 +188,12 @@ def _extract(payload: dict[str, Any], *, service: str, operation: str) -> KtoRes
 
     code = str(header.get("resultCode", "")).strip()
     if code and code not in NORMAL_CODES:
-        _raise_for_code(code, str(header.get("resultMsg", "")), service=service, operation=operation)
+        _raise_for_code(
+            code,
+            str(header.get("resultMsg", "")),
+            service=service,
+            operation=operation,
+        )
 
     # items 는 빈 문자열 / dict / {"item": dict} / {"item": [dict]} 로 온다.
     raw_items = body.get("items")
@@ -276,7 +281,9 @@ class TourApiClient:
             KtoTransientError: 재시도해도 실패한 일시 장애
         """
         if self.is_blocked(service):
-            raise KtoQuotaExceeded(f"{service}: 오늘 한도 초과로 차단된 상태입니다.", code=QUOTA_CODE)
+            raise KtoQuotaExceeded(
+                f"{service}: 오늘 한도 초과로 차단된 상태입니다.", code=QUOTA_CODE
+            )
 
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=settings.kto_timeout_seconds)

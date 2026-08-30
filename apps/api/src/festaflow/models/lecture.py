@@ -61,6 +61,7 @@ class LectureSession(Base, TimestampMixin, ArchivableMixin):
     )
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     speaker: Mapped[str | None] = mapped_column(String(120), nullable=True)
     affiliation: Mapped[str | None] = mapped_column(String(120), nullable=True)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -82,6 +83,7 @@ class LectureSession(Base, TimestampMixin, ArchivableMixin):
         Boolean, nullable=False, server_default="false"
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     #: 체크인 QR 의 HMAC 키. 부스 `qr_secret` 과 같은 이유로 응답에 싣지 않는다.
     qr_secret: Mapped[bytes] = mapped_column(

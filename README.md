@@ -11,8 +11,14 @@
 ## 문서
 
 설계 문서는 [docs/](docs/)에 있습니다. 처음이면 [docs/README.md](docs/README.md)부터 보세요.
+팀 개발·Windows 설정·GitHub PR 절차는
+**[docs/12-team-github-guide.md](docs/12-team-github-guide.md)** 에 있습니다.
 
 ## 개발 환경 준비
+
+Python 3.12+, PostgreSQL 15+, Node.js 20+(22 LTS 권장)가 필요합니다. 아래 명령은
+macOS 기준이며 Windows PowerShell 절차는 [팀 GitHub 가이드](docs/12-team-github-guide.md#3-최초-로컬-설정)를
+따르세요.
 
 ### 1. 데이터베이스
 
@@ -21,7 +27,7 @@ brew install postgresql@17
 brew services start postgresql@17
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 
-createuser -s festaflow
+createuser -d festaflow
 createdb -O festaflow festaflow
 psql -d festaflow -c "ALTER USER festaflow WITH PASSWORD 'festaflow';"
 psql -d festaflow -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
@@ -55,7 +61,7 @@ python3 -m venv .venv
 
 ```bash
 cd apps/web
-npm install
+npm ci
 ```
 
 ## 실행
@@ -113,7 +119,7 @@ cd apps/api
 
 빈 화면에서는 무엇이 잘못됐는지 보이지 않습니다. **계정 하나와 안이 채워진 축제
 하나**를 명령 한 번으로 만듭니다 — 부스와 참여, 특강 출결(찍고 나간 사람 포함),
-전시 작품과 심사 점수와 관객 투표까지.
+전시 작품과 심사 점수·관객 투표, Consumer Experience 12개와 Open/Favorite까지.
 
 ```bash
 cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
@@ -123,13 +129,17 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 
 무엇을 어디서 봐야 하는지, 버그를 어떻게 알리는지는
 **[docs/10-team-testing.md](docs/10-team-testing.md)** 에 있습니다.
+포크·기능 브랜치·검증·PR 제출 순서는
+**[docs/12-team-github-guide.md](docs/12-team-github-guide.md)** 에 있습니다.
+Consumer 전체 여정의 QA 결과와 실제 파일럿 전 남은 게이트는
+**[docs/11-consumer-pilot-readiness.md](docs/11-consumer-pilot-readiness.md)** 에 있습니다.
 
 > 🚨 개발·테스트 DB 전용입니다. 이 비밀번호는 가입 화면으로는 만들 수 없습니다
 > (정책이 이메일 아이디가 든 비밀번호를 거절합니다). 운영 DB 에 돌리지 마세요.
 
 ## 진행 상황
 
-테스트 **472개 통과**. 기획 진단부터 현장 QR 지급·조각 수집, 부스 퀴즈,
+테스트 **491개 통과**. 기획 진단부터 현장 QR 지급·조각 수집, 부스 퀴즈,
 완성 보상 뽑기, 축제 당일 운영 대시보드와 한시 추가 포인트, 사후 성과 리포트까지
 하나의 흐름으로 돕니다.
 
@@ -142,7 +152,7 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 | 데이터 모델 · Alembic 마이그레이션 | ✅ 제약 테스트 25개 |
 | 사전 진단 파이프라인 | ✅ 테스트 36개 · 실호출로 검증 |
 | 축제 · 진단 API | ✅ 테스트 16개 |
-| 스태프 인증 (2단계 로그인 · JWT) | ✅ 로그인 화면까지 |
+| 스태프 인증 (2단계 로그인 · JWT) | ✅ 로그인·잠금·역할 검사 |
 | 기관 계정 (회원가입 · 로그인 · 세션) | ✅ 테스트 25개 |
 | 스태프 발급 · 재발급 · 비활성화 | ✅ 테스트 12개 |
 | 비밀번호 재설정 · SMTP 발송 | ✅ 테스트 6개 |
@@ -152,7 +162,7 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 | 진행 보드 표현 — 그림 퍼즐 · 스탬프 지도 | ✅ |
 | 경품 뽑기 — 재고 · 가중치 · 수령 확인 | ✅ 테스트 15개 |
 | 프론트엔드 — 기획자 화면 | 🟡 목록 · 생성 · 진단 · 부스/체험/경품 |
-| 프론트엔드 — 관객 화면 | 🟡 참여 · 조각 보드 · QR 스캔 · 퀴즈 · 뽑기 |
+| 프론트엔드 — 관객 화면 | 🟡 Consumer V1 기술 검증 완료 · 실제 기기/사용자 파일럿 게이트 남음 |
 | 운영 인사이트 — 편중 판정 · 확인 요청 카드 | ✅ 테스트 30개 |
 | 한시 추가 포인트 — 캠페인 · 전후 변화 | ✅ 테스트 17개 |
 | 사후 리포트 — 목표 대비 · 개선안 | ✅ 테스트 29개 |
@@ -161,15 +171,14 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 | 공결 확인서 — 교수님이 계정 없이 확인 | ✅ 테스트 11개 |
 | 사진 체험 | ⛔ **의도적 미구현** — 법률 검토·S3·동의 기록 선행 |
 
-**🟡 스태프 인증** — `POST /api/auth/staff/login` 은 계약대로 돕니다(접근 코드 bcrypt,
-5회 실패 시 10분 잠금, 자기 축제만 접근, 역할 검사). 남은 것 두 가지입니다.
+**스태프·기관 인증** — `POST /api/auth/staff/login` 은 계약대로 돕니다(접근 코드 bcrypt,
+5회 실패 시 10분 잠금, 자기 축제만 접근, 역할 검사). 기관 계정의 회원가입·로그인·
+httpOnly 세션도 구현되어 있습니다.
 
-- **기획자(planner) 자격증명이 스펙에 없습니다.** 계약의 로그인은 축제별 스태프용이라
-  `festival_id` 가 필요한데 축제 목록·생성은 축제가 생기기 전에 호출됩니다.
-  그래서 이 두 엔드포인트만 `X-Organization-Id` 헤더 폴백을 쓰고, 폴백은
-  `APP_ENV=local` 또는 `DEMO_MODE=true` 에서만 삽니다. 그 밖에서는 401 입니다.
-- 스태프 발급·목록·코드 재발급·비활성화 엔드포인트(계약 §1)가 아직 없습니다.
-  지금은 축제 생성 시 만들어지는 운영자 한 명으로만 로그인합니다.
+- `X-Organization-Id` 헤더 폴백은 로컬 개발에서만 동작합니다. 배포 환경에서는 기관
+  계정이나 스태프 세션이 없으면 401로 닫히며, `DEMO_MODE=true` 배포는 부팅 단계에서
+  거부합니다.
+- 스태프 목록·발급·코드 재발급·비활성화·재활성화·잠금 해제가 구현되어 있습니다.
 
 **🟡 프론트엔드** — 기획자 화면(워크스페이스 · 새 축제 · 사전 진단 · 부스/체험/경품)과
 관객 화면(`/join/:id` 참여·진행 보드, `/join/:id/scan` 체험), 그리고 부스에 띄우는
@@ -180,9 +189,10 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 스태프 로그인(`/staff/login`)과 스태프 발급 화면까지 있습니다. 세션은 전부
 **httpOnly 쿠키**로 오가며 화면이 토큰을 저장하지 않습니다.
 
-**비밀번호 재설정은 메일 발송기가 없어 운영에서 동작하지 않습니다.** 로직과
-화면은 완성돼 있고 로컬에서는 링크가 서버 로그에 찍힙니다 — SMTP나 메일 제공자를
-붙이면 그 자리(`services/mailer.py`) 하나만 고치면 됩니다.
+**비밀번호 재설정 메일 발송기는 구현돼 있지만 운영 SMTP 설정이 필요합니다.**
+로컬에서 SMTP를 비워 두면 링크가 서버 로그에 찍히고, 운영에서는 `SMTP_HOST`,
+`MAIL_FROM`과 제공자 계정을 설정해야 실제 메일이 발송됩니다. 설정이 빠진 운영
+환경은 발송 실패를 오류 로그로 남깁니다.
 
 조각 보드 그림은 **부스 화면에서 직접 올립니다**(PNG·JPG·WEBP, 5MB 이하).
 올린 파일은 `apps/api/media/` 에 저장되고 `/media` 로 서빙되며, 저장소에는
@@ -191,7 +201,8 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 생성 스크립트는 `apps/web/scripts/make-placeholder-board.py` 입니다.
 
 **부스 QR 체험** — 부스 QR을 찍은 관객에게 무엇을 시킬지 미션마다 정합니다.
-`도착 확인`(버튼 한 번) · `퀴즈`(객관식) · `안내 읽기` 세 가지입니다.
+`도착 확인`(버튼 한 번) · `퀴즈`(객관식) · `안내 읽기` · `설문`(평점/선택형)
+네 가지입니다. 설문은 자유 서술을 받지 않아 불필요한 개인정보 입력을 막습니다.
 퀴즈 **채점은 서버만 하고 정답도 해설도 화면에 내려가지 않습니다** — 내려가면 개발자
 도구를 여는 것으로 축제 전체가 통과됩니다. 오답은 참여 이력을 만들지 않아
 집계에 섞이지 않고, 시도 횟수만 따로 셉니다.
@@ -203,8 +214,9 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 체험이 붙은 부스는 QR 인정 시간이 30~60초에서 **2분 30초**로 늘어납니다.
 퀴즈를 60초 안에 못 풀면 "정답을 아는데 만료됐다"에 갇히기 때문입니다.
 
-`사진`·`설문`은 개인정보 수집·보관·삭제 정책이 정해질 때까지 저장 단계에서
-막습니다. 조용히 저장하면 운영자는 설정한 줄 알고 현장에선 아무것도 안 뜹니다.
+`사진`은 개인정보 수집·보관·삭제 정책과 외부 객체 저장소가 정해질 때까지 저장
+단계에서 막습니다. 조용히 저장하면 운영자는 설정한 줄 알고 현장에선 아무것도 안
+뜨기 때문에 명시적 오류로 거부합니다.
 
 **경품 뽑기** — 조각을 다 모은 관객이 축제당 한 번 돌립니다.
 설계 문서가 룰렛을 미룬 이유(보너스 포인트가 보상 캠페인과 겹침)를 **포인트 대신

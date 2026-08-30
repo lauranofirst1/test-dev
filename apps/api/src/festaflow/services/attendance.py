@@ -187,6 +187,8 @@ class AttendanceResult:
     #: 지금까지 열린 체크인 수. 강의 중에는 계속 늘어난다.
     opened: int
     required: int
+    #: 가장 최근 체크인 시각. 출석 인정 여부는 호출자가 함께 확인한다.
+    completed_at: datetime | None = None
 
     @property
     def is_met(self) -> bool:
@@ -201,19 +203,25 @@ class AttendanceResult:
 def result_for(
     db: Session, session: LectureSession, participant_id: int
 ) -> AttendanceResult:
-    checked = db.execute(
-        select(func.count(SessionAttendance.id)).where(
+    checked, completed_at = db.execute(
+        select(
+            func.count(SessionAttendance.id),
+            func.max(SessionAttendance.checked_at),
+        ).where(
             SessionAttendance.session_id == session.id,
             SessionAttendance.participant_id == participant_id,
         )
-    ).scalar_one()
+    ).one()
     opened = db.execute(
         select(func.count(SessionCheckpoint.id)).where(
             SessionCheckpoint.session_id == session.id
         )
     ).scalar_one()
     return AttendanceResult(
-        checked=int(checked), opened=int(opened), required=session.required_checkins
+        checked=int(checked),
+        opened=int(opened),
+        required=session.required_checkins,
+        completed_at=completed_at,
     )
 
 

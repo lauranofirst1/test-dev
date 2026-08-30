@@ -27,6 +27,7 @@ import type {
 
 const EMPTY = {
   title: '',
+  summary: '',
   speaker: '',
   affiliation: '',
   location: '',
@@ -34,6 +35,7 @@ const EMPTY = {
   ends_at: '',
   required_checkins: '2',
   grants_excused_absence: true,
+  is_featured: false,
 };
 
 export function LecturesPage() {
@@ -61,6 +63,7 @@ export function LecturesPage() {
     mutationFn: () =>
       api.post(`/api/festivals/${id}/lectures`, {
         title: form.title.trim(),
+        summary: form.summary.trim() || null,
         speaker: form.speaker.trim() || null,
         affiliation: form.affiliation.trim() || null,
         location: form.location.trim() || null,
@@ -68,6 +71,7 @@ export function LecturesPage() {
         ends_at: new Date(form.ends_at).toISOString(),
         required_checkins: Number(form.required_checkins) || 2,
         grants_excused_absence: form.grants_excused_absence,
+        is_featured: form.is_featured,
         is_active: true,
       }),
     onSuccess: () => {
@@ -120,6 +124,17 @@ export function LecturesPage() {
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="인공지능, 무엇이고 어디로 가고 있는가?"
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="lec-summary">참가자는 이 강연에서 무엇을 듣게 되나요?</label>
+            <textarea
+              id="lec-summary"
+              value={form.summary}
+              maxLength={2000}
+              onChange={(e) => setForm({ ...form, summary: e.target.value })}
+              placeholder="강연을 선택하는 데 필요한 내용을 짧게 알려주세요."
             />
           </div>
 
@@ -208,6 +223,16 @@ export function LecturesPage() {
               style={{ width: 20, height: 20 }}
             />
             <span className="muted">공결 대상 강의 — 명단을 학교에 제출합니다.</span>
+          </label>
+
+          <label className="row" style={{ gap: 'var(--space-2)' }}>
+            <input
+              type="checkbox"
+              checked={form.is_featured}
+              onChange={(e) => setForm({ ...form, is_featured: e.target.checked })}
+              style={{ width: 20, height: 20 }}
+            />
+            <span className="muted">처음 온 참가자에게 보여주기</span>
           </label>
 
           {create.error instanceof ApiError && (
@@ -336,7 +361,12 @@ export function LecturesPage() {
         onClose={() => setOpenId(null)}
       >
         {openSession && (
-          <LecturePanel festivalId={id} session={openSession} onChanged={reload} />
+          <LecturePanel
+            key={openSession.id}
+            festivalId={id}
+            session={openSession}
+            onChanged={reload}
+          />
         )}
       </Drawer>
     </div>
@@ -369,6 +399,7 @@ function LecturePanel({
       window.open(
         `/festivals/${festivalId}/lectures/${session.id}/checkin/${cp.checkpoint_id}`,
         '_blank',
+        'noopener,noreferrer',
       );
     },
   });
@@ -419,6 +450,12 @@ function LecturePanel({
         </div>
       </div>
 
+      <LectureConsumerMetadata
+        festivalId={festivalId}
+        session={session}
+        onChanged={onChanged}
+      />
+
       {open.error instanceof ApiError && (
         <div className="notice notice--warn">
           <span>⚠</span>
@@ -430,6 +467,76 @@ function LecturePanel({
           명단이고, 한 번 더 눌러야 나오면 그 절반이 숨는다. */}
       {roster.isLoading && <div className="skeleton" style={{ height: 120 }} />}
       {roster.data && <RosterTable roster={roster.data} />}
+    </div>
+  );
+}
+
+function LectureConsumerMetadata({
+  festivalId,
+  session,
+  onChanged,
+}: {
+  festivalId: string;
+  session: LectureSessionDetail;
+  onChanged: () => void;
+}) {
+  const [summary, setSummary] = useState(session.summary ?? '');
+  const [featured, setFeatured] = useState(session.is_featured);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.put(`/api/festivals/${festivalId}/lectures/${session.id}`, {
+        title: session.title,
+        summary: summary.trim() || null,
+        speaker: session.speaker,
+        affiliation: session.affiliation,
+        location: session.location,
+        starts_at: session.starts_at,
+        ends_at: session.ends_at,
+        required_checkins: session.required_checkins,
+        grants_excused_absence: session.grants_excused_absence,
+        is_featured: featured,
+        is_active: session.is_active,
+      }),
+    onSuccess: onChanged,
+  });
+
+  return (
+    <div className="card card--sunk stack" style={{ gap: 'var(--space-3)' }}>
+      <p className="eyebrow">참가자 화면</p>
+      <div className="field">
+        <label htmlFor={`lecture-summary-${session.id}`}>강연 한 줄 소개</label>
+        <textarea
+          id={`lecture-summary-${session.id}`}
+          value={summary}
+          maxLength={2000}
+          onChange={(event) => setSummary(event.target.value)}
+          placeholder="모르면 비워 두어도 됩니다."
+        />
+      </div>
+      <label className="row" style={{ gap: 'var(--space-2)' }}>
+        <input
+          type="checkbox"
+          checked={featured}
+          onChange={(event) => setFeatured(event.target.checked)}
+          style={{ width: 20, height: 20 }}
+        />
+        <span className="muted">처음 온 참가자에게 보여주기</span>
+      </label>
+      {save.error instanceof ApiError && (
+        <div className="notice notice--warn">
+          <span>⚠</span>
+          <span>{save.error.message}</span>
+        </div>
+      )}
+      <button
+        type="button"
+        className="btn btn--ghost"
+        onClick={() => save.mutate()}
+        disabled={save.isPending}
+      >
+        {save.isPending ? '저장 중…' : '참가자 정보 저장'}
+      </button>
     </div>
   );
 }

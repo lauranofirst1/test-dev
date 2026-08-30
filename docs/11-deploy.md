@@ -40,6 +40,9 @@
 **부스 QR 스캔이 카메라를 씁니다**(`navigator.mediaDevices.getUserMedia`).
 브라우저는 HTTPS 가 아닌 페이지에는 **카메라를 아예 열어 주지 않습니다.**
 
+Caddy는 HSTS, clickjacking 차단, MIME sniffing 차단과 같은 출처 카메라만 허용하는
+기본 보안 헤더도 응답에 붙입니다.
+
 즉 `http://140.x.x.x` 같은 IP 주소로 띄우면 화면은 다 보이는데 스캔만 안 됩니다.
 그리고 스캔은 이 서비스의 핵심 기능입니다.
 
@@ -148,12 +151,14 @@ nano .env
 | 값 | 무엇을 넣나 |
 |---|---|
 | `SITE_ADDRESS` | `festaflow.duckdns.org` — **`http://` 를 붙이지 마세요.** 도메인만 |
-| `POSTGRES_PASSWORD` | `openssl rand -base64 24` 결과 |
+| `POSTGRES_PASSWORD` | `openssl rand -hex 32` 결과. DATABASE_URL에 그대로 들어가므로 URL 예약문자가 없는 hex 사용 |
 | `JWT_SECRET` | `openssl rand -hex 32` 결과. **개발 기본값이면 서버가 뜨지 않습니다** |
 | `KTO_API_KEY` | 공공데이터포털 **Decoding 키** |
 
-`CORS_ORIGINS` 는 손대지 않아도 됩니다 — 화면과 API 가 같은 주소를 쓰므로
-브라우저가 CORS 를 따지지 않습니다.
+`PUBLIC_WEB_ORIGIN`, `CORS_ORIGINS`, `TRUSTED_HOSTS`,
+`SESSION_COOKIE_SECURE=true`, `DEMO_MODE=false`는 compose가 `SITE_ADDRESS`에서
+안전한 production 값으로 넣습니다. 화면과 API는 같은 공개 주소를 쓰며, 필수값이
+빠지거나 HTTP 주소가 들어가면 API가 부팅을 거부합니다.
 
 > `.env` 는 `.gitignore` 와 `.dockerignore` 양쪽에 있습니다. 커밋되지도,
 > 이미지에 들어가지도 않습니다.
@@ -241,7 +246,7 @@ docker run --rm -v festaflow_media:/m -v ~:/out alpine tar czf /out/media-$(date
 | 접속이 아예 안 된다 | 방화벽 **두 겹** 중 하나를 안 열었습니다 (4장) |
 | 자물쇠가 안 뜨고 경고가 난다 | 도메인이 서버를 안 가리킵니다. `dig +short` 로 확인 |
 | QR 스캔에서 카메라가 안 열린다 | HTTPS 가 아닙니다. `SITE_ADDRESS` 에 도메인이 들어갔는지 확인 |
-| `api` 가 계속 재시작한다 | `docker compose logs api` — 대개 `JWT_SECRET` 이 개발 기본값입니다 |
+| `api` 가 계속 재시작한다 | `docker compose logs api` — 대개 `JWT_SECRET`이 개발 기본값이거나 `SITE_ADDRESS`가 도메인 형식이 아닙니다 |
 | 부스를 만들면 500 | `pgcrypto` 가 없습니다. `pgdata` 볼륨을 지우고 다시 올리면 초기화 스크립트가 돕니다 |
 | 재배포했더니 보드 그림이 사라졌다 | `media` 볼륨이 안 붙었습니다. `docker compose ps` 와 compose 파일 확인 |
 | 인증서를 자주 새로 받는다 | `caddy_data` 볼륨이 없으면 매번 재발급하다 Let's Encrypt 한도에 걸립니다 |

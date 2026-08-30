@@ -329,6 +329,7 @@ def _mine(db: Session, session: LectureSession, participant_id: int) -> MyAttend
         opened=r.opened,
         is_met=r.is_met,
         remaining=r.remaining,
+        completed_at=r.completed_at if r.is_met else None,
     )
 
 

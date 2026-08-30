@@ -11,8 +11,8 @@ from sqlalchemy import (
     Index,
     Integer,
     LargeBinary,
+    SmallInteger,
     String,
-    Text,
     func,
     text,
 )
@@ -82,6 +82,11 @@ class Mission(Base, TimestampMixin, ArchivableMixin):
     __tablename__ = "missions"
     __table_args__ = (
         CheckConstraint("points BETWEEN 0 AND 1000000", name="points_range"),
+        CheckConstraint(
+            "estimated_duration_minutes IS NULL OR "
+            "estimated_duration_minutes BETWEEN 1 AND 1440",
+            name="estimated_duration_range",
+        ),
         Index("ix_missions_booth", "booth_id", postgresql_where="archived_at IS NULL"),
         Index("ix_missions_festival", "festival_id", postgresql_where="archived_at IS NULL"),
     )
@@ -99,6 +104,8 @@ class Mission(Base, TimestampMixin, ArchivableMixin):
     description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     points: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    estimated_duration_minutes: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     # ── QR 체험 ──
     experience_type: Mapped[ExperienceType] = mapped_column(

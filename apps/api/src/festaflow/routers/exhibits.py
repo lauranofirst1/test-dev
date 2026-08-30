@@ -40,10 +40,10 @@ from festaflow.schemas.exhibit import (
     CriterionOut,
     CriterionResultOut,
     ExhibitIn,
+    ExhibitionSettingsIn,
     ExhibitList,
     ExhibitOut,
     ExhibitResultOut,
-    ExhibitionSettingsIn,
     JudgeProgressOut,
     JudgeSheetOut,
     MyScoreOut,
@@ -158,7 +158,8 @@ def upload_poster(
     exhibit_id: int,
     db: DbSession,
     org: CurrentOrg,
-    file: UploadFile = File(...),
+    # ruff B008: FastAPI는 업로드 의존성을 기본값으로 선언하는 것이 관용구다.
+    file: UploadFile = File(...),  # noqa: B008
 ) -> ExhibitOut:
     """포스터 업로드. 조각 보드 그림과 같은 검사를 거친다 —
     매직 바이트로 형식을 판별하고, 확장자와 이름은 서버가 붙인다."""
@@ -414,7 +415,14 @@ def voting_status(
     """
     festival = _live(db, festival_id)
     exhibits = svc.active_exhibits(db, festival.id)
-    mine = svc.voted_exhibit_ids(db, festival.id, participant.id)
+    mine = dict(
+        db.execute(
+            select(AudienceVote.exhibit_id, AudienceVote.voted_at).where(
+                AudienceVote.festival_id == festival.id,
+                AudienceVote.participant_id == participant.id,
+            )
+        ).all()
+    )
 
     reason: str | None = None
     can_vote = True
@@ -443,6 +451,7 @@ def voting_status(
                 tags=list(e.tags or []),
                 location=e.location,
                 voted=e.id in mine,
+                voted_at=mine.get(e.id),
             )
             for e in exhibits
         ],

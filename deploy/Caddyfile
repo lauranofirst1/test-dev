@@ -8,6 +8,16 @@
 {$SITE_ADDRESS} {
 	encode gzip zstd
 
+	# 기본 브라우저 방어. 카메라는 같은 출처의 스캐너에만 허용한다.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+	}
+
 	# 업로드된 조각 보드 그림. 백엔드가 /media 로 서빙합니다.
 	handle /media/* {
 		reverse_proxy api:8000

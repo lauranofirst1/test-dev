@@ -73,7 +73,12 @@ export function PrizeSettings({ festivalId }: { festivalId: string }) {
           </p>
         </div>
         {/* 현장에서 실물을 건네는 화면. 창구 태블릿에 따로 띄운다. */}
-        <Link to={`/festivals/${festivalId}/claim`} className="btn btn--soft" target="_blank">
+        <Link
+          to={`/festivals/${festivalId}/claim`}
+          className="btn btn--soft"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           경품 수령대 열기 ↗
         </Link>
       </div>

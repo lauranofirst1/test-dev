@@ -105,6 +105,13 @@ export function ExperienceEditor({
   onClose: () => void;
 }) {
   const [type, setType] = useState<ExperienceType>(mission.experience_type);
+  const [summary, setSummary] = useState(mission.description ?? '');
+  const [duration, setDuration] = useState(
+    mission.estimated_duration_minutes == null
+      ? ''
+      : String(mission.estimated_duration_minutes),
+  );
+  const [featured, setFeatured] = useState(mission.is_featured);
   const [quiz, setQuiz] = useState(() => quizDraftOf(mission.experience_config));
   const [info, setInfo] = useState(() => infoDraftOf(mission.experience_config));
   const [survey, setSurvey] = useState(() => surveyDraftOf(mission.experience_config));
@@ -115,9 +122,11 @@ export function ExperienceEditor({
       api.put<MissionOut>(`/api/festivals/${festivalId}/missions/${mission.id}`, {
         // PUT 은 전체 교체다. 안 보낸 필드는 기본값으로 덮인다.
         title: mission.title,
-        description: mission.description,
+        description: summary.trim() || null,
         points: mission.points,
         is_active: mission.is_active,
+        estimated_duration_minutes: duration ? Number(duration) : null,
+        is_featured: featured,
         experience_type: type,
         experience_config: buildConfig(),
       }),
@@ -180,6 +189,49 @@ export function ExperienceEditor({
         <button className="btn btn--ghost" onClick={onClose} type="button">
           닫기
         </button>
+      </div>
+
+      <div className="stack" style={{ gap: 'var(--space-4)' }}>
+        <div className="field">
+          <label htmlFor={`consumer-summary-${mission.id}`}>
+            참가자는 여기서 뭘 하게 되나요?
+          </label>
+          <textarea
+            id={`consumer-summary-${mission.id}`}
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            maxLength={2000}
+            placeholder="현장에서 어떤 경험을 하게 되는지 짧게 알려주세요."
+          />
+          <span className="hint">참가자가 상세 화면에서 가장 먼저 읽는 소개입니다.</span>
+        </div>
+
+        <div className="grid2">
+          <div className="field field--inline">
+            <label htmlFor={`consumer-duration-${mission.id}`}>보통 얼마나 걸려요?</label>
+            <input
+              id={`consumer-duration-${mission.id}`}
+              type="number"
+              min={1}
+              max={1440}
+              inputMode="numeric"
+              value={duration}
+              onChange={(event) => setDuration(event.target.value)}
+              placeholder="선택"
+            />
+            <span className="unit">분</span>
+            <span className="hint">모르면 비워 두세요. 화면에서 추정하지 않습니다.</span>
+          </div>
+          <label className="row" style={{ gap: 'var(--space-2)', alignSelf: 'center' }}>
+            <input
+              type="checkbox"
+              checked={featured}
+              onChange={(event) => setFeatured(event.target.checked)}
+              style={{ width: 20, height: 20 }}
+            />
+            <span className="muted">처음 온 참가자에게 보여주기</span>
+          </label>
+        </div>
       </div>
 
       <div className="exptypes">

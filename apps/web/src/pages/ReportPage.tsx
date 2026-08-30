@@ -30,6 +30,12 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
  *  비교할 때 차이가 통째로 사라진다 — 이 값은 대개 한 자릿수다. */
 const rate = (v: number) => `${(v * 100).toFixed(1)}%`;
 
+const sourceLabel = { mission: '미션', lecture: '특강', exhibit: '전시' } as const;
+const contextLabel: Record<string, string> = {
+  now: '지금', featured: '추천', explore_time: '시간별 둘러보기', explore_place: '장소별 둘러보기',
+  explore_type: '유형별 둘러보기', search: '검색', shared_link: '공유 링크', flow: '나의 Flow',
+};
+
 export function ReportPage() {
   const { id = '' } = useParams<{ id: string }>();
 
@@ -310,6 +316,42 @@ export function ReportPage() {
                   </tbody>
                 </table>
               </div>
+            </section>
+          )}
+
+          {/* 열람은 완료로, 즐겨찾기는 만족도로 해석하지 않는다. */}
+          {d.experience_insights.length > 0 && (
+            <section className="card stack" style={{ gap: 'var(--space-4)' }}>
+              <div className="stack" style={{ gap: 'var(--space-1)' }}>
+                <h2 className="section">Experience 발견과 참여</h2>
+                <p className="muted">상세 열람, 확인된 현장 행동, Favorite Memory를 서로 다른 신호로 표시합니다.</p>
+              </div>
+              <div className="tablewrap">
+                <table className="table">
+                  <thead><tr><th>Experience</th><th>발견 경로</th><th className="num">열람</th><th className="num">고유 열람자</th><th className="num">확인 참여</th><th className="num">완료</th><th className="num">Favorite</th></tr></thead>
+                  <tbody>
+                    {d.experience_insights.map((item) => (
+                      <tr key={`${item.source_type}-${item.source_id}`}>
+                        <td><strong>{item.title}</strong><br /><span className="muted">{sourceLabel[item.source_type]}</span></td>
+                        <td className="muted">{Object.entries(item.discovery_contexts).map(([key, count]) => `${contextLabel[key] ?? key} ${count}`).join(' · ') || '—'}</td>
+                        <td className="num tabular">{item.opens}</td>
+                        <td className="num tabular">{item.unique_openers}</td>
+                        <td className="num tabular">{item.verified_participants}</td>
+                        <td className="num tabular">{item.completed_participants ?? '해당 없음'}</td>
+                        <td className="num tabular">{item.favorites}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {d.experience_insights.some((item) => item.observations.length > 0) && (
+                <ul className="stack" style={{ gap: 'var(--space-2)' }}>
+                  {d.experience_insights.flatMap((item) => item.observations.map((note) => (
+                    <li key={`${item.source_type}-${item.source_id}-${note}`} className="tip"><b>{item.title}</b> — {note}</li>
+                  )))}
+                </ul>
+              )}
+              <p className="disclaimer">열람은 관심 신호일 뿐 참여 완료가 아니며, 이 표는 발견 경로가 결과의 원인이라고 판단하지 않습니다.</p>
             </section>
           )}
 

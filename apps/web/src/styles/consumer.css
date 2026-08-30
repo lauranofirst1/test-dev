@@ -1,0 +1,276 @@
+/* Consumer journey: calm, mobile-first layers on top of the shared paper theme. */
+.paper .consumer-page,
+.paper .consumer-scan {
+  width: min(100%, 620px);
+  margin-inline: auto;
+  padding-block: clamp(1.25rem, 5vw, 2.5rem) var(--space-10);
+  gap: var(--space-8);
+}
+
+.paper .consumer-page h1 {
+  max-width: 16ch;
+  font-size: clamp(1.9rem, 8vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -.035em;
+}
+
+.paper .consumer-page h2 { font-size: clamp(1.2rem, 5vw, 1.55rem); }
+.paper .consumer-page-head { display: grid; gap: var(--space-2); }
+.paper .consumer-page-head > * { margin: 0; }
+
+.paper .consumer-event-hero {
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(1.25rem, 6vw, 2.25rem);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-2xl);
+  background:
+    radial-gradient(circle at 88% 12%, var(--color-gold-fill) 0 12%, transparent 36%),
+    linear-gradient(145deg, var(--color-surface), var(--color-act-wash));
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.paper .consumer-event-hero > * { margin: 0; }
+.paper .consumer-event-meta { color: var(--color-ink-soft); }
+.paper .consumer-start,
+.paper .consumer-action,
+.paper .consumer-memory {
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.paper .consumer-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.paper .consumer-section-head h2,
+.paper .consumer-section-head p { margin: 0; }
+.paper .consumer-text-link {
+  flex: none;
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0;
+  border: 0;
+  background: none;
+  color: var(--color-act-ink);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.paper .consumer-experience-list { display: grid; gap: var(--space-3); }
+.paper .consumer-experience-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.paper .consumer-experience-card:has(.consumer-experience-card__image) {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+}
+
+.paper .consumer-experience-card--featured {
+  padding: var(--space-5);
+  border-color: var(--color-act-fill);
+  background: linear-gradient(135deg, var(--color-surface), var(--color-act-wash));
+}
+
+.paper .consumer-experience-card__image {
+  width: 72px;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+}
+
+.paper .consumer-experience-card__body { display: grid; min-width: 0; gap: var(--space-1); }
+.paper .consumer-experience-card__kicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--color-ink-mute);
+  font-size: .78rem;
+}
+.paper .consumer-experience-card__kicker b { color: var(--color-success); }
+.paper .consumer-experience-card__title { line-height: 1.3; overflow-wrap: anywhere; }
+.paper .consumer-experience-card__summary,
+.paper .consumer-experience-card__signals {
+  color: var(--color-ink-mute);
+  font-size: .86rem;
+  line-height: 1.45;
+}
+.paper .consumer-experience-card__signals { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.paper .consumer-experience-card__signals span:not(:last-child)::after { content: ' ·'; }
+.paper .consumer-experience-card__arrow { color: var(--color-act-ink); font-size: 1.25rem; }
+
+.paper .consumer-now-flow,
+.paper .consumer-extra-card,
+.paper .consumer-utility-card {
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+.paper .consumer-tool-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.paper .consumer-quiet-state {
+  margin: 0;
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-sunk);
+  color: var(--color-ink-mute);
+  text-align: center;
+}
+
+.paper .consumer-search input { min-height: 52px; font-size: 1rem; }
+.paper .consumer-lenses {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunk);
+}
+.paper .consumer-lenses button {
+  min-height: var(--tap-min);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-mute);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+.paper .consumer-lenses button[aria-selected='true'] {
+  background: var(--color-surface);
+  color: var(--color-act-ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.paper .consumer-flow { display: grid; gap: var(--space-6); }
+.paper .consumer-flow__graphic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 112px;
+  padding: var(--space-5);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(145deg, var(--color-act-wash), var(--color-gold-wash));
+}
+.paper .consumer-flow__graphic-node {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-left: -7px;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-act-solid);
+  color: var(--color-on-act);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(calc((var(--flow-index) % 2) * 12px - 6px));
+}
+.paper .consumer-flow__graphic-node[data-source='lecture'] { background: var(--color-gold-solid); color: var(--color-on-gold); }
+.paper .consumer-flow__graphic-node[data-source='exhibit'] { background: var(--color-success); }
+.paper .consumer-flow__timeline { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.paper .consumer-flow__timeline li { position: relative; display: grid; grid-template-columns: 18px 1fr; gap: var(--space-3); padding-bottom: var(--space-5); }
+.paper .consumer-flow__timeline li:not(:last-child)::before { content: ''; position: absolute; left: 6px; top: 14px; bottom: 0; width: 2px; background: var(--color-line); }
+.paper .consumer-flow__dot { z-index: 1; width: 14px; height: 14px; margin-top: 4px; border: 3px solid var(--color-surface); border-radius: 50%; background: var(--color-act-solid); box-shadow: 0 0 0 1px var(--color-act-fill); }
+.paper .consumer-flow__dot[data-source='lecture'] { background: var(--color-gold-solid); }
+.paper .consumer-flow__dot[data-source='exhibit'] { background: var(--color-success); }
+.paper .consumer-flow__moment { display: grid; gap: 3px; }
+.paper .consumer-flow__moment > span { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--color-ink-mute); font-size: .82rem; }
+.paper .consumer-flow-empty { display: grid; place-items: center; gap: var(--space-3); min-height: 150px; padding: var(--space-5); border-radius: var(--radius-xl); background: var(--color-surface-sunk); color: var(--color-ink-mute); }
+.paper .consumer-flow-empty__node { width: 36px; height: 36px; border: 2px dashed var(--color-line-strong); border-radius: 50%; }
+
+.paper .consumer-utility-card { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.paper .consumer-utility-card > div { display: grid; gap: var(--space-1); }
+.paper .consumer-utility-code { font-size: clamp(1.4rem, 7vw, 2.2rem); letter-spacing: .08em; }
+.paper .consumer-utility-stats { display: flex; gap: var(--space-5); margin: 0; }
+.paper .consumer-utility-stats div { display: grid; gap: 2px; }
+.paper .consumer-utility-stats dt { color: var(--color-ink-mute); font-size: .78rem; }
+.paper .consumer-utility-stats dd { margin: 0; font-weight: var(--weight-bold); }
+.paper .consumer-extra-card__head { display: flex; align-items: center; justify-content: space-between; }
+.paper .consumer-extra-card__head > div { display: grid; gap: var(--space-1); }
+.paper .consumer-extra-link { display: flex; align-items: center; justify-content: space-between; min-height: 64px; padding: var(--space-4); border-radius: var(--radius-xl); background: var(--color-act-wash); color: var(--color-act-ink); text-decoration: none; }
+.paper .consumer-extra-link > span:first-child { display: grid; }
+.paper .consumer-prize-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.paper .consumer-prize-list span,
+.paper .consumer-memory-options button { padding: var(--space-2) var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: var(--color-surface); color: var(--color-ink-soft); }
+.paper .consumer-extra-note { margin: 0; padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-gold-wash); color: var(--color-gold-ink); }
+
+.paper .consumer-memory-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.paper .consumer-memory-options button { min-height: var(--tap-min); font: inherit; cursor: pointer; }
+.paper .consumer-memory-options button[aria-pressed='true'] { border-color: var(--color-act-solid); background: var(--color-act-wash); color: var(--color-act-ink); }
+
+.paper .consumer-share-action { display: grid; min-width: 0; gap: var(--space-3); }
+.paper .consumer-share-action > .btn { width: 100%; }
+.paper .consumer-share-fallback > div { display: grid; min-width: 0; flex: 1; gap: var(--space-2); }
+.paper .consumer-share-fallback textarea {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.paper .consumer-privacy { padding: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface-soft); }
+.paper .consumer-privacy summary { min-height: var(--tap-min); display: flex; align-items: center; color: var(--color-ink-soft); font-weight: 700; cursor: pointer; }
+.paper .consumer-privacy p { margin: var(--space-2) 0 0; }
+
+/* 보조 링크도 엄지로 누르는 실제 컨트롤이다. 글자 높이만큼만 잡히면 모바일에서
+   쉽게 빗나가므로 시각적 밀도는 유지하되 터치 영역은 44px로 보장한다. */
+.paper a.consumer-text-link,
+.paper a.muted,
+.paper .notice a,
+.paper button.tagchip {
+  min-height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+}
+
+.paper .consumer-detail__image { width: 100%; max-height: 390px; border-radius: var(--radius-2xl); object-fit: cover; }
+.paper .consumer-detail__head { display: grid; gap: var(--space-2); }
+.paper .consumer-detail__head > * { margin: 0; }
+.paper .consumer-context { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: 0; }
+.paper .consumer-context div { min-width: 0; padding: var(--space-3); border-radius: var(--radius-lg); background: var(--color-surface-sunk); }
+.paper .consumer-context dt { color: var(--color-ink-mute); font-size: .75rem; }
+.paper .consumer-context dd { margin: var(--space-1) 0 0; font-weight: var(--weight-bold); overflow-wrap: anywhere; }
+.paper .consumer-detail__secondary { padding: var(--space-4); border-radius: var(--radius-xl); background: var(--color-gold-wash); }
+.paper .consumer-detail__secondary > * { margin: 0; }
+
+.paper .consumer-scan__viewport { position: relative; overflow: hidden; aspect-ratio: 1; border-radius: var(--radius-2xl); background: #111; }
+.paper .consumer-scan__viewport video { width: 100%; height: 100%; object-fit: cover; }
+.paper .consumer-scan__frame { position: absolute; inset: 18%; border: 3px solid rgba(255,255,255,.92); border-radius: var(--radius-xl); box-shadow: 0 0 0 999px rgba(0,0,0,.22); }
+.paper .exhibit--focused { border-color: var(--color-act-solid); box-shadow: var(--shadow-focus); }
+
+@media (max-width: 430px) {
+  .paper .consumer-page,
+  .paper .consumer-scan { padding-inline: var(--space-4); }
+  .paper .consumer-tool-row { grid-template-columns: 1fr; }
+  .paper .consumer-context { grid-template-columns: 1fr; }
+  .paper .consumer-utility-card { align-items: flex-start; flex-direction: column; }
+  .paper .consumer-experience-card:has(.consumer-experience-card__image) { grid-template-columns: 58px minmax(0, 1fr) auto; }
+  .paper .consumer-experience-card__image { width: 58px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper .consumer-flow__graphic-node { transform: none; }
+}

@@ -5,7 +5,7 @@
 #   cp .env.example .env   → .env 를 서버 값으로 채우고
 #   docker compose up -d --build
 #
-# 필요한 값은 .env 의 DATABASE_URL · JWT_SECRET · SITE_ADDRESS · KTO_API_KEY 입니다.
+# 필요한 값은 .env 의 POSTGRES_PASSWORD · JWT_SECRET · SITE_ADDRESS · KTO_API_KEY 입니다.
 
 name: festaflow
 
@@ -41,6 +41,15 @@ services:
       MEDIA_DIR: /app/media
       APP_ENV: production
       API_WORKERS: ${API_WORKERS:-4}
+      # Caddy와 API가 같은 공개 도메인을 쓴다. SITE_ADDRESS는 docs/11-deploy.md의
+      # 안내대로 scheme/path 없는 도메인이어야 한다.
+      PUBLIC_WEB_ORIGIN: https://${SITE_ADDRESS}
+      CORS_ORIGINS: https://${SITE_ADDRESS}
+      # loopback 두 값은 컨테이너 내부 healthcheck 전용이다. API 포트는 외부에
+      # publish하지 않으므로 인터넷 요청이 이 이름으로 직접 들어오지 않는다.
+      TRUSTED_HOSTS: ${SITE_ADDRESS},localhost,127.0.0.1
+      SESSION_COOKIE_SECURE: "true"
+      DEMO_MODE: "false"
     volumes:
       # 업로드된 조각 보드 그림. 이 줄이 없으면 재배포마다 사라집니다.
       - media:/app/media

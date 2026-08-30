@@ -147,7 +147,7 @@ export function FieldScreensMenu({ festivalId }: { festivalId: string }) {
                   key={s.to}
                   href={s.to}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   role="menuitem"
                   className="fieldmenu__item"
                   onClick={() => setOpen(false)}

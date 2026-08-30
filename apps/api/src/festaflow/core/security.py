@@ -18,9 +18,11 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 
 from festaflow.core.config import settings
 from festaflow.core.errors import ApiError
@@ -162,7 +164,7 @@ def decode_staff_token(token: str) -> StaffClaims:
     """
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise ApiError(
             401, "INVALID_TOKEN", "세션이 만료되었거나 올바르지 않습니다. 다시 로그인하세요."
         ) from exc
@@ -197,6 +199,64 @@ def assert_secret_is_safe() -> None:
         raise RuntimeError(
             f"APP_ENV={settings.app_env} 에서 JWT_SECRET 이 개발 기본값이거나 너무 짧습니다. "
             "openssl rand -hex 32 으로 새로 만들어 넣으세요."
+        )
+
+
+def _is_https_origin(value: str | None) -> bool:
+    """경로·쿼리·자격증명이 없는 HTTPS origin인지 확인한다."""
+    if not value:
+        return False
+    parsed = urlsplit(value)
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.path in {"", "/"}
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def assert_deployment_is_safe() -> None:
+    """운영 배포가 보안 필수값 없이 시작되는 것을 막는다.
+
+    로컬은 휴대폰 LAN 테스트 때문에 HTTP와 비-Secure 쿠키를 허용한다. 그 예외가
+    운영까지 번지면 세션 탈취와 Host 헤더 기반 재설정 링크 변조로 이어지므로,
+    로컬이 아닌 환경은 실패-폐쇄(fail closed)한다.
+    """
+    assert_secret_is_safe()
+    if settings.app_env == "local":
+        return
+
+    if settings.demo_mode:
+        raise RuntimeError(
+            "DEMO_MODE=true 는 로컬 전용입니다. 배포에서는 헤더 기반 기관 폴백을 "
+            "다시 열 수 있으므로 DEMO_MODE=false 로 두세요."
+        )
+    if not settings.session_cookie_secure:
+        raise RuntimeError(
+            f"APP_ENV={settings.app_env} 에서는 SESSION_COOKIE_SECURE=true 가 필요합니다."
+        )
+    if not _is_https_origin(settings.public_web_origin):
+        raise RuntimeError(
+            f"APP_ENV={settings.app_env} 에서는 PUBLIC_WEB_ORIGIN을 경로 없는 HTTPS "
+            "주소(예: https://festaflow.example.com)로 설정해야 합니다."
+        )
+
+    if not settings.trusted_host_list or "*" in settings.trusted_host_list:
+        raise RuntimeError(
+            f"APP_ENV={settings.app_env} 에서는 TRUSTED_HOSTS에 API가 실제로 받는 "
+            "호스트만 적어야 하며 *는 허용되지 않습니다."
+        )
+
+    invalid_cors = [
+        origin for origin in settings.cors_origin_list if not _is_https_origin(origin)
+    ]
+    if not settings.cors_origin_list or invalid_cors:
+        raise RuntimeError(
+            f"APP_ENV={settings.app_env} 에서는 CORS_ORIGINS를 HTTPS origin만으로 "
+            "설정해야 합니다."
         )
 
 
@@ -369,7 +429,7 @@ def issue_org_token(*, account_id: int, organization_id: int) -> tuple[str, int]
 def decode_org_token(token: str) -> OrgClaims:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise ApiError(401, "INVALID_TOKEN", "세션이 만료됐습니다. 다시 로그인하세요.") from exc
 
     if payload.get("typ") != "org":

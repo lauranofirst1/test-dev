@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     app_env: str = "local"
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173"
+    #: 요청의 Host 헤더 허용 목록. 운영에서는 API가 실제로 받는 호스트만 적는다.
+    #: `testserver`는 FastAPI TestClient의 기본 호스트이며 로컬 기본값에만 둔다.
+    trusted_hosts: str = "localhost,127.0.0.1,::1,testserver"
     demo_mode: bool = False
 
     #: 관객이 실제로 접속하는 프런트엔드 주소. 부스 QR 에 담을 링크를 만들 때 쓴다.
@@ -148,6 +151,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_host_list(self) -> list[str]:
+        return [host.strip() for host in self.trusted_hosts.split(",") if host.strip()]
 
     @property
     def tour_key(self) -> str:

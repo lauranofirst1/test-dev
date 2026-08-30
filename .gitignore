@@ -27,11 +27,16 @@ dist/
 
 # 업로드된 파일 — 사용자 데이터라 저장소에 넣지 않는다
 apps/api/media/
+/media/
 
 # 도구 산출물
 .playwright-mcp/
 coverage/
 *.log
+pytest-results.xml
+
+# 개인 환경 경로가 들어가는 로컬 감사 산출물 — 공개 전 별도 비식별화
+docs/current-prototype-audit/
 
 # 스크린샷 잔여물
 *.png

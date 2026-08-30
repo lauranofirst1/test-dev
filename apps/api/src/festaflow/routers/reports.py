@@ -32,6 +32,7 @@ from festaflow.models import (
 from festaflow.schemas.report import (
     BoothPerformanceOut,
     CampaignImpactSummary,
+    ExperienceInsightOut,
     ImprovementOut,
     KpiResultOut,
     KpiTargetIn,
@@ -50,6 +51,7 @@ from festaflow.schemas.report import (
 )
 from festaflow.services import reports as svc
 from festaflow.services import reward_campaign_impact as impact_svc
+from festaflow.services.consumer import build_experience_insights
 
 router = APIRouter(prefix="/api/festivals/{festival_id}", tags=["reports"])
 
@@ -395,4 +397,21 @@ def get_report(festival_id: int, db: DbSession, org: CurrentOrg) -> ReportOut:
         ),
         campaigns=summaries,
         improvements=[ImprovementOut(rule=i.rule, message=i.message) for i in r.improvements],
+        experience_insights=[
+            ExperienceInsightOut(
+                source_type=item.source_type,
+                source_id=item.source_id,
+                title=item.title,
+                opens=item.opens,
+                unique_openers=item.unique_openers,
+                discovery_contexts=item.discovery_contexts,
+                verified_participants=item.verified_participants,
+                completed_participants=item.completed_participants,
+                verification_kind=item.verification_kind,
+                favorites=item.favorites,
+                favorite_reasons=item.favorite_reasons,
+                observations=item.observations,
+            )
+            for item in build_experience_insights(db, festival_id)
+        ],
     )

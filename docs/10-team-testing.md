@@ -22,23 +22,29 @@ cd test-dev
 # 원본을 upstream 으로 걸어 둔다 — 나중에 최신 코드를 당겨오는 통로다
 git remote add upstream https://github.com/lauranofirst1/test-dev.git
 
-# 작업 브랜치로 옮긴다 — 테스트도 수정도 여기서 한다
+# 작업마다 기능 브랜치를 만든다 — 공용 test에서 직접 작업하지 않는다
 git fetch upstream
-git checkout -b test upstream/test
+git switch -c fix/짧은-작업명 upstream/test
 ```
 
-이후 최신 코드를 받을 때는 `git pull upstream test` 입니다.
-(`git pull` 만 치면 자기 포크를 봅니다.)
+이후 최신 코드를 반영할 때는 작업을 먼저 커밋한 뒤 `git fetch upstream`과
+`git rebase upstream/test`를 실행합니다. (`git pull`만 치면 자기 포크를 봅니다.)
 
 고친 것을 보낼 때:
 
 ```bash
-git push origin test        # 자기 포크로 올린다
+git add <변경한 파일을 이름으로 명시>
+git diff --cached
+git commit -m "fix: 변경 내용"
+git push -u origin fix/짧은-작업명
 ```
 
 GitHub 이 띄워 주는 **Compare & pull request** 를 누르고, **받는 쪽 브랜치를
 `test` 로** 맞춰 주세요. `main` 이 기본값으로 잡히는데, `main` 은 확인이 끝난
 것만 모으는 자리라 바로 열면 안 됩니다.
+
+Windows 설치, 필수 테스트, 안전한 stage와 PR 체크리스트는
+[12-team-github-guide.md](12-team-github-guide.md)에 한 번에 정리되어 있습니다.
 
 ---
 
@@ -77,14 +83,16 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 
 | 영역 | 데이터 | 이 데이터로 확인하는 것 |
 |---|---|---|
-| 부스 | 6개(스캔 방식 혼합) · 미션 8개 · 완료 100건 | 최근 30분에 47건이 몰려 있어 **AI 체험존이 51% 집중** 판정을 받습니다 |
+| 부스 | 6개(스캔 방식 혼합) · 미션 6개 · 완료 100건 | 최근 30분에 47건이 몰려 있어 **AI 체험존이 51% 집중** 판정을 받습니다 |
 | 참여자 | 72명(학번 있음) | 교내 행사라 `identity_mode = student_id` 입니다 |
 | 특강 | 2개 | 어제 특강은 48명이 찍었는데 **37명만 인정**됩니다 — 첫 체크인만 찍고 나간 11명 |
-| 전시 | 작품 6 · 심사 항목 4 · 심사위원 3 · 투표 66표 | 심사 1위와 관객 1위가 **일부러 어긋나** 있습니다 |
+| 전시 | 작품 4 · 심사 항목 4 · 심사위원 3 · 투표 48표 | 심사 1위와 관객 1위가 **일부러 어긋나** 있습니다 |
+| Consumer | Experience 12개 · Open 142건 · Favorite 29건 | 발견 → 확인 참여 → 기억이 서로 다른 실제 데이터로 보입니다 |
 | 그 밖 | 경품 4종 · 공지 2건 · 스탬프판 2×3 · KPI 목표 3개 | |
 
-숫자는 고정된 난수 씨로 만들어집니다. **다시 돌려도 같은 화면**이 나오므로,
-어제와 다르면 그것은 코드가 바뀐 것입니다.
+초기 숫자는 고정된 난수 씨로 만들어집니다. `--reset`으로 다시 만들면 **같은 기준
+화면**이 나옵니다. 그 뒤 실제 QA 행동을 하면 참여·Open·Favorite가 늘어나는 것이
+정상입니다.
 
 ---
 
@@ -98,9 +106,9 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 | 현황 | `/festivals/23` | 남은 일과 각 영역 진행 상태가 표로 보입니다 |
 | 오늘 | `/festivals/23/dashboard` | AI 체험존이 **집중**, 나머지는 여유. 재배치 확인 요청 카드가 한 장 뜹니다 |
 | 특강 출결 | `/festivals/23/lectures` | 어제 특강 `찍은 사람 48 / 출석 인정 37`. 오늘 특강은 체크인이 열려 있습니다 |
-| 전시 심사 | `/festivals/23/exhibits` | 작품 6개, 시상 집계에 **심사위원 수 불균등** 경고. 순위가 심사·관객 혼합으로 정해집니다 |
+| 전시 심사 | `/festivals/23/exhibits` | 작품 4개, 시상 집계에 **심사위원 수 불균등** 경고. 순위가 심사·관객 혼합으로 정해집니다 |
 | 부스 · 미션 | `/festivals/23/booths` | 부스 6개(확인 방식 혼합) · 조각 보드 · **경품 탭에 상품 4종과 당첨 확률** |
-| 리포트 | `/festivals/23/report` | 목표 대비 실제 |
+| 리포트 | `/festivals/23/report` | 목표 대비 실제와 Experience별 Open/Discovery/확인 참여/Favorite |
 | 사전 진단 | `/festivals/23/diagnosis` | 관광 데이터를 실호출합니다 — **인증키가 없으면 여기만 안 돕니다** |
 | 스태프 (설정) | `/festivals/23/staff` | 발급된 6명. **여기서 코드를 재발급하면 아래 고정 코드가 무효가 됩니다** |
 | 경품 수령대 | `/festivals/23/claim` | 당첨된 참여 코드를 찾아 수령을 찍는 화면 |
@@ -148,7 +156,10 @@ cd apps/api && ./.venv/bin/python scripts/seed_test_account.py
 
 | 화면 | 주소 |
 |---|---|
-| 참여 · 스탬프판 | `/join/23` |
+| NOW / REMEMBER | `/join/23` |
+| 둘러보기 | `/join/23/explore` |
+| Experience 상세 | `/join/23/experience/{mission|lecture|exhibit}/{sourceId}` |
+| My Flow | `/join/23/flow` |
 | 부스 QR 스캔 | `/join/23/scan` |
 | 내 특강 출결 | `/join/23/lectures` |
 | 체크인 | `/join/23/checkin` |
@@ -185,6 +196,10 @@ cd apps/api
 # 처음부터 다시 (테스트 축제만 지우고 새로 만든다 — 축제 ID 가 바뀐다)
 ./.venv/bin/python scripts/seed_test_account.py --reset
 
+# Consumer 생명주기 검증 (정확히 이 테스트 행사만 바꾼다)
+./.venv/bin/python scripts/seed_test_account.py --phase live
+./.venv/bin/python scripts/seed_test_account.py --phase ended
+
 # 현장 참여만 비우기 (부스·미션·보드는 남는다)
 ./.venv/bin/python scripts/reset_participation.py {축제ID} --yes
 
@@ -194,6 +209,10 @@ cd apps/api
 
 `--reset` 없이 다시 돌리면 **아무것도 지우지 않습니다.** 테스트하다 만들어 둔 것을
 날리지 않기 위해서입니다.
+
+`--phase`는 행사 날짜·상태·투표와 현장성 관객 공지만 좁게 바꿉니다. REMEMBER를
+확인한 뒤에는 `--phase live`로 돌려 두세요. Consumer 전체 테스트 절차와 파일럿 판정은
+[11-consumer-pilot-readiness.md](11-consumer-pilot-readiness.md)에 있습니다.
 
 ---
 
@@ -224,6 +243,7 @@ cd apps/api
 테스트를 직접 돌려 보려면:
 
 ```bash
-cd apps/api && ./.venv/bin/python -m pytest -q      # 인증키 없이 돕니다
-cd apps/web && npx tsc --noEmit                     # 프론트엔드 타입 검사
+cd apps/api && ./.venv/bin/python -m pytest -q -ra  # 인증키 없이 돕니다; skip이 없어야 함
+cd apps/web && npm run typecheck
+cd apps/web && npm run test:share && npm run test:navigation && npm run build
 ```

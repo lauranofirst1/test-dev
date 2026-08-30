@@ -41,6 +41,11 @@ class Exhibit(Base, TimestampMixin, ArchivableMixin):
     __tablename__ = "exhibits"
     __table_args__ = (
         UniqueConstraint("festival_id", "entry_no", name="uq_exhibits_entry_no"),
+        CheckConstraint(
+            "estimated_duration_minutes IS NULL OR "
+            "estimated_duration_minutes BETWEEN 1 AND 1440",
+            name="estimated_duration_range",
+        ),
         Index("ix_exhibits_festival", "festival_id", postgresql_where="archived_at IS NULL"),
         # 태그로 거르려면 GIN 이 필요하다. 작품이 수십 점이면 없어도 돌지만,
         # 나중에 붙이면 그때는 이미 목록 화면이 느리다.
@@ -68,7 +73,9 @@ class Exhibit(Base, TimestampMixin, ArchivableMixin):
 
     #: 전시 구역. 관객이 실물을 찾아갈 때 쓴다.
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    estimated_duration_minutes: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
 
 class VoteCriterion(Base, TimestampMixin, ArchivableMixin):

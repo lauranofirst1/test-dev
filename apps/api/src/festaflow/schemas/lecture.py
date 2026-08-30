@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class LectureSessionIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
+    summary: str | None = Field(None, max_length=2000)
     speaker: str | None = Field(None, max_length=120)
     affiliation: str | None = Field(None, max_length=120)
     location: str | None = Field(None, max_length=200)
@@ -23,6 +24,7 @@ class LectureSessionIn(BaseModel):
     required_checkins: int = Field(2, ge=1, le=20)
     grants_excused_absence: bool = False
     is_active: bool = True
+    is_featured: bool = False
 
 
 class LectureSessionOut(BaseModel):
@@ -31,6 +33,7 @@ class LectureSessionOut(BaseModel):
     id: int
     festival_id: int
     title: str
+    summary: str | None
     speaker: str | None
     affiliation: str | None
     location: str | None
@@ -39,6 +42,7 @@ class LectureSessionOut(BaseModel):
     required_checkins: int
     grants_excused_absence: bool
     is_active: bool
+    is_featured: bool
 
 
 class LectureSessionDetail(LectureSessionOut):
@@ -106,6 +110,8 @@ class MyAttendance(BaseModel):
     opened: int
     is_met: bool
     remaining: int
+    #: 출석 인정 기준을 채운 마지막 체크인 시각. 아직 인정 전이면 None.
+    completed_at: datetime | None = None
 
 
 class CertificateIssued(BaseModel):

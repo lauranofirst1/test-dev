@@ -11,7 +11,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
 import { loadParticipant, participantApi } from '../api/participant';
@@ -19,6 +19,7 @@ import type { PublicExhibit, VoteResult, VotingStatus } from '../api/types';
 
 export function ExhibitionPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const qc = useQueryClient();
   const stored = loadParticipant(id);
   const [tag, setTag] = useState<string | null>(null);
@@ -35,7 +36,9 @@ export function ExhibitionPage() {
       v.on
         ? participantApi.post<VoteResult>(id, `/exhibits/${v.exhibitId}/vote`, stored!.secret)
         : participantApi.del<VoteResult>(id, `/exhibits/${v.exhibitId}/vote`, stored!.secret),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['exhibition', id] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['exhibition', id] });
+    },
   });
 
   if (!stored) {
@@ -55,7 +58,10 @@ export function ExhibitionPage() {
   }
 
   const s = status.data;
-  const shown = (s?.exhibits ?? []).filter((e) => !tag || e.tags.includes(tag));
+  const focusId = Number(searchParams.get('focus')) || null;
+  const shown = (s?.exhibits ?? [])
+    .filter((e) => !tag || e.tags.includes(tag))
+    .sort((a, b) => Number(b.id === focusId) - Number(a.id === focusId));
   const left = s ? s.votes_limit - s.votes_used : 0;
 
   return (
@@ -66,6 +72,13 @@ export function ExhibitionPage() {
       </div>
 
       {status.isLoading && <div className="skeleton" style={{ height: 200 }} />}
+
+      {focusId && s?.exhibits.some((exhibit) => exhibit.id === focusId) && (
+        <div className="notice notice--ok">
+          <span aria-hidden>↓</span>
+          <span>상세에서 고른 작품을 목록 맨 앞에 두었습니다.</span>
+        </div>
+      )}
 
       {status.error instanceof ApiError && (
         <div className="notice notice--warn">
@@ -104,6 +117,16 @@ export function ExhibitionPage() {
         <div className="notice notice--warn">
           <span>⚠</span>
           <span>{vote.error.message}</span>
+        </div>
+      )}
+
+      {vote.data?.voted && (
+        <div className="notice notice--ok" role="status">
+          <span>✓</span>
+          <span>
+            My Flow에 ‘{s?.exhibits.find((exhibit) => exhibit.id === vote.data?.exhibit_id)?.title ?? '이 작품'}’
+            순간이 남았어요. <Link to={`/join/${id}/flow`}>Flow 보기</Link>
+          </span>
         </div>
       )}
 
@@ -146,6 +169,7 @@ export function ExhibitionPage() {
             canVote={!!s?.can_vote}
             outOfVotes={left === 0}
             pending={vote.isPending}
+            focused={e.id === focusId}
             onToggle={(on) => vote.mutate({ exhibitId: e.id, on })}
           />
         ))}
@@ -163,12 +187,14 @@ function ExhibitCard({
   canVote,
   outOfVotes,
   pending,
+  focused,
   onToggle,
 }: {
   exhibit: PublicExhibit;
   canVote: boolean;
   outOfVotes: boolean;
   pending: boolean;
+  focused: boolean;
   onToggle: (on: boolean) => void;
 }) {
   // 표를 다 썼어도 **이미 준 표는 거둘 수 있어야 한다.** 그러지 않으면 첫
@@ -176,7 +202,10 @@ function ExhibitCard({
   const disabled = pending || (!exhibit.voted && (outOfVotes || !canVote));
 
   return (
-    <article className={`card exhibit${exhibit.voted ? ' exhibit--voted' : ''}`}>
+    <article
+      id={`exhibit-${exhibit.id}`}
+      className={`card exhibit${exhibit.voted ? ' exhibit--voted' : ''}${focused ? ' exhibit--focused' : ''}`}
+    >
       {exhibit.poster_url ? (
         <img className="exhibit__poster" src={exhibit.poster_url} alt={`${exhibit.title} 포스터`} />
       ) : (
