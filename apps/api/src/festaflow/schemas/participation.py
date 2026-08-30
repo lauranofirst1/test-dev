@@ -84,6 +84,9 @@ class PublicMission(BaseModel):
     title: str
     description: str | None
     points: int
+    experience_type: ExperienceType
+    estimated_duration_minutes: int | None
+    is_featured: bool
 
 
 class PublicBooth(BaseModel):
@@ -96,6 +99,31 @@ class PublicBooth(BaseModel):
     missions: list[PublicMission] = Field(default_factory=list)
 
 
+class PublicLecture(BaseModel):
+    id: int
+    title: str
+    summary: str | None
+    speaker: str | None
+    affiliation: str | None
+    location: str | None
+    starts_at: datetime
+    ends_at: datetime
+    is_featured: bool = False
+
+
+class PublicExperienceExhibit(BaseModel):
+    id: int
+    entry_no: int
+    title: str
+    team_name: str | None
+    summary: str | None
+    poster_url: str | None
+    tags: list[str] = Field(default_factory=list)
+    location: str | None
+    estimated_duration_minutes: int | None
+    is_featured: bool = False
+
+
 class PublicFestival(BaseModel):
     """관객 화면이 참여 전에 보는 것. 인증이 없으므로 운영 정보는 담지 않는다."""
 
@@ -105,7 +133,11 @@ class PublicFestival(BaseModel):
     venue: str
     starts_on: str
     ends_on: str
+    status: str
+    summary: str | None = None
     booths: list[PublicBooth]
+    lectures: list[PublicLecture] = Field(default_factory=list)
+    exhibits: list[PublicExperienceExhibit] = Field(default_factory=list)
     #: 참여 시작 화면이 학번을 물어야 하는지 여기서 정해진다.
     identity_mode: IdentityMode = IdentityMode.ANONYMOUS
     #: 화면에 반드시 함께 표시해야 하는 출처 표기

@@ -6,6 +6,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './styles/tokens.css';
 import './styles/app.css';
 import './styles/paper.css';
+import './styles/consumer.css';
 // 콘솔 전용. app.css 를 덮으므로 반드시 뒤에 온다.
 import './styles/console.css';
 import { AudienceLayout, PlannerLayout } from './layouts';
@@ -19,8 +20,11 @@ import { CheckpointScreenPage } from './pages/CheckpointScreenPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DiagnosisPage } from './pages/DiagnosisPage';
 import { ExhibitionPage } from './pages/ExhibitionPage';
+import { ExperiencePage } from './pages/ExperiencePage';
+import { ExplorePage } from './pages/ExplorePage';
 import { ExhibitsAdminPage } from './pages/ExhibitsAdminPage';
 import { JoinPage } from './pages/JoinPage';
+import { FlowPage } from './pages/FlowPage';
 import { LoginPage } from './pages/LoginPage';
 import {
   PasswordResetConfirmPage,
@@ -105,6 +109,9 @@ createRoot(document.getElementById('root')!).render(
           {/* 관객 — 로그인 없이 축제 링크로 들어온다. 헤더가 다르다. */}
           <Route element={<AudienceLayout />}>
             <Route path="/join/:id" element={<JoinPage />} />
+            <Route path="/join/:id/explore" element={<ExplorePage />} />
+            <Route path="/join/:id/flow" element={<FlowPage />} />
+            <Route path="/join/:id/experience/:sourceType/:sourceId" element={<ExperiencePage />} />
             <Route path="/join/:id/scan" element={<ScanPage />} />
           {/* 특강 출결 — 학생이 보는 쪽. */}
           <Route path="/join/:id/lectures" element={<MyLecturesPage />} />

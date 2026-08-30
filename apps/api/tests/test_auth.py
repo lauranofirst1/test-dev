@@ -396,3 +396,45 @@ def test_default_secret_is_refused_outside_local(monkeypatch):
 
     monkeypatch.setattr(settings, "jwt_secret", "a" * 64, raising=False)
     security.assert_secret_is_safe()  # 충분히 길면 통과
+
+
+def _safe_production_settings(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "production", raising=False)
+    monkeypatch.setattr(settings, "jwt_secret", "a" * 64, raising=False)
+    monkeypatch.setattr(settings, "demo_mode", False, raising=False)
+    monkeypatch.setattr(settings, "session_cookie_secure", True, raising=False)
+    monkeypatch.setattr(
+        settings, "public_web_origin", "https://festaflow.example.com", raising=False
+    )
+    monkeypatch.setattr(settings, "trusted_hosts", "api.festaflow.example.com", raising=False)
+    monkeypatch.setattr(
+        settings, "cors_origins", "https://festaflow.example.com", raising=False
+    )
+
+
+def test_safe_production_settings_are_accepted(monkeypatch):
+    _safe_production_settings(monkeypatch)
+    security.assert_deployment_is_safe()
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("demo_mode", True, "DEMO_MODE"),
+        ("session_cookie_secure", False, "SESSION_COOKIE_SECURE"),
+        ("public_web_origin", None, "PUBLIC_WEB_ORIGIN"),
+        ("public_web_origin", "http://festaflow.example.com", "PUBLIC_WEB_ORIGIN"),
+        ("trusted_hosts", "*", "TRUSTED_HOSTS"),
+        ("cors_origins", "http://festaflow.example.com", "CORS_ORIGINS"),
+    ],
+)
+def test_unsafe_production_settings_are_refused(monkeypatch, field, value, message):
+    _safe_production_settings(monkeypatch)
+    monkeypatch.setattr(settings, field, value, raising=False)
+    with pytest.raises(RuntimeError, match=message):
+        security.assert_deployment_is_safe()
+
+
+def test_untrusted_host_is_rejected(client):
+    response = client.get("/api/health", headers={"Host": "evil.example"})
+    assert response.status_code == 400

@@ -18,22 +18,25 @@
  * 한 손에 먹거리를 들고 서 있는 사람에게 화면을 한 번 더 태우지 않습니다.
  */
 
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
 import { clearParticipant, loadParticipant, participantApi } from '../api/participant';
+import { scannerSupported, startScanner, type ScannerHandle } from '../lib/scanner';
 import type {
   GrantResult,
   InfoConfig,
   QuizConfig,
   ScanContext,
   ScanContextMission,
+  SurveyConfig,
 } from '../api/types';
 
 export function ScanPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const [params] = useSearchParams();
   const boothId = params.get('b');
   // 회전 QR 은 `t`(토큰), 인쇄 QR 은 `s`(고정 서명). 어느 쪽이든 하나면 된다 —
@@ -68,6 +71,14 @@ export function ScanPage() {
         mission_id: vars.missionId,
         response: vars.response ?? null,
       }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['my-progress', id] }),
+        qc.invalidateQueries({ queryKey: ['my-overview', id] }),
+        qc.invalidateQueries({ queryKey: ['my-board', id] }),
+        qc.invalidateQueries({ queryKey: ['prize-draw', id] }),
+      ]);
+    },
   });
 
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -98,7 +109,7 @@ export function ScanPage() {
   const picked = open.find((m) => m.mission_id === pickedId) ?? null;
 
   if (!boothId || !proof) {
-    return <Fail title="잘못된 링크입니다" body="부스 화면의 QR을 다시 스캔해 주세요." id={id} />;
+    return <ConsumerScanner festivalId={id} />;
   }
 
   if (!stored) {
@@ -109,7 +120,12 @@ export function ScanPage() {
           <p className="lede" style={{ textAlign: 'center' }}>
             참여 코드를 받은 뒤 다시 QR을 스캔하면 조각이 열립니다.
           </p>
-          <Link to={`/join/${id}`} className="btn btn--primary btn--lg">
+          <Link
+            to={`/join/${id}?returnTo=${encodeURIComponent(
+              `${window.location.pathname}${window.location.search}`,
+            )}`}
+            className="btn btn--primary btn--lg"
+          >
             참여 시작하기
           </Link>
         </div>
@@ -162,8 +178,18 @@ export function ScanPage() {
             <small>{done.was_already_granted ? 'ALREADY' : 'GRANTED'}</small>
           </span>
           <p className="eyebrow">
-            {done.was_already_granted ? '이미 받은 미션입니다' : '조각이 열렸습니다'}
+            {done.was_already_granted ? '이미 Flow에 남은 순간이에요' : '하나의 순간이 남았어요'}
           </p>
+          {picked && <h2 style={{ textAlign: 'center' }}>{picked.title}</h2>}
+          {done.participation.completed_at && (
+            <p className="muted" style={{ textAlign: 'center' }}>
+              {new Date(done.participation.completed_at).toLocaleTimeString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}{' '}
+              완료
+            </p>
+          )}
           <p className="figure tabular" style={{ textAlign: 'center' }}>
             {done.board_progress.revealed_count} / {done.board_progress.total_tiles}
             <small>모은 조각</small>
@@ -185,7 +211,10 @@ export function ScanPage() {
             </div>
           )}
           <Link to={`/join/${id}`} className="btn btn--primary btn--lg">
-            내 조각 보기
+            닫기
+          </Link>
+          <Link to={`/join/${id}/flow`} className="btn btn--ghost">
+            내 Flow 보기
           </Link>
         </div>
       </div>
@@ -206,9 +235,11 @@ export function ScanPage() {
           <div className="stack" style={{ gap: 'var(--space-3)' }}>
             <p className="eyebrow">부스 도착</p>
             <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>{s.booth_name}</h1>
-            <p className="punch">
-              <span>{[s.type_label, s.location].filter(Boolean).join(' · ') || '위치 미정'}</span>
-            </p>
+            {[s.type_label, s.location].some(Boolean) && (
+              <p className="punch">
+                <span>{[s.type_label, s.location].filter(Boolean).join(' · ')}</span>
+              </p>
+            )}
           </div>
 
           {remaining !== null && (
@@ -279,10 +310,159 @@ export function ScanPage() {
           )}
 
           <Link to={`/join/${id}`} className="muted" style={{ textAlign: 'center' }}>
-            내 조각 보기 →
+            지금 화면으로 돌아가기 →
           </Link>
         </>
       )}
+    </div>
+  );
+}
+
+// ── 소비자 카메라 스캐너 ───────────────────────────────────────────────────
+
+/**
+ * 빈 `/scan` 경로는 QR 도착 결과가 아니라 카메라 도구다. 읽은 값의 서명이나
+ * query를 다시 만들지 않고 서버가 발급한 전체 목적지로 그대로 이동한다.
+ */
+function ConsumerScanner({ festivalId }: { festivalId: string }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pasted, setPasted] = useState('');
+
+  const follow = (raw: string) => {
+    const value = raw.trim();
+    if (!value) {
+      setMessage('QR 링크를 붙여 넣어 주세요.');
+      return;
+    }
+
+    try {
+      const url = new URL(value, window.location.origin);
+      const boothPath = `/join/${festivalId}/scan`;
+      const checkInPath = `/join/${festivalId}/checkin`;
+      const boothProof =
+        url.pathname === boothPath &&
+        Boolean(url.searchParams.get('b')) &&
+        Boolean(url.searchParams.get('t') || url.searchParams.get('s'));
+      const lectureProof =
+        url.pathname === checkInPath &&
+        Boolean(url.searchParams.get('s')) &&
+        Boolean(url.searchParams.get('c')) &&
+        Boolean(url.searchParams.get('t'));
+
+      if (!boothProof && !lectureProof) {
+        setMessage('이 행사의 FestaFlow QR인지 확인해 주세요.');
+        return;
+      }
+
+      // 같은 오리진의 경로로만 이동하되 path/query/hash는 읽은 그대로 넘긴다.
+      // 특히 t/s 값을 해석하거나 재서명하지 않는다.
+      window.location.assign(`${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      setMessage('QR에서 FestaFlow 링크를 읽지 못했습니다. 다시 비춰 주세요.');
+    }
+  };
+
+  useEffect(() => {
+    if (!scanning || !video.current) return;
+    let alive = true;
+    let handle: ScannerHandle | null = null;
+
+    void startScanner(
+      video.current,
+      (raw) => {
+        if (!alive) return;
+        setScanning(false);
+        follow(raw);
+      },
+      (error) => {
+        if (!alive) return;
+        setMessage(error);
+        setScanning(false);
+      },
+    ).then((started) => {
+      if (!alive) started.stop();
+      else handle = started;
+    });
+
+    return () => {
+      alive = false;
+      handle?.stop();
+    };
+    // `follow` only depends on the route festival id. Restarting for input/message changes
+    // would close the camera while it is focusing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanning, festivalId]);
+
+  const supported = scannerSupported();
+
+  return (
+    <div className="shell stack consumer-scan" style={{ gap: 'var(--space-5)' }}>
+      <div className="stack" style={{ gap: 'var(--space-2)' }}>
+        <p className="eyebrow">현장 기록</p>
+        <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>QR을 비춰 주세요</h1>
+        <p className="lede">부스나 강의실에 있는 FestaFlow QR을 읽으면 기존 확인 화면으로 이어집니다.</p>
+      </div>
+
+      {scanning && (
+        <div className="consumer-scan__viewport">
+          <video ref={video} muted playsInline aria-label="QR 스캔 카메라" />
+          <span className="consumer-scan__frame" aria-hidden="true" />
+        </div>
+      )}
+
+      {supported ? (
+        <button
+          type="button"
+          className="btn btn--primary btn--lg"
+          onClick={() => {
+            setMessage(null);
+            setScanning((value) => !value);
+          }}
+        >
+          {scanning ? '카메라 닫기' : '카메라로 QR 읽기'}
+        </button>
+      ) : (
+        <div className="notice notice--info">
+          <span>◎</span>
+          <span>이 브라우저는 앱 안의 QR 읽기를 지원하지 않습니다. 휴대폰 기본 카메라로 QR을 열거나 아래에 링크를 붙여 넣어 주세요.</span>
+        </div>
+      )}
+
+      {message && (
+        <div className="notice notice--warn" role="status">
+          <span>⚠</span>
+          <span>{message}</span>
+        </div>
+      )}
+
+      <form
+        className="card stack"
+        style={{ gap: 'var(--space-3)' }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          follow(pasted);
+        }}
+      >
+        <div className="field">
+          <label htmlFor="consumer-qr-link">QR 링크 붙여 넣기</label>
+          <input
+            id="consumer-qr-link"
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            value={pasted}
+            onChange={(event) => setPasted(event.target.value)}
+            placeholder="https://…/join/…/scan?…"
+          />
+        </div>
+        <button type="submit" className="btn btn--ghost">링크 열기</button>
+      </form>
+
+      <Link to={`/join/${festivalId}`} className="muted" style={{ textAlign: 'center' }}>
+        지금 화면으로 돌아가기
+      </Link>
     </div>
   );
 }
@@ -310,6 +490,7 @@ function Experience(props: ExperienceProps) {
   const { mission } = props;
   if (mission.experience_type === 'quiz') return <Quiz {...props} />;
   if (mission.experience_type === 'info') return <Info {...props} />;
+  if (mission.experience_type === 'survey') return <Survey {...props} />;
   return <Stamp {...props} />;
 }
 
@@ -419,6 +600,80 @@ function Quiz({ mission, locked, pending, error, onBack, onSubmit }: ExperienceP
         onClick={() => onSubmit({ choice_index: choice })}
       >
         {pending ? '채점 중…' : exhausted ? '시도 횟수를 모두 썼습니다' : '정답 제출'}
+      </button>
+    </ExperienceShell>
+  );
+}
+
+function Survey({ mission, locked, pending, error, onBack, onSubmit }: ExperienceProps) {
+  const config = mission.experience_config as unknown as SurveyConfig;
+  const [answers, setAnswers] = useState<(number | null)[]>(() =>
+    config.questions.map(() => null),
+  );
+
+  useEffect(() => {
+    setAnswers(config.questions.map(() => null));
+  }, [mission.mission_id, config.questions.length]);
+
+  const choose = (questionIndex: number, answer: number) => {
+    setAnswers((current) =>
+      current.map((value, index) => (index === questionIndex ? answer : value)),
+    );
+  };
+  const complete = answers.length === config.questions.length && answers.every((a) => a !== null);
+
+  return (
+    <ExperienceShell mission={mission} onBack={onBack}>
+      <h2 style={{ fontSize: 'var(--text-h3)' }}>{mission.title}</h2>
+      {mission.description && <p className="lede">{mission.description}</p>}
+
+      <div className="survey-questions">
+        {config.questions.map((question, questionIndex) => {
+          const options =
+            question.type === 'rating'
+              ? Array.from({ length: question.scale }, (_, index) => ({
+                  value: index + 1,
+                  label: `${index + 1}점`,
+                }))
+              : question.choices.map((label, index) => ({ value: index, label }));
+
+          return (
+            <fieldset key={questionIndex} className="survey-question">
+              <legend>
+                <span className="tabular">{questionIndex + 1}.</span> {question.text}
+              </legend>
+              <div className="choices">
+                {options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`choice${
+                      answers[questionIndex] === option.value ? ' choice--on' : ''
+                    }`}
+                    disabled={locked}
+                    aria-pressed={answers[questionIndex] === option.value}
+                    onClick={() => choose(questionIndex, option.value)}
+                  >
+                    <span className="choice__no tabular">
+                      {question.type === 'rating' ? option.value : option.value + 1}
+                    </span>
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          );
+        })}
+      </div>
+
+      {error && <Problem error={error} />}
+
+      <button
+        className="btn btn--primary btn--lg"
+        disabled={locked || !complete}
+        onClick={() => onSubmit({ answers })}
+      >
+        {pending ? '제출 중…' : '설문 제출'}
       </button>
     </ExperienceShell>
   );

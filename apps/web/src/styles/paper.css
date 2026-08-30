@@ -357,6 +357,26 @@ button.rcpt__row:disabled {
   cursor: not-allowed;
 }
 
+.survey-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.survey-question {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.survey-question legend {
+  width: 100%;
+  margin-bottom: var(--space-3);
+  font-weight: var(--weight-bold);
+  line-height: 1.45;
+}
+
 /* ── 뽑기 ─────────────────────────────────────────────────────
    조각을 다 모은 사람만 본다. 아직 뜯지 않았다는 것이 보여야 한다 —
    결과를 이미 아는 카드처럼 보이면 뜯을 이유가 없다. 빗금 봉투였던 자리를

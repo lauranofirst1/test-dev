@@ -490,7 +490,12 @@ export function BoothsPage() {
             >
               주소 복사
             </button>
-            <a className="btn btn--ghost" href={joinUrl} target="_blank" rel="noreferrer">
+            <a
+              className="btn btn--ghost"
+              href={joinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               관객 화면 열기 ↗
             </a>
           </div>
@@ -719,6 +724,7 @@ function BoothQrSettings({
           to={`/festivals/${festivalId}/booths/${booth.id}/qr`}
           className="btn btn--soft"
           target="_blank"
+          rel="noopener noreferrer"
         >
           QR 화면 열기 ↗
         </Link>
@@ -727,6 +733,7 @@ function BoothQrSettings({
             to={`/festivals/${festivalId}/booths/${booth.id}/poster`}
             className="btn btn--ghost"
             target="_blank"
+            rel="noopener noreferrer"
           >
             인쇄용 안내문 ↗
           </Link>

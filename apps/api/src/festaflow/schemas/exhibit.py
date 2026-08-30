@@ -19,7 +19,9 @@ class ExhibitIn(BaseModel):
     poster_url: str | None = None
     tags: list[str] = Field(default_factory=list, max_length=12)
     location: str | None = Field(None, max_length=200)
+    estimated_duration_minutes: int | None = Field(None, ge=1, le=1440)
     is_active: bool = True
+    is_featured: bool = False
 
 
 class ExhibitOut(BaseModel):
@@ -34,7 +36,9 @@ class ExhibitOut(BaseModel):
     poster_url: str | None
     tags: list[str]
     location: str | None
+    estimated_duration_minutes: int | None
     is_active: bool
+    is_featured: bool
 
 
 class ExhibitList(BaseModel):
@@ -128,6 +132,8 @@ class PublicExhibit(BaseModel):
     location: str | None
     #: 내가 이 작품에 표를 줬는가.
     voted: bool = False
+    #: 내가 표를 준 시각. 표를 주지 않았다면 None.
+    voted_at: datetime | None = None
 
 
 class VotingStatus(BaseModel):

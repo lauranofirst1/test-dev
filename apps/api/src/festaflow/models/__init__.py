@@ -8,6 +8,7 @@ from festaflow.db.base import Base
 from festaflow.models.account import OrganizationAccount, PasswordResetToken
 from festaflow.models.announcement import Announcement, AnnouncementAck
 from festaflow.models.booth import Booth, Mission
+from festaflow.models.consumer import ExperienceOpen, FavoriteMemory
 from festaflow.models.diagnosis import (
     Diagnosis,
     DiagnosisItem,
@@ -52,6 +53,8 @@ __all__ = [
     "Diagnosis",
     "DiagnosisItem",
     "Exhibit",
+    "ExperienceOpen",
+    "FavoriteMemory",
     "Festival",
     "FestivalPlan",
     "FestivalStaff",

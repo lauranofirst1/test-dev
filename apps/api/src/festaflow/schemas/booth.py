@@ -23,6 +23,8 @@ class MissionIn(BaseModel):
     description: str | None = Field(None, max_length=2000)
     points: int = Field(0, ge=0, le=1_000_000)
     is_active: bool = True
+    estimated_duration_minutes: int | None = Field(None, ge=1, le=1440)
+    is_featured: bool = False
     experience_type: ExperienceType = ExperienceType.STAMP
     experience_config: dict = Field(default_factory=dict)
 
@@ -49,6 +51,8 @@ class MissionOut(BaseModel):
     description: str | None
     points: int
     is_active: bool
+    estimated_duration_minutes: int | None
+    is_featured: bool
     experience_type: ExperienceType
     experience_config: dict = Field(default_factory=dict)
     created_at: datetime

@@ -17,6 +17,7 @@ export interface StoredParticipant {
 }
 
 const key = (festivalId: number | string) => `festaflow-participant-${festivalId}`;
+const volatileParticipants = new Map<string, StoredParticipant>();
 
 /** 참여 자격이 생기거나 사라졌다는 신호.
  *
@@ -47,21 +48,24 @@ export function onParticipantChange(handler: () => void): () => void {
 }
 
 export function loadParticipant(festivalId: number | string): StoredParticipant | null {
+  const storageKey = key(festivalId);
   try {
-    const raw = localStorage.getItem(key(festivalId));
-    if (!raw) return null;
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return volatileParticipants.get(storageKey) ?? null;
     const parsed = JSON.parse(raw) as Partial<StoredParticipant>;
-    if (!parsed.code || !parsed.secret) return null;
+    if (!parsed.code || !parsed.secret) return volatileParticipants.get(storageKey) ?? null;
     return { code: parsed.code, secret: parsed.secret };
   } catch {
     // 사파리 프라이빗 모드처럼 localStorage 가 막힌 환경에서도 화면은 떠야 한다.
-    return null;
+    return volatileParticipants.get(storageKey) ?? null;
   }
 }
 
 export function saveParticipant(festivalId: number | string, p: StoredParticipant): void {
+  const storageKey = key(festivalId);
+  volatileParticipants.set(storageKey, p);
   try {
-    localStorage.setItem(key(festivalId), JSON.stringify(p));
+    localStorage.setItem(storageKey, JSON.stringify(p));
   } catch {
     /* 저장 못 해도 이번 세션은 메모리 상태로 계속 쓴다 */
   }
@@ -69,8 +73,10 @@ export function saveParticipant(festivalId: number | string, p: StoredParticipan
 }
 
 export function clearParticipant(festivalId: number | string): void {
+  const storageKey = key(festivalId);
+  volatileParticipants.delete(storageKey);
   try {
-    localStorage.removeItem(key(festivalId));
+    localStorage.removeItem(storageKey);
   } catch {
     /* 무시 */
   }
@@ -91,6 +97,9 @@ export const participantApi = {
 
   post: <T>(festivalId: number | string, path: string, secret: string, body?: unknown) =>
     api.post<T>(`/api/festivals/${festivalId}${path}`, body, auth(secret)),
+
+  put: <T>(festivalId: number | string, path: string, secret: string, body: unknown) =>
+    api.put<T>(`/api/festivals/${festivalId}${path}`, body, auth(secret)),
 
   /** 표를 거두는 것처럼 되돌리는 동작에 쓴다. */
   del: <T>(festivalId: number | string, path: string, secret: string) =>

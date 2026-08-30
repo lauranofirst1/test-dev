@@ -151,6 +151,21 @@ class ImprovementOut(BaseModel):
     message: str
 
 
+class ExperienceInsightOut(BaseModel):
+    source_type: str
+    source_id: int
+    title: str
+    opens: int
+    unique_openers: int
+    discovery_contexts: dict[str, int]
+    verified_participants: int
+    completed_participants: int | None
+    verification_kind: str
+    favorites: int
+    favorite_reasons: dict[str, int]
+    observations: list[str]
+
+
 class ReportOut(BaseModel):
     festival_id: int
     festival_name: str
@@ -170,3 +185,5 @@ class ReportOut(BaseModel):
     recommendation_accuracy: RecommendationAccuracy | None
     campaigns: list[CampaignImpactSummary]
     improvements: list[ImprovementOut]
+    #: 열람·검증된 참여·회고를 서로 다른 신호로 유지한다.
+    experience_insights: list[ExperienceInsightOut]

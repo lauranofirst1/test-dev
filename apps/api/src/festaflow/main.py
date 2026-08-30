@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from festaflow.core import security
 from festaflow.core.config import settings
@@ -19,6 +20,7 @@ from festaflow.routers import (
     auth,
     booths,
     campaigns,
+    consumer,
     diagnoses,
     exhibits,
     festivals,
@@ -47,7 +49,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # 개발용 기본 JWT 시크릿으로 로컬 밖에서 뜨는 것을 막는다.
 # 시크릿이 저장소에 공개된 채로 배포되면 토큰을 누구나 위조할 수 있다.
-security.assert_secret_is_safe()
+security.assert_deployment_is_safe()
 
 app = FastAPI(
     title="FestaFlow API",
@@ -61,6 +63,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.trusted_host_list,
 )
 
 
@@ -152,6 +158,7 @@ app.include_router(exhibits.router)
 app.include_router(staff.router)
 app.include_router(operations.router)
 app.include_router(campaigns.router)
+app.include_router(consumer.router)
 app.include_router(reports.router)
 app.include_router(announcements.router)
 app.include_router(search.router)

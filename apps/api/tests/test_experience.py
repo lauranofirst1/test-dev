@@ -1,4 +1,4 @@
-"""부스 QR 체험 — 퀴즈·안내. docs/05-booth-experience.md, 계약 §11.
+"""부스 QR 체험 — 퀴즈·안내·설문. docs/05-booth-experience.md, 계약 §11.
 
 여기서 지키는 것은 하나입니다. **정답은 서버 밖으로 나가지 않고, 채점도 서버만 한다.**
 정답이 화면으로 내려가면 개발자 도구를 여는 것만으로 축제 전체가 통과됩니다.
@@ -302,6 +302,43 @@ def test_info_without_dwell_requirement_grants_immediately(client, festival, db)
     assert r.status_code == 200, r.text
 
 
+# ── 설문(survey) ────────────────────────────────────────────────────────────
+
+
+def test_survey_requires_every_answer_and_records_the_response(client, festival, db):
+    booth, mission = _quiz_booth(db, festival)
+    mission.experience_type = ExperienceType.SURVEY
+    mission.experience_config = {
+        "questions": [
+            {"type": "rating", "text": "도움이 됐나요?", "scale": 5},
+            {"type": "choice", "text": "다시 올까요?", "choices": ["예", "아니요"]},
+        ]
+    }
+    db.commit()
+    _, headers = _issue(client, festival)
+
+    context = client.get(
+        f"/api/festivals/{festival.id}/scan",
+        params={"booth_id": booth.id, "token": _token(booth)},
+        headers=headers,
+    )
+    assert context.status_code == 200, context.text
+    shown = context.json()["missions"][0]
+    assert shown["experience_type"] == "survey"
+    assert shown["experience_config"] == mission.experience_config
+    assert shown["attempts_left"] is None
+
+    incomplete = _submit(client, festival, booth, mission, headers, {"answers": [5]})
+    assert incomplete.status_code == 422
+    assert _err(incomplete) == "EXPERIENCE_INVALID_RESPONSE"
+    assert db.query(Participation).filter(Participation.mission_id == mission.id).count() == 0
+
+    completed = _submit(client, festival, booth, mission, headers, {"answers": [5, 0]})
+    assert completed.status_code == 200, completed.text
+    row = db.query(Participation).filter(Participation.mission_id == mission.id).one()
+    assert row.response == {"answers": [5, 0]}
+
+
 # ── 설정 검증 (운영자가 저장할 때) ──────────────────────────────────────────
 
 
@@ -364,8 +401,8 @@ def test_saving_a_quiz_normalizes_and_keeps_the_answer_for_operators(client, fes
     assert "unknown_key" not in config
 
 
-def test_photo_and_survey_are_refused_with_a_reason(client, festival):
-    """아직 못 여는 유형은 조용히 저장되지 않고 이유를 말한다."""
+def test_photo_is_refused_with_a_reason(client, festival):
+    """아직 못 여는 사진 유형은 조용히 저장되지 않고 이유를 말한다."""
     r = client.post(
         f"/api/festivals/{festival.id}/booths",
         json={

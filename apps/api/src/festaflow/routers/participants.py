@@ -35,7 +35,9 @@ from festaflow.schemas.participation import (
     ParticipantMe,
     ParticipantOverview,
     PublicBooth,
+    PublicExperienceExhibit,
     PublicFestival,
+    PublicLecture,
     PublicMission,
     ScanContext,
     ScanContextMission,
@@ -102,6 +104,28 @@ def public_festival(festival_id: int, db: DbSession) -> PublicFestival:
     by_booth: dict[int, list[Mission]] = {}
     for m in missions:
         by_booth.setdefault(m.booth_id, []).append(m)
+    lectures = list(
+        db.execute(
+            select(LectureSession)
+            .where(
+                LectureSession.festival_id == festival_id,
+                LectureSession.archived_at.is_(None),
+                LectureSession.is_active.is_(True),
+            )
+            .order_by(LectureSession.starts_at, LectureSession.id)
+        ).scalars()
+    )
+    exhibits = list(
+        db.execute(
+            select(Exhibit)
+            .where(
+                Exhibit.festival_id == festival_id,
+                Exhibit.archived_at.is_(None),
+                Exhibit.is_active.is_(True),
+            )
+            .order_by(Exhibit.entry_no, Exhibit.id)
+        ).scalars()
+    )
 
     return PublicFestival(
         id=festival.id,
@@ -110,6 +134,8 @@ def public_festival(festival_id: int, db: DbSession) -> PublicFestival:
         venue=festival.venue,
         starts_on=festival.starts_on.isoformat(),
         ends_on=festival.ends_on.isoformat(),
+        status=festival.status.value,
+        summary=festival.plan.summary if festival.plan else None,
         booths=[
             PublicBooth(
                 id=b.id,
@@ -123,21 +149,38 @@ def public_festival(festival_id: int, db: DbSession) -> PublicFestival:
             for b in _active_booths(db, festival_id)
         ],
         identity_mode=festival.identity_mode,
+        lectures=[
+            PublicLecture(
+                id=item.id,
+                title=item.title,
+                summary=item.summary,
+                speaker=item.speaker,
+                affiliation=item.affiliation,
+                location=item.location,
+                starts_at=item.starts_at,
+                ends_at=item.ends_at,
+                is_featured=item.is_featured,
+            )
+            for item in lectures
+        ],
+        exhibits=[
+            PublicExperienceExhibit(
+                id=item.id,
+                entry_no=item.entry_no,
+                title=item.title,
+                team_name=item.team_name,
+                summary=item.summary,
+                poster_url=item.poster_url,
+                tags=item.tags,
+                location=item.location,
+                estimated_duration_minutes=item.estimated_duration_minutes,
+                is_featured=item.is_featured,
+            )
+            for item in exhibits
+        ],
         # 있고 없음만. 탭을 띄울지 정하는 데 필요한 전부다.
-        has_lectures=db.execute(
-            select(func.count(LectureSession.id)).where(
-                LectureSession.festival_id == festival_id,
-                LectureSession.is_active.is_(True),
-            )
-        ).scalar_one()
-        > 0,
-        has_exhibits=db.execute(
-            select(func.count(Exhibit.id)).where(
-                Exhibit.festival_id == festival_id,
-                Exhibit.is_active.is_(True),
-            )
-        ).scalar_one()
-        > 0,
+        has_lectures=bool(lectures),
+        has_exhibits=bool(exhibits),
     )
 
 

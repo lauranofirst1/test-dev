@@ -167,6 +167,9 @@ export interface PublicMission {
   title: string;
   description: string | null;
   points: number;
+  experience_type: ExperienceType;
+  estimated_duration_minutes: number | null;
+  is_featured: boolean;
 }
 
 export interface PublicBooth {
@@ -177,6 +180,33 @@ export interface PublicBooth {
   location: string | null;
   verify_mode: BoothVerifyMode;
   missions: PublicMission[];
+}
+
+/** 참여 전에 공개해도 되는 특강 정보. 출결 운영 수치는 포함하지 않습니다. */
+export interface PublicLecture {
+  id: number;
+  title: string;
+  summary: string | null;
+  speaker: string | null;
+  affiliation: string | null;
+  location: string | null;
+  starts_at: string;
+  ends_at: string;
+  is_featured: boolean;
+}
+
+/** 행사 진입 화면에서 보여 주는 공개 전시 정보. 개인의 투표 상태는 포함하지 않습니다. */
+export interface PublicExperienceExhibit {
+  id: number;
+  entry_no: number;
+  title: string;
+  team_name: string | null;
+  summary: string | null;
+  poster_url: string | null;
+  tags: string[];
+  location: string | null;
+  estimated_duration_minutes: number | null;
+  is_featured: boolean;
 }
 
 /** 참여자를 어떻게 식별하는가.
@@ -193,7 +223,11 @@ export interface PublicFestival {
   venue: string;
   starts_on: string;
   ends_on: string;
+  status: string;
+  summary: string | null;
   booths: PublicBooth[];
+  lectures: PublicLecture[];
+  exhibits: PublicExperienceExhibit[];
   /** 참여 시작 화면이 학번을 물어야 하는지 여기서 정해집니다. */
   identity_mode: IdentityMode;
   source_note: string;
@@ -287,6 +321,22 @@ export interface InfoConfig {
   min_dwell_seconds: number;
 }
 
+export interface SurveyRatingQuestion {
+  type: 'rating';
+  text: string;
+  scale: number;
+}
+
+export interface SurveyChoiceQuestion {
+  type: 'choice';
+  text: string;
+  choices: string[];
+}
+
+export interface SurveyConfig {
+  questions: (SurveyRatingQuestion | SurveyChoiceQuestion)[];
+}
+
 /** 운영자 편집용 — 이쪽에는 정답이 있습니다. */
 export interface QuizConfigAdmin extends QuizConfig {
   answer_index: number;
@@ -301,7 +351,7 @@ export interface ScanContextMission {
   points: number;
   already_granted: boolean;
   experience_type: ExperienceType;
-  /** 정답이 빠진 설정. 유형에 따라 QuizConfig | InfoConfig | {} */
+  /** 정답이 빠진 설정. 유형에 따라 QuizConfig | InfoConfig | SurveyConfig | {} */
   experience_config: Record<string, unknown>;
   /** 남은 시도 횟수. 제한이 없는 유형이면 null. */
   attempts_left: number | null;
@@ -366,6 +416,8 @@ export interface MissionOut {
   points: number;
   is_active: boolean;
   experience_type: ExperienceType;
+  estimated_duration_minutes: number | null;
+  is_featured: boolean;
   /** **운영자 전용.** 퀴즈의 정답이 여기 들어 있습니다. */
   experience_config: Record<string, unknown>;
   created_at: string;
@@ -544,6 +596,7 @@ export interface LectureSession {
   id: number;
   festival_id: number;
   title: string;
+  summary: string | null;
   speaker: string | null;
   affiliation: string | null;
   location: string | null;
@@ -553,6 +606,7 @@ export interface LectureSession {
   required_checkins: number;
   grants_excused_absence: boolean;
   is_active: boolean;
+  is_featured: boolean;
 }
 
 export interface LectureSessionDetail extends LectureSession {
@@ -600,6 +654,8 @@ export interface MyAttendance {
   opened: number;
   is_met: boolean;
   remaining: number;
+  /** 출석 인정 기준을 채운 마지막 체크인 시각. 아직 인정 전이면 null입니다. */
+  completed_at: string | null;
 }
 
 export interface CheckInResult {
@@ -645,7 +701,40 @@ export interface Exhibit {
   poster_url: string | null;
   tags: string[];
   location: string | null;
+  estimated_duration_minutes: number | null;
   is_active: boolean;
+  is_featured: boolean;
+}
+
+export type ExperienceSourceType = 'mission' | 'lecture' | 'exhibit';
+export type ExperienceOpenContext =
+  | 'now'
+  | 'featured'
+  | 'explore_time'
+  | 'explore_place'
+  | 'explore_type'
+  | 'search'
+  | 'shared_link'
+  | 'flow';
+
+export interface ExperienceOpen {
+  id: number;
+  source_type: ExperienceSourceType;
+  source_id: number;
+  source_context: ExperienceOpenContext;
+  opened_at: string;
+}
+
+export type FavoriteMemoryReason = 'fun' | 'new' | 'together' | 'discovered' | 'again';
+
+export interface FavoriteMemory {
+  id: number;
+  source_type: ExperienceSourceType;
+  source_id: number;
+  reason: FavoriteMemoryReason | null;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ExhibitList {
@@ -699,6 +788,8 @@ export interface PublicExhibit {
   location: string | null;
   /** 내가 이 작품에 표를 줬는가. 자기 표는 남의 정보가 아닙니다. */
   voted: boolean;
+  /** 내가 표를 준 시각. 표를 주지 않았다면 null입니다. */
+  voted_at: string | null;
 }
 
 export interface VotingStatus {
@@ -1065,6 +1156,20 @@ export interface FestivalReport {
     in_progress: boolean;
   }[];
   improvements: { rule: string; message: string }[];
+  experience_insights: {
+    source_type: ExperienceSourceType;
+    source_id: number;
+    title: string;
+    opens: number;
+    unique_openers: number;
+    discovery_contexts: Record<string, number>;
+    verified_participants: number;
+    completed_participants: number | null;
+    verification_kind: 'mission_completion' | 'lecture_checkin' | 'audience_vote' | 'none';
+    favorites: number;
+    favorite_reasons: Record<string, number>;
+    observations: string[];
+  }[];
 }
 
 // ── 현장 공지 ────────────────────────────────────────────────────────────────

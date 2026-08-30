@@ -29,18 +29,25 @@ import sys
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from sqlalchemy import delete, select  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from festaflow.core import security  # noqa: E402
+from festaflow.core.config import settings  # noqa: E402
 from festaflow.db.session import SessionLocal  # noqa: E402
 from festaflow.models import (  # noqa: E402
     Announcement,
     AudienceVote,
     Booth,
     Exhibit,
+    ExperienceOpen,
+    FavoriteMemory,
     Festival,
     FestivalPlan,
     FestivalStaff,
@@ -66,6 +73,7 @@ from festaflow.models.enums import (  # noqa: E402
     BoothQrMode,
     BoothType,
     BoothVerifyMode,
+    ExperienceType,
     FestivalStatus,
     GrantUnit,
     IdentityMode,
@@ -83,6 +91,17 @@ FESTIVAL_NAME = "제9회 Hallym SW Week (테스트)"
 #: 씨를 고정한다. 다시 돌려도 같은 화면이 나와야 "어제와 다르다" 가 신호가 된다.
 RNG = random.Random(20261102)
 
+
+def _assert_local_seed_target() -> None:
+    """알려진 테스트 자격증명을 로컬 DB 밖에 만드는 실수를 막는다."""
+    url = make_url(settings.database_url)
+    host = (url.host or "").lower()
+    if settings.app_env != "local" or host not in {"localhost", "127.0.0.1", "::1"}:
+        raise SystemExit(
+            "중단: seed_test_account.py는 APP_ENV=local인 로컬 PostgreSQL 전용입니다. "
+            f"현재 APP_ENV={settings.app_env}, DB host={host or '(없음)'}"
+        )
+
 #: 스태프 접근 코드. 발급 코드는 원래 무작위지만, 테스트 계정에서는 **고정**한다 —
 #: 현장 화면(부스 지급·심사표)에 들어가 보려면 코드가 손에 있어야 하고, 매번
 #: 바뀌면 그때마다 스크립트 출력을 뒤져야 한다. 글자는 코드 알파벳 안에서만 쓴다.
@@ -96,6 +115,7 @@ STAFF_CODES: list[tuple[StaffRole, str, str, int | None]] = [
 ]
 
 #: (이름, 유형, 위치, 확인 방식, QR 방식, 미션[(제목, 점수)])
+#: Consumer 데모는 미션 6 + 특강 2 + 전시 4 = Experience 12개로 맞춘다.
 BOOTHS: list[tuple[str, BoothType, str, BoothVerifyMode, BoothQrMode, list[tuple[str, int]]]] = [
     (
         "AI 체험존",
@@ -103,7 +123,7 @@ BOOTHS: list[tuple[str, BoothType, str, BoothVerifyMode, BoothQrMode, list[tuple
         "공학관 1층 A구역",
         BoothVerifyMode.STAFF_SCAN,
         BoothQrMode.ROTATING,
-        [("모델 데모 돌려보기", 30), ("프롬프트 챌린지", 20)],
+        [("AI 그림 프롬프트 실험", 30)],
     ),
     (
         "메이커존",
@@ -111,7 +131,7 @@ BOOTHS: list[tuple[str, BoothType, str, BoothVerifyMode, BoothQrMode, list[tuple
         "공학관 1층 B구역",
         BoothVerifyMode.STAFF_SCAN,
         BoothQrMode.ROTATING,
-        [("3D 프린팅 관람", 20), ("키링 만들기", 30)],
+        [("3D 프린팅 키링 만들기", 30)],
     ),
     (
         "동아리 홍보관",
@@ -119,7 +139,7 @@ BOOTHS: list[tuple[str, BoothType, str, BoothVerifyMode, BoothQrMode, list[tuple
         "공학관 2층 복도",
         BoothVerifyMode.PARTICIPANT_SCAN,
         BoothQrMode.PRINTED,
-        [("동아리 소개 듣기", 10)],
+        [("동아리 번개 발표 듣기", 0)],
     ),
     (
         "SW 진로 상담",
@@ -127,7 +147,7 @@ BOOTHS: list[tuple[str, BoothType, str, BoothVerifyMode, BoothQrMode, list[tuple
         "공학관 로비",
         BoothVerifyMode.PARTICIPANT_SCAN,
         BoothQrMode.PRINTED,
-        [("상담 받기", 20)],
+        [("진로 고민 카드 상담", 20)],
     ),
     (
         "푸드트럭 존",
@@ -135,7 +155,7 @@ BOOTHS: list[tuple[str, BoothType, str, BoothVerifyMode, BoothQrMode, list[tuple
         "공학관 앞 광장",
         BoothVerifyMode.STAFF_SCAN,
         BoothQrMode.ROTATING,
-        [("간식 받기", 10)],
+        [("로컬 푸드 한입 시식", 10)],
     ),
     (
         "개막 공연",
@@ -143,9 +163,77 @@ BOOTHS: list[tuple[str, BoothType, str, BoothVerifyMode, BoothQrMode, list[tuple
         "대강당",
         BoothVerifyMode.PARTICIPANT_SCAN,
         BoothQrMode.PRINTED,
-        [("공연 관람 인증", 10)],
+        [("오프닝 라이브 함께 보기", 0)],
     ),
 ]
+
+#: (설명, 예상 분, 추천 노출, 체험 유형, 유형별 설정). 일부 시간은 의도적으로
+#: 비워 두어, 모르는 정보를 화면이 지어내지 않는지도 확인한다.
+MISSION_DETAILS: dict[str, tuple[str, int | None, bool, ExperienceType, dict]] = {
+    "AI 그림 프롬프트 실험": (
+        "같은 주제를 서로 다른 프롬프트로 생성해 보고 결과가 달라지는 이유를 맞혀 봅니다.",
+        12,
+        True,
+        ExperienceType.QUIZ,
+        {
+            "question": "생성 결과를 가장 구체적으로 바꾸는 프롬프트는 무엇일까요?",
+            "choices": ["고양이", "그림 그려 줘", "노을 진 캠퍼스를 걷는 주황 고양이, 수채화"],
+            "answer_index": 2,
+            "max_attempts": 3,
+            "hint": "장면·대상·스타일을 함께 적어 보세요.",
+            "explanation": (
+                "대상과 장면, 표현 스타일을 함께 지정하면 결과의 방향이 더 분명해집니다."
+            ),
+        },
+    ),
+    "3D 프린팅 키링 만들기": (
+        "이니셜을 고르고 출력 과정을 본 뒤 완성된 키링을 받아 갑니다.",
+        20,
+        True,
+        ExperienceType.STAMP,
+        {},
+    ),
+    "동아리 번개 발표 듣기": (
+        "세 동아리가 3분씩 들려주는 프로젝트 이야기를 듣고 관심 동아리를 찾아봅니다.",
+        None,
+        False,
+        ExperienceType.INFO,
+        {
+            "body": "발표가 끝난 뒤 테이블의 프로젝트를 직접 만져 보고 질문해 보세요.",
+            "min_dwell_seconds": 0,
+            "links": [],
+        },
+    ),
+    "진로 고민 카드 상담": (
+        "개발·기획·디자인 중 궁금한 진로 카드를 골라 선배와 짧게 이야기합니다.",
+        15,
+        False,
+        ExperienceType.SURVEY,
+        {
+            "questions": [
+                {
+                    "type": "choice",
+                    "text": "오늘 가장 궁금한 진로는 무엇인가요?",
+                    "choices": ["개발", "기획", "디자인"],
+                }
+            ]
+        },
+    ),
+    "로컬 푸드 한입 시식": (
+        "춘천 로컬 재료로 만든 오늘의 한입 메뉴를 맛봅니다.",
+        5,
+        False,
+        ExperienceType.STAMP,
+        {},
+    ),
+    "오프닝 라이브 함께 보기": (
+        "학생 밴드의 오프닝 무대를 현장에서 함께 봅니다.",
+        None,
+        True,
+        ExperienceType.STAMP,
+        {},
+    ),
+}
 
 #: 참여를 부스에 흩는 가중치. 일부러 한쪽으로 몰아 둔다 — 균등하게 두면
 #: 대시보드의 편중 판정과 "조용한 부스" 추천 카드가 영영 안 뜬다.
@@ -158,13 +246,15 @@ BOOTH_WEIGHTS = [34, 22, 14, 9, 16, 5]
 RECENT_WEIGHTS = [24, 8, 5, 3, 6, 1]
 
 #: (제목, 팀, 한 줄 소개, 태그, 전시 위치)
-EXHIBITS: list[tuple[str, str, str, list[str], str]] = [
+EXHIBITS: list[tuple[str, str, str, list[str], str, int | None, bool]] = [
     (
         "출결 QR 위조 탐지기",
         "3팀 겹눈",
         "화면 촬영본으로 찍은 출석을 잡아냅니다.",
         ["보안", "머신러닝"],
         "공학관 1층 A-1",
+        8,
+        True,
     ),
     (
         "캠퍼스 길찾기 AR",
@@ -172,6 +262,8 @@ EXHIBITS: list[tuple[str, str, str, list[str], str]] = [
         "강의실 번호만 넣으면 복도에 화살표를 띄웁니다.",
         ["AR", "모바일"],
         "공학관 1층 A-2",
+        10,
+        True,
     ),
     (
         "강의실 혼잡도 알림",
@@ -179,6 +271,8 @@ EXHIBITS: list[tuple[str, str, str, list[str], str]] = [
         "빈 좌석 수를 실시간으로 셉니다.",
         ["IoT", "비전"],
         "공학관 1층 A-3",
+        6,
+        False,
     ),
     (
         "학식 리뷰 모음",
@@ -186,20 +280,8 @@ EXHIBITS: list[tuple[str, str, str, list[str], str]] = [
         "학식 메뉴와 후기를 한 곳에 모읍니다.",
         ["웹", "크롤링"],
         "공학관 1층 B-1",
-    ),
-    (
-        "수어 번역 글러브",
-        "2팀 손말",
-        "손가락 관절 각도를 읽어 자모로 옮깁니다.",
-        ["하드웨어", "접근성"],
-        "공학관 1층 B-2",
-    ),
-    (
-        "탄소 발자국 대시보드",
-        "9팀 초록발",
-        "학과별 전력 사용량을 하루 단위로 보여줍니다.",
-        ["데이터", "시각화"],
-        "공학관 1층 B-3",
+        None,
+        False,
     ),
 ]
 
@@ -212,18 +294,42 @@ CRITERIA: list[tuple[str, int, int]] = [
 ]
 
 #: 작품별 심사 성향(평균으로 삼을 값). 1번 작품이 앞서고 4번이 처진다.
-EXHIBIT_BIAS = [4.6, 4.1, 3.9, 3.2, 4.3, 3.6]
+EXHIBIT_BIAS = [4.6, 4.1, 3.9, 3.2]
 
 #: 작품별 관객 득표. 심사 1등과 관객 1등을 **일부러 어긋나게** 둔다 —
 #: 두 점수를 어떻게 섞는지가 이 화면의 핵심인데, 순위가 같으면 확인이 안 된다.
-EXHIBIT_VOTES = [12, 9, 21, 6, 14, 4]
+EXHIBIT_VOTES = [12, 9, 21, 6]
 
 
 def _dt(day: date, hh: int, mm: int = 0) -> datetime:
     return datetime.combine(day, time(hh, mm), tzinfo=UTC)
 
 
-def seed(db: Session, *, reset: bool) -> None:
+def _set_phase(db: Session, festival: Festival, phase: str, today: date) -> None:
+    """데모 행사 하나만 LIVE/REMEMBER 시연 상태로 전환한다."""
+    if phase == "live":
+        festival.starts_on = today - timedelta(days=1)
+        festival.ends_on = today + timedelta(days=2)
+        festival.status = FestivalStatus.LIVE
+        festival.voting_open = True
+    else:
+        festival.starts_on = today - timedelta(days=4)
+        festival.ends_on = today - timedelta(days=1)
+        festival.status = FestivalStatus.CLOSED
+        festival.voting_open = False
+
+    # 현장성 공지는 REMEMBER 화면에 남으면 거짓말이 된다. 기록은 보존하고
+    # 관객 노출만 phase에 맞춰 켜고 끈다.
+    for announcement in db.execute(
+        select(Announcement).where(
+            Announcement.festival_id == festival.id,
+            Announcement.channel == AnnouncementChannel.AUDIENCE,
+        )
+    ).scalars():
+        announcement.is_active = phase == "live"
+
+
+def seed(db: Session, *, reset: bool, phase: str | None = None) -> None:
     today = datetime.now(UTC).date()
 
     account = db.execute(
@@ -258,8 +364,16 @@ def seed(db: Session, *, reset: bool) -> None:
         )
     ).scalar_one_or_none()
 
+    if existing is not None and not reset and phase:
+        _set_phase(db, existing, phase, today)
+        print(f"✓ 축제 #{existing.id} 를 {phase.upper()} 데모 상태로 바꿉니다")
+        return
+
     if existing is not None and not reset:
-        print(f"· 축제 #{existing.id} 가 이미 있습니다. 데이터는 그대로 둡니다 (--reset 으로 다시).")
+        print(
+            f"· 축제 #{existing.id} 가 이미 있습니다. "
+            "데이터는 그대로 둡니다 (--reset 으로 다시)."
+        )
         return
 
     if existing is not None:
@@ -289,11 +403,16 @@ def seed(db: Session, *, reset: bool) -> None:
     )
     db.add(festival)
     db.flush()
+    if phase:
+        _set_phase(db, festival, phase, today)
 
     db.add(
         FestivalPlan(
             festival_id=festival.id,
-            summary="재학생이 한 학기 동안 만든 것을 서로 보여주고, 외부 멘토가 심사하는 주간 행사.",
+            summary=(
+                "재학생이 한 학기 동안 만든 것을 서로 보여주고, "
+                "외부 멘토가 심사하는 주간 행사."
+            ),
             description=(
                 "전공 부스와 동아리 홍보, SW 특강, 전시 심사로 이루어집니다. "
                 "특강은 출석을 인정받으면 공결 처리가 되므로 체크인을 두 번 엽니다."
@@ -351,8 +470,17 @@ def seed(db: Session, *, reset: bool) -> None:
 
         made: list[Mission] = []
         for title, points in missions:
+            description, duration, featured, experience_type, config = MISSION_DETAILS[title]
             m = Mission(
-                festival_id=festival.id, booth_id=booth.id, title=title, points=points
+                festival_id=festival.id,
+                booth_id=booth.id,
+                title=title,
+                description=description,
+                points=points,
+                estimated_duration_minutes=duration,
+                is_featured=featured,
+                experience_type=experience_type,
+                experience_config=config,
             )
             db.add(m)
             made.append(m)
@@ -418,6 +546,7 @@ def seed(db: Session, *, reset: bool) -> None:
     # 한 사람이 같은 미션을 두 번 완료할 수 없다(uq_participations_grant).
     # 무작위로 뽑으면 같은 쌍이 나오므로 쓴 쌍을 기억하며 채운다.
     used_grants: set[tuple[int, int]] = set()
+    completed_by_participant: dict[int, list[int]] = {}
     total = 0
     for idx, booth in enumerate(booths):
         want = BOOTH_WEIGHTS[idx]
@@ -432,6 +561,7 @@ def seed(db: Session, *, reset: bool) -> None:
             if key in used_grants:
                 continue
             used_grants.add(key)
+            completed_by_participant.setdefault(participant.id, []).append(mission.id)
             recent = made < RECENT_WEIGHTS[idx]
             minutes = RNG.randint(1, 25) if recent else RNG.randint(60, 900)
             db.add(
@@ -457,6 +587,7 @@ def seed(db: Session, *, reset: bool) -> None:
     past = LectureSession(
         festival_id=festival.id,
         title="생성형 AI 시대의 개발자",
+        summary="현업 개발자가 생성형 AI와 함께 일하며 달라진 코드 리뷰와 협업 방식을 들려줍니다.",
         speaker="김지훈",
         affiliation="네이버클라우드",
         location="공학관 대강의실 101",
@@ -464,6 +595,7 @@ def seed(db: Session, *, reset: bool) -> None:
         ends_at=_dt(yesterday, 7),
         required_checkins=2,
         grants_excused_absence=True,
+        is_featured=False,
     )
     db.add(past)
     db.flush()
@@ -510,6 +642,7 @@ def seed(db: Session, *, reset: bool) -> None:
     live = LectureSession(
         festival_id=festival.id,
         title="클라우드 네이티브 입문",
+        summary="작은 웹 서비스를 컨테이너로 배포하는 흐름을 라이브 데모로 따라갑니다.",
         speaker="이서연",
         affiliation="당근",
         location="공학관 대강의실 101",
@@ -517,6 +650,7 @@ def seed(db: Session, *, reset: bool) -> None:
         ends_at=now + timedelta(hours=1, minutes=30),
         required_checkins=2,
         grants_excused_absence=True,
+        is_featured=True,
     )
     db.add(live)
     db.flush()
@@ -553,7 +687,15 @@ def seed(db: Session, *, reset: bool) -> None:
         criteria.append(c)
 
     exhibits: list[Exhibit] = []
-    for no, (title, team, summary, tags, location) in enumerate(EXHIBITS, start=1):
+    for no, (
+        title,
+        team,
+        summary,
+        tags,
+        location,
+        duration,
+        featured,
+    ) in enumerate(EXHIBITS, start=1):
         e = Exhibit(
             festival_id=festival.id,
             entry_no=no,
@@ -562,6 +704,8 @@ def seed(db: Session, *, reset: bool) -> None:
             summary=summary,
             tags=tags,
             location=location,
+            estimated_duration_minutes=duration,
+            is_featured=featured,
         )
         db.add(e)
         exhibits.append(e)
@@ -591,7 +735,11 @@ def seed(db: Session, *, reset: bool) -> None:
     voters = participants[:60]
     for i, exhibit in enumerate(exhibits):
         want = EXHIBIT_VOTES[i]
-        pool = [p for p in voters if len(used.get(p.id, ())) < festival.audience_votes_per_participant]
+        pool = [
+            p
+            for p in voters
+            if len(used.get(p.id, ())) < festival.audience_votes_per_participant
+        ]
         RNG.shuffle(pool)
         for p in pool[:want]:
             used.setdefault(p.id, set()).add(exhibit.id)
@@ -603,6 +751,56 @@ def seed(db: Session, *, reset: bool) -> None:
                     voted_at=now - timedelta(minutes=RNG.randint(5, 600)),
                 )
             )
+
+    # ── Consumer 관심과 기억 ───────────────────────────────────────────────
+    # 분석 화면도 빈 표가 아니라 실제 Open/참여/Favorite 간 차이를 보여야 한다.
+    # Open은 클릭 문맥만 기록하고, Favorite은 사용자가 명시적으로 고른 한 건만 둔다.
+    sources = (
+        [("mission", mission.id) for group in missions_by_booth for mission in group]
+        + [("lecture", past.id), ("lecture", live.id)]
+        + [("exhibit", exhibit.id) for exhibit in exhibits]
+    )
+    contexts = ["now", "featured", "explore_time", "explore_place", "explore_type", "search"]
+    open_count = 0
+    for participant in participants[:48]:
+        for source_type, source_id in RNG.sample(sources, k=RNG.randint(2, 4)):
+            db.add(
+                ExperienceOpen(
+                    festival_id=festival.id,
+                    participant_id=participant.id,
+                    source_type=source_type,
+                    source_id=source_id,
+                    source_context=RNG.choice(contexts),
+                    opened_at=now - timedelta(minutes=RNG.randint(1, 900)),
+                )
+            )
+            open_count += 1
+
+    met_past_ids = {participant.id for participant in attendees if participant not in left_early}
+    reasons = ["fun", "new", "together", "discovered", "again"]
+    favorite_count = 0
+    for index, participant in enumerate(participants[:30]):
+        candidates = [
+            ("mission", source_id)
+            for source_id in completed_by_participant.get(participant.id, [])
+        ]
+        candidates.extend(("exhibit", source_id) for source_id in used.get(participant.id, set()))
+        if participant.id in met_past_ids:
+            candidates.append(("lecture", past.id))
+        if not candidates:
+            continue
+        source_type, source_id = RNG.choice(candidates)
+        db.add(
+            FavoriteMemory(
+                festival_id=festival.id,
+                participant_id=participant.id,
+                source_type=source_type,
+                source_id=source_id,
+                reason=reasons[index % len(reasons)],
+                comment=("친구에게도 권하고 싶은 순간이었어요." if index % 5 == 0 else None),
+            )
+        )
+        favorite_count += 1
 
     # ── 경품과 공지 ─────────────────────────────────────────────────────────
     for name, stock, weight, blank in (
@@ -640,16 +838,28 @@ def seed(db: Session, *, reset: bool) -> None:
         )
     )
 
+    if phase:
+        # 위 첫 호출 때는 아직 공지가 없었다. 생성 뒤 노출 상태도 맞춘다.
+        db.flush()
+        _set_phase(db, festival, phase, today)
+
     db.flush()
 
     print(f"✓ 축제 #{festival.id} {FESTIVAL_NAME}")
     print(f"  부스 {len(booths)} · 미션 {sum(len(m) for m in missions_by_booth)} · 참여 {total}건")
     print(f"  참여자 {len(participants)}명 · 특강 2개(출튀 {len(left_early)}명 포함)")
-    print(f"  작품 {len(exhibits)} · 심사 항목 {len(criteria)} · 심사위원 {len(judges)}명 · 투표 {sum(EXHIBIT_VOTES)}표")
+    print(
+        f"  작품 {len(exhibits)} · 심사 항목 {len(criteria)} · "
+        f"심사위원 {len(judges)}명 · 투표 {sum(EXHIBIT_VOTES)}표"
+    )
+    print(
+        f"  Consumer Experience {len(sources)}개 · "
+        f"Open {open_count}건 · Favorite {favorite_count}건"
+    )
     # 초대 주소를 그대로 찍는다. 스태프 ID 는 다시 채울 때마다 바뀌는데,
     # 그때마다 콘솔을 뒤져 찾게 하면 팀원은 현장 화면까지 가지 않는다.
     print("\n  현장 화면 — 아래 주소를 열고 접근 코드를 넣으세요:")
-    for (role, display_name, code, _), staff in zip(
+    for (_role, display_name, code, _), staff in zip(
         STAFF_CODES, staff_by_role_order, strict=True
     ):
         print(
@@ -665,10 +875,17 @@ def main() -> int:
         action="store_true",
         help="같은 이름의 테스트 축제가 있으면 지우고 다시 만든다",
     )
+    ap.add_argument(
+        "--phase",
+        choices=("live", "ended"),
+        help="이 테스트 축제만 LIVE 또는 REMEMBER 시연 상태로 바꾼다",
+    )
     args = ap.parse_args()
 
+    _assert_local_seed_target()
+
     with SessionLocal() as db:
-        seed(db, reset=args.reset)
+        seed(db, reset=args.reset, phase=args.phase)
         db.commit()
 
     print(f"\n로그인: {EMAIL} / {PASSWORD}")

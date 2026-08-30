@@ -120,7 +120,8 @@ def staff_login(payload: StaffLogin, response: Response, db: DbSession) -> Staff
             db.commit()
         raise _invalid()
 
-    assert staff is not None  # 위 조건이 참이면 staff 는 있다 (타입 좁히기)
+    if staff is None:  # 방어적 실패: 최적화(-O)에서도 assert처럼 사라지지 않는다.
+        raise _invalid()
     staff.failed_attempts = 0
     staff.locked_until = None
     staff.last_login_at = now

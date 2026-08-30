@@ -24,14 +24,18 @@ TEST_DB = "festaflow_test"
 
 
 def _test_url() -> str:
-    return str(make_url(settings.database_url).set(database=TEST_DB))
+    return make_url(settings.database_url).set(database=TEST_DB).render_as_string(
+        hide_password=False
+    )
 
 
 @pytest.fixture(scope="session")
 def engine() -> Iterator[Engine]:
     admin_url = make_url(settings.database_url).set(database="postgres")
     try:
-        admin = create_engine(str(admin_url), isolation_level="AUTOCOMMIT")
+        admin = create_engine(
+            admin_url.render_as_string(hide_password=False), isolation_level="AUTOCOMMIT"
+        )
         with admin.connect() as conn:
             exists = conn.execute(
                 text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": TEST_DB}

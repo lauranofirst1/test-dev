@@ -301,6 +301,7 @@ def test_two_checkins_meet_the_requirement(client, campus, lecture, db):
 
     assert r.json()["attendance"]["is_met"] is True
     assert r.json()["attendance"]["remaining"] == 0
+    assert r.json()["attendance"]["completed_at"] is not None
 
 
 def test_checking_the_same_checkpoint_twice_counts_once(client, campus, lecture, db):
@@ -376,7 +377,9 @@ def test_checkin_qr_rotates(client, campus, lecture, db):
 
     now = datetime.now(UTC)
     later = now + timedelta(seconds=120)
-    a = att.checkpoint_token(lecture.qr_secret, cp["checkpoint_id"], att.security.current_window(now))
+    a = att.checkpoint_token(
+        lecture.qr_secret, cp["checkpoint_id"], att.security.current_window(now)
+    )
     b = att.checkpoint_token(
         lecture.qr_secret, cp["checkpoint_id"], att.security.current_window(later)
     )
@@ -425,3 +428,4 @@ def test_my_attendance_shows_what_i_missed(client, campus, lecture, db):
     assert mine[0]["opened"] == 2
     assert mine[0]["checked"] == 1
     assert mine[0]["is_met"] is False
+    assert mine[0]["completed_at"] is None

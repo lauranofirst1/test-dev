@@ -10,7 +10,8 @@
  * 자기가 뭘 잘못했다고 생각합니다.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
@@ -19,6 +20,7 @@ import type { CheckInResult } from '../api/types';
 
 export function CheckInPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const [params] = useSearchParams();
   const sessionId = params.get('s');
   const checkpointId = params.get('c');
@@ -52,6 +54,11 @@ export function CheckInPage() {
     refetchOnReconnect: false,
   });
 
+  useEffect(() => {
+    if (!checkIn.data) return;
+    void qc.invalidateQueries({ queryKey: ['my-lectures', id] });
+  }, [checkIn.data, id, qc]);
+
 
   if (!sessionId || !checkpointId || !token) {
     return (
@@ -67,7 +74,12 @@ export function CheckInPage() {
           <p className="lede" style={{ textAlign: 'center' }}>
             학번으로 참여를 시작한 뒤 다시 QR 을 찍으면 출석이 기록됩니다.
           </p>
-          <Link to={`/join/${id}`} className="btn btn--primary btn--lg">
+          <Link
+            to={`/join/${id}?returnTo=${encodeURIComponent(
+              `${window.location.pathname}${window.location.search}`,
+            )}`}
+            className="btn btn--primary btn--lg"
+          >
             참여 시작하기
           </Link>
         </div>
@@ -86,10 +98,13 @@ export function CheckInPage() {
             <small>{done.was_new ? 'CHECKED' : 'ALREADY'}</small>
           </span>
           <p className="eyebrow">
-            {done.was_new
-              ? `${done.sequence}회차 체크인 완료`
-              : '이미 이 회차를 찍었습니다'}
+            {done.was_new && a.is_met
+              ? '하나의 순간이 남았어요'
+              : done.was_new
+                ? '체크인이 기록됐어요'
+                : '이미 이 회차를 찍었습니다'}
           </p>
+          <h2 style={{ textAlign: 'center' }}>{a.title}</h2>
           <p className="figure tabular" style={{ textAlign: 'center' }}>
             {a.checked} / {a.required}
             <small>체크인</small>
@@ -107,8 +122,11 @@ export function CheckInPage() {
               {a.remaining}번 더 찍어야 출석으로 인정됩니다. 자리를 지켜 주세요.
             </p>
           )}
-          <Link to={`/join/${id}/lectures`} className="btn btn--primary btn--lg">
-            내 출결 보기
+          <Link to={`/join/${id}`} className="btn btn--primary btn--lg">
+            닫기
+          </Link>
+          <Link to={`/join/${id}/lectures`} className="btn btn--ghost">
+            출결 자세히 보기
           </Link>
         </div>
       </div>

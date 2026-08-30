@@ -12,4 +12,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 apps/api/media/
+/media/
+docs/current-prototype-audit/
+*.log
+pytest-results.xml
 apps/web/node_modules/

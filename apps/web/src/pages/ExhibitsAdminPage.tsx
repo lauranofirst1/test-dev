@@ -22,7 +22,15 @@ import type {
   VoteCriterion,
 } from '../api/types';
 
-const EMPTY = { title: '', team_name: '', summary: '', tags: '', location: '' };
+const EMPTY = {
+  title: '',
+  team_name: '',
+  summary: '',
+  tags: '',
+  location: '',
+  estimated_duration_minutes: '',
+  is_featured: false,
+};
 
 export function ExhibitsAdminPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -65,6 +73,10 @@ export function ExhibitsAdminPage() {
         team_name: form.team_name.trim() || null,
         summary: form.summary.trim() || null,
         location: form.location.trim() || null,
+        estimated_duration_minutes: form.estimated_duration_minutes
+          ? Number(form.estimated_duration_minutes)
+          : null,
+        is_featured: form.is_featured,
         // 쉼표로 나눈다. 태그 입력에 UI 를 얹으면 현장에서 붙여넣기가 안 된다.
         tags: form.tags
           .split(',')
@@ -88,7 +100,12 @@ export function ExhibitsAdminPage() {
               {festival.data?.name ?? '불러오는 중…'}
             </h1>
           </div>
-          <Link to={`/festivals/${id}/judging`} className="btn btn--soft" target="_blank">
+          <Link
+            to={`/festivals/${id}/judging`}
+            className="btn btn--soft"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             심사표 열기 ↗
           </Link>
         </div>
@@ -174,6 +191,34 @@ export function ExhibitsAdminPage() {
               placeholder="3팀"
             />
           </div>
+        </div>
+        <div className="grid2">
+          <div className="field field--inline">
+            <label htmlFor="ex-duration">보통 얼마나 둘러보나요?</label>
+            <input
+              id="ex-duration"
+              type="number"
+              min={1}
+              max={1440}
+              inputMode="numeric"
+              value={form.estimated_duration_minutes}
+              onChange={(e) =>
+                setForm({ ...form, estimated_duration_minutes: e.target.value })
+              }
+              placeholder="선택"
+            />
+            <span className="unit">분</span>
+            <span className="hint">모르면 비워 두세요. 참가자 화면에서 숨깁니다.</span>
+          </div>
+          <label className="row" style={{ gap: 'var(--space-2)', alignSelf: 'center' }}>
+            <input
+              type="checkbox"
+              checked={form.is_featured}
+              onChange={(e) => setForm({ ...form, is_featured: e.target.checked })}
+              style={{ width: 20, height: 20 }}
+            />
+            <span className="muted">처음 온 참가자에게 보여주기</span>
+          </label>
         </div>
         <div className="field">
           <label htmlFor="ex-summary">한 줄 소개</label>
@@ -605,6 +650,13 @@ function Results({
 
             {open.exhibit.summary && <p>{open.exhibit.summary}</p>}
 
+            <ExhibitConsumerMetadata
+              key={open.exhibit.id}
+              festivalId={festivalId}
+              exhibit={open.exhibit}
+              onChanged={onChanged}
+            />
+
             {open.exhibit.poster_url && (
               <img
                 src={open.exhibit.poster_url}
@@ -646,6 +698,91 @@ function Results({
           <span>{upload.error.message}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function ExhibitConsumerMetadata({
+  festivalId,
+  exhibit,
+  onChanged,
+}: {
+  festivalId: string;
+  exhibit: Exhibit;
+  onChanged: () => void;
+}) {
+  const [summary, setSummary] = useState(exhibit.summary ?? '');
+  const [duration, setDuration] = useState(
+    exhibit.estimated_duration_minutes == null
+      ? ''
+      : String(exhibit.estimated_duration_minutes),
+  );
+  const [featured, setFeatured] = useState(exhibit.is_featured);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.put(`/api/festivals/${festivalId}/exhibits/${exhibit.id}`, {
+        title: exhibit.title,
+        team_name: exhibit.team_name,
+        summary: summary.trim() || null,
+        poster_url: exhibit.poster_url,
+        tags: exhibit.tags,
+        location: exhibit.location,
+        estimated_duration_minutes: duration ? Number(duration) : null,
+        is_featured: featured,
+        is_active: exhibit.is_active,
+      }),
+    onSuccess: onChanged,
+  });
+
+  return (
+    <div className="card card--sunk stack" style={{ gap: 'var(--space-3)' }}>
+      <p className="eyebrow">참가자 화면</p>
+      <div className="field">
+        <label htmlFor={`exhibit-summary-${exhibit.id}`}>작품 한 줄 소개</label>
+        <textarea
+          id={`exhibit-summary-${exhibit.id}`}
+          value={summary}
+          maxLength={2000}
+          onChange={(event) => setSummary(event.target.value)}
+        />
+      </div>
+      <div className="field field--inline">
+        <label htmlFor={`exhibit-duration-${exhibit.id}`}>둘러보는 시간</label>
+        <input
+          id={`exhibit-duration-${exhibit.id}`}
+          type="number"
+          min={1}
+          max={1440}
+          value={duration}
+          onChange={(event) => setDuration(event.target.value)}
+          placeholder="선택"
+        />
+        <span className="unit">분</span>
+      </div>
+      <label className="row" style={{ gap: 'var(--space-2)' }}>
+        <input
+          type="checkbox"
+          checked={featured}
+          onChange={(event) => setFeatured(event.target.checked)}
+          style={{ width: 20, height: 20 }}
+        />
+        <span className="muted">처음 온 참가자에게 보여주기</span>
+      </label>
+      {save.error instanceof ApiError && (
+        <div className="notice notice--warn">
+          <span>⚠</span>
+          <span>{save.error.message}</span>
+        </div>
+      )}
+      <button
+        type="button"
+        className="btn btn--ghost"
+        onClick={() => save.mutate()}
+        disabled={save.isPending}
+      >
+        {save.isPending ? '저장 중…' : '참가자 정보 저장'}
+      </button>
     </div>
   );
 }
