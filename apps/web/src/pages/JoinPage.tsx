@@ -8,7 +8,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
@@ -21,8 +21,7 @@ import {
 } from '../api/participant';
 import type {
   MyAttendance,
-  ParticipantBoard,
-  ParticipantMe,
+  ParticipantOverview,
   PrizeDrawResult,
   PrizeDrawStatus,
   PublicFestival,
@@ -30,6 +29,13 @@ import type {
 
 /** 두구두구 지속 시간. 길면 지루하고 짧으면 연출로 안 읽힌다. */
 const ROLL_MS = 1600;
+
+/** 화면이 방금 바뀌었을 때 다시 묻는 간격. */
+const POLL_FAST_MS = 10_000;
+/** 한동안 아무것도 안 바뀌었을 때의 간격. */
+const POLL_SLOW_MS = 45_000;
+/** 몇 번 연속으로 그대로여야 느린 쪽으로 넘어가는가. */
+const IDLE_BEFORE_BACKOFF = 3;
 
 /** 움직임 줄이기를 켠 사람인가. 연출을 통째로 건너뛴다. */
 function prefersReducedMotion(): boolean {
@@ -51,40 +57,61 @@ export function JoinPage() {
     retry: false,
   });
 
-  const board = useQuery({
-    queryKey: ['my-board', id, stored?.code],
-    queryFn: () => participantApi.get<ParticipantBoard>(id, '/stamp-board/me', stored!.secret),
+  //: 연속으로 값이 그대로였던 횟수. 폴링 간격을 여기서 정한다.
+  const idleRounds = useRef(0);
+  const lastSig = useRef<string | null>(null);
+
+  // 부스에서 스태프가 지급하면 이 화면은 그 사실을 모른다. 그래서 다시 물어본다.
+  //
+  // **한 번에 묻는다.** 보드·진행·뽑기를 따로 물으면 참여자 1명이 10초마다 세
+  // 요청을 만들고, 1000명이 붙는 축제에서는 그것만으로 초당 300 요청이 된다.
+  // 셋은 어차피 같은 순간의 같은 참여자를 말한다.
+  const overview = useQuery({
+    queryKey: ['my-overview', id, stored?.code],
+    queryFn: () =>
+      participantApi.get<ParticipantOverview>(id, '/participants/me/overview', stored!.secret),
     enabled: !!stored,
-    // 부스에서 스태프가 지급하면 이 화면은 그 사실을 모른다. 짧게 다시 물어본다.
-    refetchInterval: 10_000,
+    refetchInterval: () => (idleRounds.current >= IDLE_BEFORE_BACKOFF ? POLL_SLOW_MS : POLL_FAST_MS),
     retry: false,
   });
 
-  const me = useQuery({
-    queryKey: ['my-progress', id, stored?.code],
-    queryFn: () => participantApi.get<ParticipantMe>(id, '/participants/me', stored!.secret),
-    enabled: !!stored,
-    refetchInterval: 10_000,
-    retry: false,
-  });
+  // ── 안 바뀌면 뜸하게 묻는다 ──
+  //
+  // 관객은 부스 사이를 걸어다니는 동안에도 화면을 켜 둔다. 그 몇 분 동안 서버가
+  // 할 말은 없는데 10초마다 묻는 것은 양쪽 모두의 낭비다. 값이 그대로면 간격을
+  // 늘리고, 뭔가 바뀌면 곧바로 되돌린다.
+  //
+  // 지급을 받는 순간은 관객이 화면을 **보고 있을 때**이고, react-query 는 창이
+  // 다시 앞으로 나오면 스스로 한 번 물어본다. 그래서 느린 간격에 있어도 부스
+  // 앞에서 기다리는 체감은 달라지지 않는다.
+  useEffect(() => {
+    const d = overview.data;
+    if (!d) return;
+    const sig = [
+      d.board.progress.revealed_count,
+      d.me.total_points,
+      d.me.completed_count,
+      d.me.active_campaigns.length,
+      d.prize_draw.can_draw,
+      d.prize_draw.draw?.id ?? 0,
+    ].join('|');
+    if (sig === lastSig.current) idleRounds.current += 1;
+    else {
+      lastSig.current = sig;
+      idleRounds.current = 0;
+    }
+  }, [overview.dataUpdatedAt, overview.data]);
 
-  // 뽑기는 완성해야 열린다. 완성 여부가 서버에서 바뀌므로 보드와 같이 갱신한다.
-  const drawStatus = useQuery({
-    queryKey: ['prize-draw', id, stored?.code],
-    queryFn: () => participantApi.get<PrizeDrawStatus>(id, '/prize-draw/me', stored!.secret),
-    enabled: !!stored,
-    refetchInterval: 10_000,
-    retry: false,
-  });
+  const board = { data: overview.data?.board, error: overview.error };
+  const me = { data: overview.data?.me };
+  const drawStatus = { data: overview.data?.prize_draw };
 
   // 저장된 비밀이 더 이상 통하지 않으면 스스로 비우고 처음 화면으로 돌아간다.
   //
   // 이걸 하지 않으면 화면에 죽은 코드와 오류 문구만 남고 빠져나갈 버튼이 없어서,
   // 관객은 localStorage 를 직접 지우는 방법밖에 없다. 운영자가 참여 데이터를
   // 초기화했거나(리허설), 90일 뒤 익명화됐거나, 축제를 다시 만든 경우에 실제로 걸린다.
-  const authFailed =
-    (board.error instanceof ApiError && board.error.status === 401) ||
-    (me.error instanceof ApiError && me.error.status === 401);
+  const authFailed = overview.error instanceof ApiError && overview.error.status === 401;
 
   useEffect(() => {
     if (!authFailed) return;
@@ -103,7 +130,7 @@ export function JoinPage() {
       setStored({ code: issued.code, secret: issued.secret });
       setResumed(issued.resumed);
       setWasReset(false);
-      qc.invalidateQueries({ queryKey: ['my-board', id] });
+      qc.invalidateQueries({ queryKey: ['my-overview', id] });
     },
   });
 
@@ -411,7 +438,7 @@ function DrawCard({ festivalId, status }: { festivalId: string; status: PrizeDra
     onSuccess: () => {
       // 움직임을 끈 사람에게는 연출을 생략한다. 기다리게 할 이유가 없다.
       if (!prefersReducedMotion()) setRolling(true);
-      qc.invalidateQueries({ queryKey: ['prize-draw', festivalId] });
+      qc.invalidateQueries({ queryKey: ['my-overview', festivalId] });
     },
   });
 

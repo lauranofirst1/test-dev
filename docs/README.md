@@ -14,6 +14,7 @@
 | **[08-contest-submission.md](08-contest-submission.md)** | 🚨 **공모전 제출 요건과 역산 일정 — 마감 9/21 16:00** |
 | [09-campus-event.md](09-campus-event.md) | 교내 행사 — 신원(학번) · 특강 출결과 공결 · 전시 심사 |
 | **[10-team-testing.md](10-team-testing.md)** | 👥 **팀원 테스트 안내 — 계정 하나로 5분 안에 화면 보기** |
+| **[11-deploy.md](11-deploy.md)** | 🚀 **배포 — 서버 한 대에 통째로 올리기 (HTTPS 필수)** |
 
 ## 에이전트 파이프라인 연결
 

@@ -17,6 +17,7 @@ from festaflow.models.enums import (
     IdentityMode,
     RevealMode,
 )
+from festaflow.schemas.prize import PrizeDrawStatus
 
 # ── 참여자 ──────────────────────────────────────────────────────────────────
 
@@ -321,3 +322,25 @@ class ScanContext(BaseModel):
     missions: list[ScanContextMission]
     #: 이 window 에서 이미 한 건 받았으면 다시 스캔해야 한다.
     scan_already_used: bool
+
+
+# ── 관객 화면 한 장 (§9) ────────────────────────────────────────────────────
+
+
+class ParticipantOverview(BaseModel):
+    """관객 화면이 주기적으로 물어보는 전부를 한 번에 싣는다.
+
+    화면 하나가 보드·진행·뽑기를 **각각** 10초마다 물어보면 참여자 1명이 초당
+    0.3 요청이 되고, 1000명이 붙는 축제에서는 그것만으로 초당 300 요청입니다.
+    세 응답은 어차피 같은 순간의 같은 참여자를 말하므로 나눠 물을 이유가 없습니다.
+
+    서버 쪽 이득이 더 큽니다 — 셋이 각자 보드와 진행률을 다시 계산하던 것을
+    한 번만 계산해 나눠 씁니다.
+
+    기존 세 엔드포인트는 그대로 둡니다. 계약에 있는 것이고, 한 조각만 필요한
+    호출자(부스 화면·스캔 화면)가 전부를 받을 이유가 없습니다.
+    """
+
+    board: ParticipantBoard
+    me: ParticipantMe
+    prize_draw: PrizeDrawStatus

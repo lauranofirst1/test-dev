@@ -21,7 +21,7 @@
 | 차트 | **Apache ECharts (SVG 렌더러)** | 히트맵·커스텀 시리즈, PDF 벡터 출력 | Recharts | 번들 큼 → 관객 화면에서는 미로드 |
 | 오프라인 | **IndexedDB (idb) + Service Worker** | 지급 큐 영속화. localStorage는 용량·동기 I/O 한계 | localStorage | SW 디버깅 비용 |
 | QR 생성 | **qrcode (클라이언트)** | 참여 코드가 제3자 서버 로그에 남지 않음 | 외부 QR 이미지 API | — |
-| QR 인식 | **BarcodeDetector + zxing-wasm 폴백** | iOS Safari 미지원 대응 | jsQR | wasm 로드 지연 |
+| QR 인식 | **BarcodeDetector + jsQR 폴백 (지연 로딩)** | iOS Safari 미지원 대응. 폴백은 부스 지급 화면에서만 받는다(gzip 47KB) | zxing-wasm | wasm 은 더 무겁고 로드가 늦어 부스 단말에서 불리 |
 | PDF | **서버 렌더 (Playwright)** | 차트 SVG를 그대로 벡터로 유지 | 클라이언트 jsPDF | 서버에 브라우저 의존 |
 | 인증 | **JWT (스태프) + 서버 발급 secret (관객)** | 무상태, 오프라인에서 토큰 검증 가능 | 세션 쿠키 | 만료 관리 필요 |
 | 테스트 | pytest + Testcontainers / Vitest + Playwright | 실제 Postgres로 제약 검증 | 목 DB | CI 시간 |

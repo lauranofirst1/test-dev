@@ -1,15 +1,26 @@
 /** QR 스캐너 — 카메라로 참여 코드를 읽는다. 스펙 §8.1.
  *
  * **수동 입력이 항상 함께 있어야 합니다.** 카메라는 현장에서 자주 실패합니다 —
- * 권한 거부, 직사광선, 깨진 화면, 손전등 없는 야간, 구형 브라우저. 스캐너를
- * 유일한 입력으로 두면 그 부스는 그 순간 멈춥니다. 이 모듈은 "되면 좋은 것"
- * 이고, 화면은 스캐너가 없어도 완전히 동작해야 합니다.
+ * 권한 거부, 직사광선, 깨진 화면, 손전등 없는 야간. 스캐너를 유일한 입력으로
+ * 두면 그 부스는 그 순간 멈춥니다. 이 모듈은 "되면 좋은 것" 이고, 화면은
+ * 스캐너가 없어도 완전히 동작해야 합니다.
+ *
+ * ── 읽는 방법이 두 가지입니다 ──
  *
  * `BarcodeDetector` 는 크롬 계열에만 있습니다(2026년 기준 사파리 미지원).
- * 폴리필을 번들에 넣지 않는 이유는, 부스 스태프 단말은 대개 안드로이드이고
- * 아이폰 사용자는 수동 입력으로 충분히 빠르기 때문입니다. 300KB 짜리 디코더를
- * 모두에게 내려보내는 쪽이 더 나쁩니다.
+ * 그것만 쓰면 **부스 담당자가 아이폰을 들고 온 순간 스캔이 통째로 없어집니다.**
+ * 부스 단말을 우리가 고를 수 있다는 보장이 없어서, 없는 브라우저에서는 디코더를
+ * **그때 내려받아** 씁니다.
+ *
+ * 번들에 미리 넣지 않습니다. 이 디코더가 필요한 곳은 부스 지급 화면 하나이고,
+ * 관객 수백 명에게 쓰지도 않을 파일을 내려보내는 것은 그 자체로 비용입니다.
+ * `import()` 는 그 파일을 따로 떼어 두었다가 **필요한 브라우저에서만** 받습니다.
  */
+
+/** 프레임 한 장에서 QR 을 읽어내는 것. 두 구현이 같은 모양을 쓴다. */
+interface Decoder {
+  detect(video: HTMLVideoElement): Promise<string | null>;
+}
 
 /** 브라우저의 BarcodeDetector. 타입 정의가 표준에 아직 없어 최소한만 선언한다. */
 interface DetectedBarcode {
@@ -22,8 +33,81 @@ interface BarcodeDetectorLike {
 
 type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
 
+/** 카메라를 쓸 수 있는 환경인가.
+ *
+ * **읽는 방법이 아니라 카메라를 기준으로 판단합니다.** 디코더는 없으면 받아오면
+ * 되지만 카메라는 대신할 것이 없습니다.
+ *
+ * `navigator.mediaDevices` 는 HTTPS 가 아닌 곳에서 아예 없습니다. 그래서 평문으로
+ * 띄운 서버에서는 이 값이 거짓이 되고, 화면은 스캔 버튼 대신 수동 입력만 보여
+ * 줍니다 — 눌러도 안 되는 버튼을 보여주는 것보다 낫습니다.
+ */
 export function scannerSupported(): boolean {
-  return typeof window !== 'undefined' && 'BarcodeDetector' in window;
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+}
+
+/** 읽기를 시도하는 간격.
+ *
+ * 예전에는 `requestAnimationFrame` 으로 초당 60번 훑었습니다. 사람이 QR 을 갖다
+ * 대는 동작에 그만한 빈도가 필요하지 않고, 부스 단말은 이 화면을 몇 시간 켜 둡니다.
+ * 초당 몇 번이면 즉시 읽히는 것처럼 느껴지면서 배터리를 훨씬 덜 씁니다.
+ */
+const NATIVE_INTERVAL_MS = 100;
+/** 직접 디코딩하는 쪽은 한 번이 더 무겁다. 조금 더 띄운다. */
+const FALLBACK_INTERVAL_MS = 200;
+/** 디코딩 전에 줄이는 긴 변의 길이(px). */
+const DECODE_MAX_EDGE = 640;
+/** 같은 코드를 다시 흘리기까지 두는 시간. */
+const REPEAT_GUARD_MS = 2_000;
+
+/** 브라우저가 직접 읽어 주는 경우. 가장 빠르고 가장 정확하다. */
+function nativeDecoder(): Decoder | null {
+  if (typeof window === 'undefined' || !('BarcodeDetector' in window)) return null;
+  const Ctor = (window as unknown as { BarcodeDetector: BarcodeDetectorCtor }).BarcodeDetector;
+  const detector = new Ctor({ formats: ['qr_code'] });
+  return {
+    async detect(video) {
+      const found = await detector.detect(video);
+      return found[0]?.rawValue?.trim() || null;
+    },
+  };
+}
+
+/** 읽어 주지 않는 브라우저(사파리 등)에서 쓰는 디코더. 필요할 때만 받아온다. */
+async function fallbackDecoder(): Promise<Decoder | null> {
+  let jsQR: typeof import('jsqr').default;
+  try {
+    jsQR = (await import('jsqr')).default;
+  } catch {
+    // 부스 와이파이가 끊겨 파일을 못 받는 경우. 수동 입력으로 떨어진다.
+    return null;
+  }
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  return {
+    async detect(video) {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (!vw || !vh) return null;
+
+      // 원본 해상도 그대로 훑으면 프레임당 수십 ms 가 든다. QR 한 장을 읽는 데
+      // 필요한 해상도는 그보다 훨씬 낮아서, 긴 변을 맞춰 줄이고 본다.
+      const scale = Math.min(1, DECODE_MAX_EDGE / Math.max(vw, vh));
+      canvas.width = Math.round(vw * scale);
+      canvas.height = Math.round(vh * scale);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const found = jsQR(image.data, image.width, image.height, {
+        // 부스 단말은 참여자 폰 화면을 비춘다. 반전 코드가 나올 일이 없다.
+        inversionAttempts: 'dontInvert',
+      });
+      return found?.data?.trim() || null;
+    },
+  };
 }
 
 export interface ScannerHandle {
@@ -42,16 +126,23 @@ export async function startScanner(
   onError: (message: string) => void,
 ): Promise<ScannerHandle> {
   if (!scannerSupported()) {
-    onError('이 브라우저는 카메라 스캔을 지원하지 않습니다. 코드를 직접 입력해 주세요.');
+    onError('이 브라우저에서는 카메라를 쓸 수 없습니다. 코드를 직접 입력해 주세요.');
     return { stop: () => {} };
   }
 
   let stream: MediaStream | null = null;
   let stopped = false;
-  let raf = 0;
+  let timer = 0;
   // 같은 코드를 연달아 흘리지 않기 위한 기억. 다른 코드가 오면 즉시 풀린다.
   let lastCode = '';
   let lastAt = 0;
+
+  const cleanup = () => {
+    stopped = true;
+    window.clearTimeout(timer);
+    stream?.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+  };
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -70,39 +161,43 @@ export async function startScanner(
   video.setAttribute('playsinline', 'true');
   await video.play().catch(() => {});
 
-  const Detector = (window as unknown as { BarcodeDetector: BarcodeDetectorCtor })
-    .BarcodeDetector;
-  const detector = new Detector({ formats: ['qr_code'] });
+  // 카메라를 먼저 열고 디코더를 정합니다 — 내려받는 동안에도 화면에는 이미
+  // 영상이 나오므로, 스태프는 "켜지는 중" 을 보지 빈 화면을 보지 않습니다.
+  const native = nativeDecoder();
+  const decoder = native ?? (await fallbackDecoder());
+  const interval = native ? NATIVE_INTERVAL_MS : FALLBACK_INTERVAL_MS;
+
+  if (stopped) {
+    cleanup();
+    return { stop: () => {} };
+  }
+
+  if (!decoder) {
+    cleanup();
+    onError('이 브라우저에서는 QR 을 읽을 수 없습니다. 코드를 직접 입력해 주세요.');
+    return { stop: () => {} };
+  }
 
   const tick = async () => {
     if (stopped) return;
     try {
-      const found = await detector.detect(video);
-      const raw = found[0]?.rawValue?.trim();
+      const raw = await decoder.detect(video);
       if (raw) {
         const now = Date.now();
-        // 같은 코드는 2초 안에 다시 흘리지 않는다.
-        if (raw !== lastCode || now - lastAt > 2_000) {
+        if (raw !== lastCode || now - lastAt > REPEAT_GUARD_MS) {
           lastCode = raw;
           lastAt = now;
           onCode(raw);
         }
       }
     } catch {
-      // 한 프레임 실패는 정상이다(흔들림, 초점). 다음 프레임에서 다시 본다.
+      // 한 프레임 실패는 정상이다(흔들림, 초점). 다음 차례에 다시 본다.
     }
-    raf = requestAnimationFrame(() => void tick());
+    if (!stopped) timer = window.setTimeout(() => void tick(), interval);
   };
-  raf = requestAnimationFrame(() => void tick());
+  timer = window.setTimeout(() => void tick(), interval);
 
-  return {
-    stop: () => {
-      stopped = true;
-      cancelAnimationFrame(raf);
-      stream?.getTracks().forEach((t) => t.stop());
-      video.srcObject = null;
-    },
-  };
+  return { stop: cleanup };
 }
 
 /** 스캔 결과에서 참여 코드를 뽑는다.
