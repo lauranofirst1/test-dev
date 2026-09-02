@@ -29,7 +29,8 @@
  * 접어야 합니다. 그건 금방 "이 메뉴 짜증난다" 가 됩니다.
  */
 
-import { NavLink, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 interface Item {
   to: string;
@@ -37,6 +38,7 @@ interface Item {
   /** 접었을 때 남는 것. 글자가 사라지므로 이것만으로 구분돼야 한다. */
   icon: string;
   hint: string;
+  details?: { label: string; to: string }[];
   /** 정확히 이 경로일 때만 활성. `/festivals/:id` 는 모든 하위 화면의
       접두사라, 이걸 안 주면 어느 화면에 있든 «현황» 이 켜져 있다. */
   end?: boolean;
@@ -70,12 +72,21 @@ function groupsFor(id: string): Group[] {
           label: '사전 진단',
           icon: '◎',
           hint: '관광 데이터로 기획을 점검하고 고칩니다',
+          details: [
+            { label: '점수', to: `/festivals/${id}/diagnosis?tab=score` },
+            { label: '기획 수정', to: `/festivals/${id}/diagnosis?tab=plan` },
+          ],
         },
         {
           to: `/festivals/${id}/booths`,
           label: '부스 · 미션',
           icon: '▤',
           hint: '부스와 미션, 조각 보드를 만듭니다',
+          details: [
+            { label: '부스', to: `/festivals/${id}/booths?tab=booths` },
+            { label: '조각 보드', to: `/festivals/${id}/booths?tab=board` },
+            { label: '경품', to: `/festivals/${id}/booths?tab=prizes` },
+          ],
         },
         {
           to: `/festivals/${id}/lectures`,
@@ -88,6 +99,10 @@ function groupsFor(id: string): Group[] {
           label: '전시 심사',
           icon: '★',
           hint: '작품과 심사 항목을 관리합니다',
+          details: [
+            { label: '작품', to: `/festivals/${id}/exhibits?tab=works` },
+            { label: '심사 설정', to: `/festivals/${id}/exhibits?tab=judging` },
+          ],
         },
       ],
     },
@@ -116,7 +131,7 @@ function groupsFor(id: string): Group[] {
     {
       // «설정» 이라는 한 화면을 따로 만들려다 그만뒀다. 정리하고 나니 남는
       // 것이 스태프 하나뿐이었기 때문이다 — 축제 정보는 사전 진단의
-      // «기획 고치기» 탭으로, 경품 설정은 부스·미션의 «경품» 탭으로, 심사
+      // «기획 수정» 탭으로, 경품 설정은 부스·미션의 «경품» 탭으로, 심사
       // 항목은 전시 심사의 «심사 설정» 탭으로 갔다. 하나짜리 설정 화면은
       // 한 번 더 눌러야 닿는 자리를 만들 뿐이다.
       //
@@ -144,25 +159,61 @@ export function FestivalNav({
   onNavigate?: () => void;
 }) {
   const { id = '' } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const items = groupsFor(id).flatMap((group) => group.items);
 
   return (
     <nav className="snav" aria-label="축제 메뉴">
-      {groupsFor(id).map((group) => (
-        <div key={group.title || 'top'} className="snav__group">
-          {/* 접으면 제목이 사라진다. 대신 구분선이 그 자리를 대신한다 —
-              아이콘만 남은 목록이 한 덩어리면 어디가 어디인지 알 수 없다. */}
-          {group.title === '' ? null : collapsed ? (
-            <hr className="snav__rule" aria-hidden />
+      {items.map((item) => (
+        <div
+          key={item.to}
+          className={`snav__group${item.details ? ' snav__group--menu' : ''}`}
+          data-open={openGroup === item.to}
+          onMouseEnter={() => item.details && setOpenGroup(item.to)}
+          onMouseLeave={() => item.details && setOpenGroup(null)}
+        >
+          {item.details ? (
+            <>
+            <button
+              type="button"
+              className="snav__title snav__trigger"
+              aria-haspopup="menu"
+              aria-expanded={openGroup === item.to}
+              onClick={() => {
+                const first = item.details?.[0];
+                if (first) navigate(first.to);
+                setOpenGroup(null);
+                onNavigate?.();
+              }}
+            >
+              <span className="snav__icon" aria-hidden>{item.icon}</span>
+              <span>{item.label}</span>
+              <span className="snav__chevron" aria-hidden>⌄</span>
+            </button>
+              {item.details.map((detail) => (
+                <Link
+                  key={detail.to}
+                  to={detail.to}
+                  className="snav__item snav__detail"
+                  data-current={`${location.pathname}${location.search}` === detail.to}
+                  onClick={() => setOpenGroup(null)}
+                >
+                  <span className="snav__icon" aria-hidden>{item.icon}</span>
+                  <span className="snav__label">{detail.label}</span>
+                </Link>
+              ))}
+            </>
           ) : (
-            <p className="snav__title">{group.title}</p>
-          )}
-          {group.items.map((item) => (
             <NavLink
-              key={item.to}
               to={item.to}
               end={item.end}
               className="snav__item"
-              onClick={onNavigate}
+              onClick={() => {
+                setOpenGroup(null);
+                onNavigate?.();
+              }}
               // 접었을 때는 글자가 없으므로 이름을 여기서 준다.
               title={collapsed ? `${item.label} — ${item.hint}` : item.hint}
               aria-label={collapsed ? item.label : undefined}
@@ -170,9 +221,14 @@ export function FestivalNav({
               <span className="snav__icon" aria-hidden>
                 {item.icon}
               </span>
-              {!collapsed && <span className="snav__label">{item.label}</span>}
+              {!collapsed && (
+                <span className="snav__copy">
+                  <span className="snav__label">{item.label}</span>
+                  <span className="snav__hint">{item.hint}</span>
+                </span>
+              )}
             </NavLink>
-          ))}
+          )}
         </div>
       ))}
     </nav>

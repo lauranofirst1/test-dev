@@ -18,10 +18,11 @@ export function WorkspacePage() {
 
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
-      <div className="row wrap" style={{ justifyContent: 'space-between' }}>
+      <div className="pagehead row wrap" style={{ justifyContent: 'space-between' }}>
         <div className="stack" style={{ gap: 4 }}>
-          <p className="eyebrow">내 축제</p>
-          <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>축제</h1>
+          <p className="eyebrow">기획자 워크스페이스</p>
+          <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 800 }}>내 축제</h1>
+          <p className="lede">준비 중인 축제를 선택해 진단부터 현장 운영까지 관리하세요.</p>
         </div>
         <Link to="/festivals/new" className="btn btn--primary btn--lg">
           ＋ 새 축제
@@ -60,7 +61,7 @@ export function WorkspacePage() {
       {data && data.items.length > 0 && (
         <div className="cards">
           {data.items.map((f) => (
-            <div className="fcard__wrap" key={f.id}>
+            <article className="fcard__wrap" key={f.id}>
             <Link to={`/festivals/${f.id}/diagnosis`} className="card fcard">
               <div className="row" style={{ justifyContent: 'space-between' }}>
                 <span className="muted tabular">#{f.id}</span>
@@ -83,22 +84,27 @@ export function WorkspacePage() {
                   <small>총예산</small>
                 </div>
               </div>
-              <span className="fcard__cta">진단 보기 →</span>
+              <span className="fcard__cta">사전 진단 열기 <span aria-hidden>→</span></span>
             </Link>
             {/* 진단만으로는 현장이 준비되지 않는다. 부스 등록으로 가는 길을
                 카드에서 바로 열어 둔다. */}
-            <Link to={`/festivals/${f.id}/booths`} className="fcard__sub">
-              부스 · 미션 관리 →
-            </Link>
+            <nav className="fcard__actions" aria-label={`${f.name} 바로가기`}>
+              <Link to={`/festivals/${f.id}/booths`} className="fcard__sub">
+                <strong>부스 · 미션</strong>
+                <span>참여 동선 준비</span>
+              </Link>
             {/* 축제 당일에 여는 화면. 준비 단계에서는 볼 것이 없지만, 당일
                 아침에 어디로 들어가는지를 미리 알아 두어야 한다. */}
-            <Link to={`/festivals/${f.id}/dashboard`} className="fcard__sub">
-              오늘 →
-            </Link>
+              <Link to={`/festivals/${f.id}/dashboard`} className="fcard__sub">
+                <strong>오늘</strong>
+                <span>현장 운영 현황</span>
+              </Link>
             <Link to={`/festivals/${f.id}/report`} className="fcard__sub">
-              사후 리포트 →
+                <strong>리포트</strong>
+                <span>종료 후 성과</span>
             </Link>
-            </div>
+            </nav>
+            </article>
           ))}
         </div>
       )}

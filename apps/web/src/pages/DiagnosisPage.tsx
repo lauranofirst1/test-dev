@@ -27,7 +27,7 @@ export function DiagnosisPage() {
   const qc = useQueryClient();
 
   /** 탭을 주소에 둔다. 새로고침하거나 링크를 건네도 같은 탭이 열려야 하고,
-   *  «기획 고치기» 를 보내 놓고 상대가 점수 탭을 보는 일이 없어야 한다. */
+   *  «기획 수정» 을 보내 놓고 상대가 점수 탭을 보는 일이 없어야 한다. */
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') === 'plan' ? 'plan' : 'score';
   const goTab = (next: 'score' | 'plan') => {
@@ -121,7 +121,7 @@ export function DiagnosisPage() {
           aria-selected={tab === 'plan'}
           onClick={() => goTab('plan')}
         >
-          기획 고치기
+          기획 수정
         </button>
       </div>
 

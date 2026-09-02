@@ -33,6 +33,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { api } from '../api/client';
+import { FieldScreensMenu } from '../components/FieldScreensMenu';
 import { loadBooths, saveBooths } from '../lib/boothCache';
 import { getGrantQueue } from '../lib/grantQueue';
 import type { QueueSnapshot } from '../lib/grantQueue';
@@ -243,9 +244,12 @@ export function BoothGrantPage() {
             {booth ? ` · ${booth.name}` : ''}
           </span>
         </div>
-        <Link to={`/festivals/${id}/dashboard`} className="btn btn--ghost">
-          오늘
-        </Link>
+        <div className="row" style={{ gap: 'var(--space-2)' }}>
+          <FieldScreensMenu festivalId={id} who="부스 담당자" />
+          <Link to={`/festivals/${id}/dashboard`} className="btn btn--ghost">
+            오늘
+          </Link>
+        </div>
       </header>
 
       <div className="shell stack" style={{ gap: 'var(--space-5)' }}>
@@ -391,7 +395,14 @@ export function BoothGrantPage() {
 
       {/* ── 입력 ── */}
       {staffGrants && (
-      <div className="card stack" style={{ gap: 'var(--space-3)' }}>
+      <section className="card stack grantstep" style={{ gap: 'var(--space-3)' }}>
+        <div className="grantstep__head">
+          <span className="grantstep__number" aria-hidden>1</span>
+          <div>
+            <h2 className="section">참여자 확인</h2>
+            <p className="muted">참여 코드 입력 또는 QR 스캔</p>
+          </div>
+        </div>
         <div className="field">
           <label htmlFor="g-code">참여 코드</label>
           <input
@@ -432,14 +443,20 @@ export function BoothGrantPage() {
             aria-label="참여자 QR 카메라"
           />
         )}
-      </div>
+      </section>
       )}
 
       {/* ── 미션 버튼 ── */}
       {staffGrants && (
-      <div className="card stack" style={{ gap: 'var(--space-3)' }}>
+      <section className="card stack grantstep" style={{ gap: 'var(--space-3)' }}>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-          <h2 className="section">미션</h2>
+          <div className="grantstep__head">
+            <span className="grantstep__number" aria-hidden>2</span>
+            <div>
+              <h2 className="section">미션 지급</h2>
+              <p className="muted">참여자가 완료한 미션 선택</p>
+            </div>
+          </div>
           <span className="muted">수행을 확인한 뒤 눌러 주세요</span>
         </div>
 
@@ -465,7 +482,7 @@ export function BoothGrantPage() {
         {!ready && (
           <p className="muted">참여 코드를 먼저 입력하면 지급 버튼이 켜집니다.</p>
         )}
-      </div>
+      </section>
       )}
 
       {/* ── 보내지 못한 건은 사람이 처리한다 ── */}
