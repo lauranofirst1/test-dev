@@ -3,18 +3,33 @@
  * 담당자는 자기를 "기획자" 라고 부르지 않고, "워크스페이스" 도 이 사람의
  * 말이 아닙니다. 화면 이름은 쓰는 사람의 말이어야 합니다. */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
 import { ApiError, api } from '../api/client';
 import type { FestivalList } from '../api/types';
 
 export function WorkspacePage() {
+  const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ['festivals'],
     queryFn: () => api.get<FestivalList>('/api/festivals'),
     retry: false,
   });
+
+  const remove = useMutation({
+    mutationFn: (festival: { id: number; name: string }) =>
+      api.del<void>(`/api/festivals/${festival.id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['festivals'] }),
+  });
+
+  const removeFestival = (festival: { id: number; name: string }) => {
+    const confirmed = window.confirm(
+      `'${festival.name}' 축제를 완전히 삭제할까요?\n\n` +
+        '참여 기록, 리포트, 부스, 특강을 포함한 모든 데이터가 삭제되며 복구할 수 없습니다.',
+    );
+    if (confirmed) remove.mutate(festival);
+  };
 
   return (
     <div className="shell stack" style={{ gap: 'var(--space-6)' }}>
@@ -43,6 +58,13 @@ export function WorkspacePage() {
           <p className="lede" style={{ textAlign: 'center' }}>
             {error.message}
           </p>
+        </div>
+      )}
+
+      {remove.error instanceof ApiError && (
+        <div className="notice notice--warn" role="alert">
+          <span>⚠</span>
+          <span>축제를 삭제하지 못했습니다 — {remove.error.message}</span>
         </div>
       )}
 
@@ -103,6 +125,15 @@ export function WorkspacePage() {
                 <strong>리포트</strong>
                 <span>종료 후 성과</span>
             </Link>
+              <button
+                type="button"
+                className="fcard__sub fcard__sub--danger"
+                onClick={() => removeFestival(f)}
+                disabled={remove.isPending}
+              >
+                <strong>{remove.isPending && remove.variables?.id === f.id ? '삭제 중…' : '축제 삭제'}</strong>
+                <span>영구 삭제</span>
+              </button>
             </nav>
             </article>
           ))}

@@ -106,7 +106,7 @@ p {
 
 .fcard__actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid var(--color-line);
 }
 
@@ -145,6 +145,25 @@ p {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fcard__actions .fcard__sub--danger {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.fcard__actions .fcard__sub--danger strong {
+  color: var(--color-danger);
+}
+
+.fcard__actions .fcard__sub--danger:hover {
+  background: var(--color-danger-bg);
+}
+
+.fcard__actions .fcard__sub--danger:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 @media (max-width: 720px) {

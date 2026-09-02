@@ -32,6 +32,7 @@ from festaflow.schemas.festival import (
     FestivalUpdate,
     StampBoardIn,
 )
+from festaflow.services import media
 
 router = APIRouter(prefix="/api/festivals", tags=["festivals"])
 
@@ -223,3 +224,16 @@ def archive_festival(festival_id: int, db: DbSession, org: CurrentOrg) -> None:
     f = _get_owned(db, org.id, festival_id)
     f.archived_at = datetime.now(UTC)
     db.commit()
+
+
+@router.delete(
+    "/{festival_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[FestivalAccess, CanManagePlan],
+)
+def delete_festival(festival_id: int, db: DbSession, org: CurrentOrg) -> None:
+    """축제와 모든 연관 기록을 영구 삭제한다. 복구할 수 없다."""
+    f = _get_owned(db, org.id, festival_id)
+    db.delete(f)
+    db.commit()
+    media.delete_festival_media(festival_id)
