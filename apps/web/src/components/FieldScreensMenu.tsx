@@ -98,9 +98,17 @@ function groupsFor(id: string): Group[] {
   ];
 }
 
-export function FieldScreensMenu({ festivalId }: { festivalId: string }) {
+export function FieldScreensMenu({
+  festivalId,
+  who,
+}: {
+  festivalId: string;
+  /** 역할 화면 안에서는 그 역할의 화면만 보여 준다. */
+  who?: string;
+}) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const groups = groupsFor(festivalId).filter((group) => !who || group.who === who);
 
   // 바깥을 누르거나 ESC 를 누르면 닫힌다. 메뉴가 열린 채로 남아 아래 내용을
   // 가리는 것이 이 메뉴에서 가장 흔한 짜증이다.
@@ -129,25 +137,27 @@ export function FieldScreensMenu({ festivalId }: { festivalId: string }) {
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
       >
-        다른 사람 화면
+        {who ?? '다른 사람 화면'}
         <span aria-hidden>▾</span>
       </button>
 
       {open && (
         <div className="fieldmenu__pop" role="menu">
           <p className="fieldmenu__note">
-            행사 당일 이 사람들이 볼 화면입니다. 모두 새 탭에서 열립니다.
+            {who
+              ? `${who} 화면 안에서 이동합니다.`
+              : '행사 당일 이 사람들이 볼 화면입니다. 모두 새 탭에서 열립니다.'}
           </p>
 
-          {groupsFor(festivalId).map((g) => (
+          {groups.map((g) => (
             <div key={g.who} className="fieldmenu__group">
               <p className="fieldmenu__who">{g.who}</p>
               {g.screens.map((s) => (
-                <a
+                <Link
                   key={s.to}
-                  href={s.to}
-                  target="_blank"
-                  rel="noreferrer"
+                  to={s.to}
+                  target={who ? undefined : '_blank'}
+                  rel={who ? undefined : 'noreferrer'}
                   role="menuitem"
                   className="fieldmenu__item"
                   onClick={() => setOpen(false)}
@@ -157,19 +167,19 @@ export function FieldScreensMenu({ festivalId }: { festivalId: string }) {
                     {s.needsCode && <span className="fieldmenu__lock">접근 코드 필요</span>}
                   </strong>
                   <span>{s.hint}</span>
-                </a>
+                </Link>
               ))}
             </div>
           ))}
 
           {/* 강의실 스크린은 여기서 못 연다. 체크인을 열어야 그 화면이
               생기기 때문이다 — 링크만 두면 눌러도 아무 데도 닿지 않는다. */}
-          <p className="fieldmenu__note">
+          {!who && <p className="fieldmenu__note">
             강의실 체크인 스크린은 «특강 출결» 에서 체크인을 열 때 함께 뜹니다.{' '}
             <Link to={`/festivals/${festivalId}/staff`} onClick={() => setOpen(false)}>
               접근 코드 발급 →
             </Link>
-          </p>
+          </p>}
         </div>
       )}
     </div>

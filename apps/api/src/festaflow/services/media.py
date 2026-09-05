@@ -91,3 +91,16 @@ def save_board_image(stream: BinaryIO, festival_id: int) -> str:
 def save_poster(stream: BinaryIO, festival_id: int) -> str:
     """전시 작품 포스터. 보드 그림과 같은 검사를 거친다."""
     return save_image(stream, festival_id, prefix="poster")
+
+
+def delete_festival_media(festival_id: int) -> None:
+    """영구 삭제된 축제의 업로드 파일을 함께 지운다.
+
+    파일 이름은 서버가 만든 ``{종류}-{축제 ID}-{난수}`` 형식만 대상으로 한다.
+    기본 이미지나 다른 축제의 파일은 건드리지 않는다.
+    """
+    root = media_root()
+    for prefix in ("board", "poster"):
+        for path in root.glob(f"{prefix}-{festival_id}-*"):
+            if path.is_file():
+                path.unlink(missing_ok=True)

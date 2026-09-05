@@ -479,6 +479,216 @@
   }
 }
 
+/* ── 데스크톱 가로 내비게이션 ─────────────────────────────
+   왼쪽 레일 대신 헤더 아래에서 전체 폭을 쓴다. 메뉴의 순서와 링크는 그대로다. */
+@media (min-width: 901px) {
+  .app__body {
+    flex-direction: column;
+  }
+
+  .app .side,
+  .app[data-collapsed='false'] .side,
+  .app[data-collapsed='true'] .side {
+    position: sticky;
+    top: var(--topbar-h);
+    z-index: calc(var(--z-sticky) - 1);
+    display: flex;
+    width: 100%;
+    height: auto;
+    min-height: 68px;
+    padding: 8px var(--space-5);
+    align-items: center;
+    gap: var(--space-5);
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+    box-shadow: 0 3px 10px rgb(20 24 31 / 4%);
+  }
+
+  .app .side__head {
+    display: flex;
+    width: 180px;
+    min-width: 180px;
+    padding: 0 var(--space-4) 0 0;
+    border-right: 1px solid var(--color-line);
+  }
+
+  .app .side__head strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app .snav,
+  .app[data-collapsed='false'] .snav {
+    flex: 1;
+    min-width: max-content;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .app .snav__group {
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .app .snav__group + .snav__group {
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--color-line);
+  }
+
+  .app .snav__rule {
+    display: none;
+  }
+
+  .app .snav__group--menu {
+    position: relative;
+  }
+
+  .app .snav__group--menu::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 10px;
+  }
+
+  .app .snav__trigger {
+    display: inline-flex;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    align-items: center;
+    gap: var(--space-2);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-ink-soft);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  .app .snav__trigger:hover,
+  .app .snav__group--menu[data-open='true'] .snav__trigger {
+    background: var(--color-surface-sunk);
+    color: var(--color-ink);
+  }
+
+  .app .snav__chevron {
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .app .snav__group--menu:hover .snav__chevron,
+  .app .snav__group--menu[data-open='true'] .snav__chevron {
+    transform: rotate(180deg);
+  }
+
+  .app .snav__group--menu > .snav__item {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 8px);
+    z-index: var(--z-overlay);
+    visibility: hidden;
+    width: 300px;
+    min-height: 58px;
+    padding: var(--space-3);
+    opacity: 0;
+    border: 1px solid var(--color-line);
+    border-radius: 0;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+    transition: opacity var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out),
+      visibility var(--duration-fast) var(--ease-out);
+  }
+
+  .app .snav__group--menu > .snav__item:nth-of-type(2) {
+    top: calc(100% + 66px);
+  }
+
+  .app .snav__group--menu > .snav__item:nth-of-type(3) {
+    top: calc(100% + 124px);
+  }
+
+  .app .snav__group--menu > .snav__item:nth-of-type(4) {
+    top: calc(100% + 182px);
+  }
+
+  .app .snav__group--menu:hover > .snav__item,
+  .app .snav__group--menu[data-open='true'] > .snav__item {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .app .snav__group--menu > .snav__item:first-of-type {
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+
+  .app .snav__group--menu > .snav__item:last-of-type {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+  }
+
+  .app .snav__group--menu > .snav__item:only-of-type {
+    border-radius: var(--radius-md);
+  }
+
+  .app .snav__group--menu > .snav__item + .snav__item {
+    border-top: 0;
+  }
+
+  .app .snav__group--menu > .snav__item[aria-current='page']::before {
+    display: none;
+  }
+
+  .app .snav__detail[data-current='true'] {
+    background: var(--color-act-wash);
+    color: var(--color-act-ink);
+    font-weight: var(--weight-bold);
+  }
+
+  .app .snav__item,
+  .app[data-collapsed='false'] .snav__item,
+  .app[data-collapsed='true'] .snav__item {
+    min-height: 44px;
+    padding: 5px var(--space-3);
+    justify-content: flex-start;
+  }
+
+  .app .snav__item[aria-current='page']::before {
+    left: var(--space-3);
+    right: var(--space-3);
+    top: auto;
+    bottom: -9px;
+    width: auto;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+  }
+
+  .app .snav__copy {
+    gap: 0;
+  }
+
+  .app .snav__group:not(.snav__group--menu) .snav__hint {
+    display: none;
+  }
+
+  .app[data-collapsed='true'] .snav__copy {
+    display: none;
+  }
+
+  .app__main {
+    width: 100%;
+  }
+}
+
 /* ── 드로어 ──────────────────────────────────────────────── */
 
 .drawer {
@@ -951,6 +1161,46 @@ button.rowlink {
   margin-top: auto;
 }
 
+/* 펼친 메뉴에서는 이름뿐 아니라 "여기서 무엇을 하는지"까지 읽힌다. */
+.app[data-collapsed='false'] .side {
+  width: 280px;
+}
+
+.app[data-collapsed='false'] .snav {
+  gap: var(--space-5);
+}
+
+.app[data-collapsed='false'] .snav__item {
+  min-height: 54px;
+  height: auto;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.snav__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.snav__label {
+  font-weight: var(--weight-bold);
+  line-height: 1.25;
+}
+
+.snav__hint {
+  color: var(--color-ink-mute);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.app .snav__item[aria-current='page'] .snav__hint {
+  color: var(--color-act-ink);
+}
+
 .afoot__in {
   /* 본문 shell 과 같은 폭·같은 좌우 여백. 출처가 본문 왼쪽 끝과 줄이 맞아야
      떠 있는 띠가 아니라 문서의 끝으로 읽힌다. */
@@ -1003,5 +1253,29 @@ button.rowlink {
 @media print {
   .afoot {
     display: none;
+  }
+}
+
+/* 이 파일 뒤쪽의 밀도 규칙보다 가로 배치가 우선한다. */
+@media (min-width: 901px) {
+  .app[data-collapsed='false'] .side,
+  .app[data-collapsed='true'] .side {
+    width: 100%;
+    height: auto;
+  }
+
+  .app[data-collapsed='false'] .snav {
+    gap: var(--space-3);
+  }
+
+  .app[data-collapsed='false'] .snav__item {
+    min-height: 44px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .app[data-collapsed='false'] .snav__group--menu > .snav__item {
+    min-height: 58px;
+    padding: var(--space-3);
   }
 }

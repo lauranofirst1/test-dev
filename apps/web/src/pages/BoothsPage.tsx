@@ -11,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Drawer } from '../components/Drawer';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, api, upload as uploadFile } from '../api/client';
 import { ExperienceEditor } from '../components/ExperienceEditor';
@@ -158,7 +158,15 @@ export function BoothsPage() {
   /** 부스 · 조각 보드 · 경품은 서로 다른 일이라 한 화면에 세로로 쌓으면
    *  스크롤이 길어지기만 한다. 다만 **같은 축제의 같은 준비 작업**이라
    *  메뉴로 가르지는 않는다 — 탭이 맞는 자리다. */
-  const [tab, setTab] = useState<'booths' | 'board' | 'prizes'>('booths');
+  const [tabParams, setTabParams] = useSearchParams();
+  const requestedTab = tabParams.get('tab');
+  const tab: 'booths' | 'board' | 'prizes' =
+    requestedTab === 'board' || requestedTab === 'prizes' ? requestedTab : 'booths';
+  const setTab = (next: 'booths' | 'board' | 'prizes') => {
+    const params = new URLSearchParams(tabParams);
+    params.set('tab', next);
+    setTabParams(params, { replace: true });
+  };
 
   const items = booths.data?.items ?? [];
   const active = items.filter((b) => b.is_active);

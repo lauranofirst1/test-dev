@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Drawer } from '../components/Drawer';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, api, upload as uploadFile } from '../api/client';
 import type {
@@ -31,7 +31,13 @@ export function ExhibitsAdminPage() {
   /** 작품 목록과 심사 설정은 여는 시점이 다르다 — 작품은 계속 들어오고,
    *  항목·가중치는 행사 전에 한 번 정하고 만다. 한 화면에 세로로 쌓으면
    *  매번 설정을 지나 스크롤해야 작품이 나온다. */
-  const [tab, setTab] = useState<'works' | 'judging'>('works');
+  const [tabParams, setTabParams] = useSearchParams();
+  const tab: 'works' | 'judging' = tabParams.get('tab') === 'judging' ? 'judging' : 'works';
+  const setTab = (next: 'works' | 'judging') => {
+    const params = new URLSearchParams(tabParams);
+    params.set('tab', next);
+    setTabParams(params, { replace: true });
+  };
   /** 열려 있는 작품. id 로 든다 — 포스터를 올린 뒤 목록이 갱신돼야 한다. */
   const [openId, setOpenId] = useState<number | null>(null);
 

@@ -205,6 +205,16 @@ def test_archive_hides_from_list_but_keeps_row(client, db: Session):
     assert db.get(Festival, fid) is not None  # 행은 남는다
 
 
+def test_delete_permanently_removes_festival(client, db: Session):
+    fid = client.post("/api/festivals", json=PAYLOAD).json()["festival"]["id"]
+
+    assert client.delete(f"/api/festivals/{fid}").status_code == 204
+
+    db.expire_all()
+    assert db.get(Festival, fid) is None
+    assert client.get("/api/festivals").json()["total"] == 0
+
+
 # ── 쿼터 ────────────────────────────────────────────────────────────────────
 
 
